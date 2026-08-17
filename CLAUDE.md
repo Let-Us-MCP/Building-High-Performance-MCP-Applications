@@ -1,8 +1,8 @@
-# Building Awesome MCP Apps — working notes
+# Building High-Performance MCP Applications — working notes
 
 Live progress log for the book. Updated as work lands.
 
-**Target repo:** https://github.com/krimler/Building-Awesome-MCP-Apps (account `krimler`, email `yavan@outlook.com`)
+**Target repo:** https://github.com/Let-Us-MCP/Building-High-Performance-MCP-Applications (account `krimler`, email `yavan@outlook.com`)
 **Spec pinned to:** MCP revision `2026-07-28`
 **Reference material:** `proto/modelcontextprotocol` (git clone of the spec repo; never committed)
 

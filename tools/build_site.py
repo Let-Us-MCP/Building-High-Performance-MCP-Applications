@@ -34,10 +34,10 @@ BOOK = ROOT / "book"
 AUX = BOOK / "build" / "book.aux"
 OUT = ROOT / "docs"
 
-SITE_TITLE = "Building Awesome MCP Apps"
+SITE_TITLE = "Building High-Performance MCP Applications"
 SITE_SUBTITLE = ("What every AI application developer should know "
                  "about the Model Context Protocol")
-REPO = "https://github.com/krimler/Building-Awesome-MCP-Apps"
+REPO = "https://github.com/Let-Us-MCP/Building-High-Performance-MCP-Applications"
 
 # ---------------------------------------------------------------------------
 # Structure
@@ -608,14 +608,14 @@ measurement harness. Both are reproducible with <code>make bench</code>.</p>
 
 <h2>The companion repository</h2>
 <pre class="text"><code>git clone {REPO}
-cd Building-Awesome-MCP-Apps
+cd Building-High-Performance-MCP-Applications
 
 make test      # 134 tests, about two seconds
 make bench     # every measurement printed in the book
 make book      # build the PDF</code></pre>
 
 <p><a href="{REPO}">Source on GitHub</a>
-&middot; <a href="Building-Awesome-MCP-Apps.pdf">Download the PDF</a></p>
+&middot; <a href="Building-High-Performance-MCP-Applications.pdf">Download the PDF</a></p>
 """
     return shell("Contents", nav_html(pages, "index"), body,
                  description=SITE_SUBTITLE)

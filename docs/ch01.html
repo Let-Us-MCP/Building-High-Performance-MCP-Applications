@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>A Primer on Latency, Tokens, and Context &middot; Building Awesome MCP Apps</title>
+<title>A Primer on Latency, Tokens, and Context &middot; Building High-Performance MCP Applications</title>
 <meta name="description" content="A Primer on Latency, Tokens, and Context. What every AI application developer should know about the Model Context Protocol">
 <meta property="og:title" content="A Primer on Latency, Tokens, and Context">
 <meta property="og:description" content="A Primer on Latency, Tokens, and Context. What every AI application developer should know about the Model Context Protocol">
@@ -131,7 +131,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <div class="layout">
 <nav class="toc"><button class="menu-btn" type="button">Contents</button>
 <div class="toc-body">
-<a class="brand" href="index.html">Building Awesome MCP Apps</a>
+<a class="brand" href="index.html">Building High-Performance MCP Applications</a>
 <p class="tagline">What every AI application developer should know about the Model Context Protocol</p>
 <a href="preface.html">Preface</a>
 <a href="how-to-read.html">How to read this book</a>
@@ -547,8 +547,8 @@ iteration 2   model reads the question + the catalogue + both results
 <p>The whole thing has no third-party runtime dependencies, which was a deliberate and slightly obsessive decision. The official SDKs are good and you should use them in production. But they were still shipping the 2025 protocol while this book was being written, and more importantly, a book about the wire that hides the wire behind somebody’s convenience wrapper is not doing its job. So <code>meridian/protocol/</code> is a complete implementation of <code>2026-07-28</code> in about 3,900 lines of standard-library Python. You can read all of it in an evening, and Appendix <a href="appendix-e.html#ch:companion">E</a> suggests an order.</p>
 <section id="try-it-now" class="level3">
 <h3>Try it now</h3>
-<pre class="bash" data-language="bash"><code>git clone https://github.com/krimler/Building-Awesome-MCP-Apps
-cd Building-Awesome-MCP-Apps
+<pre class="bash" data-language="bash"><code>git clone https://github.com/Let-Us-MCP/Building-High-Performance-MCP-Applications
+cd Building-High-Performance-MCP-Applications
 make test     # 208 tests, roughly four seconds
 make bench    # every number in this book</code></pre>
 <p>It also connects to real clients. This is Claude Code driving three Meridian servers at once:</p>

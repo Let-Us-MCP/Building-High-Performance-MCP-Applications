@@ -1,4 +1,4 @@
-# Building Awesome MCP Apps
+# Building High-Performance MCP Applications
 #
 #   make            build figures, the PDF, and the website
 #   make book       the PDF only
@@ -31,7 +31,7 @@ $(PDF): $(wildcard $(BOOKDIR)/*.tex) $(wildcard $(BOOKDIR)/chapters/*.tex) \
 	@mkdir -p $(BUILD)
 	cd $(BOOKDIR) && latexmk -pdf -interaction=nonstopmode -halt-on-error \
 	  -outdir=build book.tex
-	@cp $(PDF) docs/Building-Awesome-MCP-Apps.pdf 2>/dev/null || true
+	@cp $(PDF) docs/Building-High-Performance-MCP-Applications.pdf 2>/dev/null || true
 	@echo "built $(PDF)"
 
 # --------------------------------------------------------------------------
@@ -50,7 +50,7 @@ figures-force:
 
 site: 
 	$(PY) tools/build_site.py
-	@cp $(PDF) docs/Building-Awesome-MCP-Apps.pdf 2>/dev/null || true
+	@cp $(PDF) docs/Building-High-Performance-MCP-Applications.pdf 2>/dev/null || true
 	$(PY) tools/check_site.py
 
 serve: site

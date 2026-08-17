@@ -90,17 +90,19 @@ for y in SERVERS:
 ax.add_patch(plt.Rectangle((0.0, 0.0), 1.0, 0.30, color=INK, alpha=0.93, zorder=30))
 ax.plot([0.09, 0.42], [0.30, 0.30], color=ACCENT_LIGHT, lw=1.6, alpha=0.9, zorder=31)
 
-ax.text(0.09, 0.225, "Building Awesome", color=PAPER, fontsize=33,
-        fontweight="bold", va="center", ha="left", zorder=32,
-        family="DejaVu Serif")
-ax.text(0.09, 0.163, "MCP Apps", color=PAPER, fontsize=33,
-        fontweight="bold", va="center", ha="left", zorder=32,
-        family="DejaVu Serif")
+# Three lines, because the title is long. The deliberate echo of "High
+# Performance Browser Networking" is the point, so the middle line carries it.
+for y, line in ((0.247, "Building"),
+                (0.192, "High-Performance"),
+                (0.137, "MCP Applications")):
+    ax.text(0.09, y, line, color=PAPER, fontsize=27,
+            fontweight="bold", va="center", ha="left", zorder=32,
+            family="DejaVu Serif")
 
-ax.text(0.09, 0.108,
+ax.text(0.09, 0.093,
         "What every AI application developer should know",
         color="#9AA6B2", fontsize=11.5, va="center", ha="left", zorder=32)
-ax.text(0.09, 0.083,
+ax.text(0.09, 0.070,
         "about the Model Context Protocol",
         color="#9AA6B2", fontsize=11.5, va="center", ha="left", zorder=32)
 

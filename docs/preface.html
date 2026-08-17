@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Preface &middot; Building Awesome MCP Apps</title>
+<title>Preface &middot; Building High-Performance MCP Applications</title>
 <meta name="description" content="Preface. What every AI application developer should know about the Model Context Protocol">
 <meta property="og:title" content="Preface">
 <meta property="og:description" content="Preface. What every AI application developer should know about the Model Context Protocol">
@@ -131,7 +131,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <div class="layout">
 <nav class="toc"><button class="menu-btn" type="button">Contents</button>
 <div class="toc-body">
-<a class="brand" href="index.html">Building Awesome MCP Apps</a>
+<a class="brand" href="index.html">Building High-Performance MCP Applications</a>
 <p class="tagline">What every AI application developer should know about the Model Context Protocol</p>
 <a href="preface.html" class="current">Preface</a>
 <a href="how-to-read.html">How to read this book</a>
@@ -182,6 +182,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <h2 class="unnumbered">What this book is</h2>
 <p>This is a protocol book that is secretly a performance book. Or possibly a performance book that is secretly a protocol book. The two turn out to be the same subject, and that is the whole thesis.</p>
 <p>The model here is Ilya Grigorik’s <em>High Performance Browser Networking</em>, which did something I have never stopped admiring. It taught web developers TCP. Not trivia about TCP. Actual TCP: slow start, congestion windows, the three-way handshake, why your first byte arrives when it arrives. And it justified every page of that by cashing it out into things you could do on Monday morning. Nobody had to be persuaded that the protocol layer mattered, because every chapter ended with a measurement that only made sense if you understood the layer underneath.</p>
+<p>The title is a deliberate echo, and I want to be straightforward about that rather than coy. <em>Building High-Performance MCP Applications</em> is <em>High Performance Browser Networking</em> pointed at a different layer, and the structure is borrowed on purpose: motivate with a measurement, define the terms properly before spending them, build the mechanism, then say what it costs. If that book taught you why your first byte arrives when it arrives, this one should teach you why your agent’s first token does.</p>
 <p>I want to do that for the Model Context Protocol. Not because MCP is beautiful, though parts of it are, but because you cannot build a good agentic application without knowing what the protocol does on the wire. The abstractions leak immediately and constantly. A tool description is not free; you pay for it on every single request, forever. An extra round trip is not a small cost; it is usually the largest single item on the bill. A cache hint you ignored is a hundred milliseconds you spent for nothing. None of this is visible from inside a framework, and all of it is obvious once you have watched the bytes.</p>
 <p>So: three parts physics, three parts protocol mechanics, and a lot of numbers.</p>
 </section>

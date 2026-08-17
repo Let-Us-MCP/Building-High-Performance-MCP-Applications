@@ -1,8 +1,8 @@
-# Building Awesome MCP Apps
+# Building High-Performance MCP Applications
 
 ### *What every AI application developer should know about the Model Context Protocol*
 
-**Read it online: [krimler.github.io/Building-Awesome-MCP-Apps](https://krimler.github.io/Building-Awesome-MCP-Apps/)**
+**Read it online: [let-us-mcp.github.io/Building-High-Performance-MCP-Applications](https://let-us-mcp.github.io/Building-High-Performance-MCP-Applications/)**
 
 A protocol book that is secretly a performance book. It teaches the Model Context
 Protocol down to the bytes on the wire, then cashes that understanding out into
@@ -31,8 +31,8 @@ reproducible with `make bench`.
 ## Quick start
 
 ```bash
-git clone https://github.com/krimler/Building-Awesome-MCP-Apps
-cd Building-Awesome-MCP-Apps
+git clone https://github.com/Let-Us-MCP/Building-High-Performance-MCP-Applications
+cd Building-High-Performance-MCP-Applications
 
 make test      # 208 tests, about four seconds
 make bench     # regenerate every measurement in the book
