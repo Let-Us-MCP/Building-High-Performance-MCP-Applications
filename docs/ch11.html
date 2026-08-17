@@ -348,22 +348,41 @@ def add_item(ctx: RequestContext):
 <section id="idempotency-because-retries-are-routine-now" class="level2">
 <h2>Idempotency, because retries are routine now</h2>
 <p>Chapter <a href="ch03.html#ch:transport">3</a> removed stream resumability. A broken response stream means the client re-issues with a new id, and it has no way to know whether the first attempt reached you.</p>
-<p>So retries are normal operation. Which means any tool with side effects needs an idempotency key, and the protocol will not provide one. It is an ordinary argument:</p>
-<pre class="python" data-language="python"><code>{
-    &quot;type&quot;: &quot;object&quot;,
-    &quot;properties&quot;: {
-        &quot;accountId&quot;: {&quot;type&quot;: &quot;string&quot;},
-        &quot;amountUsd&quot;: {&quot;type&quot;: &quot;number&quot;},
-        &quot;idempotencyKey&quot;: {
-            &quot;type&quot;: &quot;string&quot;,
-            &quot;description&quot;: &quot;Client-generated unique id. Repeating a key &quot;
-                           &quot;within 24 hours returns the original result &quot;
-                           &quot;rather than performing the action again.&quot;,
-        },
-    },
-    &quot;required&quot;: [&quot;accountId&quot;, &quot;amountUsd&quot;, &quot;idempotencyKey&quot;],
+<p>So retries are normal operation. Which means any tool with side effects needs an idempotency key, and the protocol will not provide one. It is an ordinary argument, which is exactly why it works everywhere with no negotiation:</p>
+<pre class="python" data-language="python"><code>IDEMPOTENCY_KEY_SCHEMA = {
+    &quot;type&quot;: &quot;string&quot;,
+    &quot;minLength&quot;: 8,
+    &quot;maxLength&quot;: 128,
+    &quot;description&quot;: (
+        &quot;Client-generated unique id for this intent. Repeating a key within &quot;
+        &quot;24 hours returns the original result rather than performing the &quot;
+        &quot;action again. Generate a fresh key per intent; reuse it on retries.&quot;
+    ),
 }</code></pre>
-<p>Server side, the shape is always the same: look up the key, return the stored result if present, otherwise do the work and store it before returning. The description matters as much as the mechanism, because the model has to know to generate a fresh key per intent and reuse it per retry.</p>
+<p>That description is load-bearing. The model is the thing generating the key, and the two sentences tell it the rule that makes the mechanism work: one key per intent, the same key on every retry of that intent. A model that generates a fresh key per attempt has an argument that does nothing.</p>
+<p>The naive server side is a dictionary lookup, and the naive version is wrong in four ways. Meridian’s is worth reading for the four things it does past the lookup.</p>
+<p><strong>The key is not the cache key.</strong> Two different callers may generate the same key, so the record is scoped to the principal. And one caller may reuse a key with different arguments, which is a client bug: returning the first operation’s result would quietly answer a question nobody asked.</p>
+<pre class="python" data-language="python"><code># A replay. Reusing one key for two different requests is a client bug
+# worth surfacing loudly, because the alternative is returning one
+# operation&#39;s result as though it were another&#39;s.
+if record.fingerprint != digest:
+    raise errors.InvalidParams(
+        &quot;idempotencyKey was already used with different arguments&quot;)</code></pre>
+<p><strong>A concurrent duplicate must wait, not proceed.</strong> Two retries can be in flight at once, and a check-then-act on a plain dictionary lets both find it empty. The record is inserted before the work starts, and the second arrival blocks on the first:</p>
+<pre class="python" data-language="python"><code>if not record.done.wait(wait_timeout):
+    raise errors.InternalError(
+        &quot;a request with this idempotencyKey is still in flight&quot;)</code></pre>
+<p><strong>A failure must not be remembered.</strong> Storing an exception as though it were a result makes a transient downstream outage permanent for the life of the key, which is 24 hours of a client that can never succeed:</p>
+<pre class="python" data-language="python"><code>except BaseException:
+    # A failure must not be remembered as a result, or the caller
+    # can never retry it. Drop the record and let the next attempt
+    # start clean.
+    with self._lock:
+        self._records.pop(slot, None)
+    record.done.set()
+    raise</code></pre>
+<p><strong>Records expire.</strong> The retention window is the promise you are making about how long a retry works. Sweep afterwards, or the store grows for the life of the process.</p>
+<p>The same caveat applies here as to the task store in Chapter <a href="ch09.html#ch:tasks">9</a>: in-memory works in a book and fails behind a load balancer, where the retry lands on a replica that has never heard of the key and cheerfully does the work again.</p>
 </section>
 <section id="configuration" class="level2">
 <h2>Configuration</h2>
@@ -453,7 +472,7 @@ StdioServerTransport(endpoint).serve_forever()</code></pre>
 <section id="contract-tests" class="level2">
 <h2>Contract tests</h2>
 <p>A server without contract tests is a server that conforms to the specification today.</p>
-<p>Meridian has 134 tests, and the ones in this section are the ones I would write first for any new server. They assert on the wire, not on convenience objects, because the wire is what another implementation has to interoperate with.</p>
+<p>Meridian has 186 tests, and the ones in this section are the ones I would write first for any new server. They assert on the wire, not on convenience objects, because the wire is what another implementation has to interoperate with.</p>
 <section id="the-envelope" class="level3">
 <h3>The envelope</h3>
 <pre class="python" data-language="python"><code>def test_request_without_protocol_version_is_rejected(self):

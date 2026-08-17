@@ -216,7 +216,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </tr>
 </tbody>
 </table>
-<p>Meridian’s 134 tests run in 2.3 seconds and use no model at all. The eval suite is separate, slower, and gates deploys.</p>
+<p>Meridian’s 186 tests run in 2.3 seconds and use no model at all. The eval suite is separate, slower, and gates deploys.</p>
 <aside class="keyidea">
 <p>If your MCP tests are slow, you are testing the model when you meant to test the protocol. Push everything you can down a layer.</p>
 </aside>
@@ -523,7 +523,7 @@ self.assertIn(&quot;structuredContent&quot;, third[&quot;result&quot;])</code></
 </tr>
 <tr>
 <td style="text-align: left;">Unit and contract</td>
-<td style="text-align: left;">134 tests, no model</td>
+<td style="text-align: left;">186 tests, no model</td>
 <td style="text-align: left;">every commit</td>
 </tr>
 <tr>
@@ -549,7 +549,7 @@ self.assertIn(&quot;structuredContent&quot;, third[&quot;result&quot;])</code></
 </tbody>
 </table>
 <p>That benchmark gate deserves a word. A performance regression in an agent system does not look like a slow function. It looks like one more round trip, or two thousand more tokens per turn, and both are invisible to correctness tests and obvious to a benchmark that runs on every commit.</p>
-<pre class="bash" data-language="bash"><code>make test      # 134 tests, about two seconds
+<pre class="bash" data-language="bash"><code>make test      # 186 tests, about two seconds
 make bench     # regenerates every number in the book
 make lint      # prose rules plus cross-reference integrity</code></pre>
 </section>

@@ -34,6 +34,7 @@ from .errors import (
     ResourceNotFound,
     UnsupportedProtocolVersion,
 )
+from .idempotency import IDEMPOTENCY_KEY_SCHEMA, IdempotencyStore
 from .http import StreamableHttpClient, StreamableHttpServer, validate_x_mcp_header
 from .inproc import InProcessTransport
 from .jsonrpc import (
@@ -92,6 +93,8 @@ __all__ = [
     # transports
     "StdioServerTransport", "StdioClientTransport",
     "StreamableHttpServer", "StreamableHttpClient", "validate_x_mcp_header",
+    "IdempotencyStore",
+    "IDEMPOTENCY_KEY_SCHEMA",
     "InProcessTransport",
     # patterns
     "input_required", "elicit_form", "elicit_url", "read_elicit",

@@ -426,5 +426,112 @@ class TestTaskNotifications(unittest.TestCase):
         self.assertFalse(sink.wants("tasks"))
 
 
+class TestIdempotency(unittest.TestCase):
+    """Retries are ordinary now, so a mutating tool must survive them."""
+
+    def setUp(self):
+        from meridian.protocol.idempotency import IdempotencyStore
+        self.Store = IdempotencyStore
+        self.server = scoped.build_booking_server()
+        self.client = Client(InProcessTransport(self.server, auth={"sub": "u1"}))
+
+    def book(self, key, amount=250_000):
+        return self.client.call_tool("book_facility", {
+            "accountId": "ACC-1000", "amountUsd": amount,
+            "idempotencyKey": key})
+
+    def test_a_retry_returns_the_first_result(self):
+        first = self.book("key-aaaaaaaa")
+        second = self.book("key-aaaaaaaa")
+        self.assertEqual(first["structuredContent"]["reference"],
+                         second["structuredContent"]["reference"])
+
+    def test_a_different_key_books_again(self):
+        """The key is the intent. Two intents are two bookings."""
+        a = self.book("key-aaaaaaaa")["structuredContent"]["reference"]
+        b = self.book("key-bbbbbbbb")["structuredContent"]["reference"]
+        self.assertNotEqual(a, b)
+
+    def test_reusing_a_key_with_different_arguments_is_refused(self):
+        """Returning the first booking's result here would hide a client bug."""
+        self.book("key-aaaaaaaa", amount=250_000)
+        with self.assertRaises(McpError):
+            self.book("key-aaaaaaaa", amount=999_000)
+
+    def test_the_work_runs_once(self):
+        calls = {"n": 0}
+        store = self.Store()
+
+        def work():
+            calls["n"] += 1
+            return {"ok": True}
+
+        for _ in range(5):
+            store.run("k-12345678", "u1", {"a": 1}, work)
+        self.assertEqual(calls["n"], 1)
+
+    def test_a_failure_is_not_remembered(self):
+        """Otherwise a transient error is permanent for the life of the key."""
+        store = self.Store()
+        attempts = {"n": 0}
+
+        def flaky():
+            attempts["n"] += 1
+            if attempts["n"] == 1:
+                raise McpError(-32603, "downstream down")
+            return {"ok": True}
+
+        with self.assertRaises(McpError):
+            store.run("k-12345678", "u1", {"a": 1}, flaky)
+        self.assertEqual(store.run("k-12345678", "u1", {"a": 1}, flaky),
+                         {"ok": True})
+
+    def test_keys_are_scoped_to_the_principal(self):
+        """One user's key must not collide with another's."""
+        store = self.Store()
+        alice = store.run("shared-key-1", "alice", {"a": 1}, lambda: "alice-result")
+        bob = store.run("shared-key-1", "bob", {"a": 1}, lambda: "bob-result")
+        self.assertEqual(alice, "alice-result")
+        self.assertEqual(bob, "bob-result")
+
+    def test_a_concurrent_duplicate_waits_rather_than_repeating_the_work(self):
+        import threading
+        store = self.Store()
+        started, release = threading.Event(), threading.Event()
+        calls = {"n": 0}
+
+        def slow():
+            calls["n"] += 1
+            started.set()
+            release.wait(5)
+            return {"ok": True}
+
+        results = []
+        t = threading.Thread(
+            target=lambda: results.append(
+                store.run("k-12345678", "u1", {"a": 1}, slow)))
+        t.start()
+        started.wait(5)
+
+        second = threading.Thread(
+            target=lambda: results.append(
+                store.run("k-12345678", "u1", {"a": 1}, slow)))
+        second.start()
+        release.set()
+        t.join(5)
+        second.join(5)
+
+        self.assertEqual(calls["n"], 1)
+        self.assertEqual(results, [{"ok": True}, {"ok": True}])
+
+    def test_records_expire(self):
+        now = {"t": 1000.0}
+        store = self.Store(retention_seconds=60, clock=lambda: now["t"])
+        store.run("k-12345678", "u1", {"a": 1}, lambda: "first")
+        now["t"] += 61
+        self.assertEqual(store.run("k-12345678", "u1", {"a": 1}, lambda: "second"),
+                         "second")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

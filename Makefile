@@ -86,6 +86,7 @@ lint:
 	$(PY) tools/lint_prose.py
 	$(PY) tools/check_refs.py
 	$(PY) tools/check_numbers.py
+	$(PY) tools/check_counts.py
 	$(PY) tools/check_listings.py
 	$(PY) tools/check_contrastive.py
 

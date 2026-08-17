@@ -61,6 +61,9 @@ jobs:
       - name: Printed numbers match the committed benchmark run
         run: python3 tools/check_numbers.py
 
+      - name: Counts the book asserts about its own code
+        run: python3 tools/check_counts.py
+
       - name: Every listing traces to real code
         run: python3 tools/check_listings.py
 

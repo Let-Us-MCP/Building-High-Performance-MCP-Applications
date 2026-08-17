@@ -19,7 +19,15 @@ import time
 import uuid
 from dataclasses import dataclass, field
 
-from ..protocol import RequestContext, Server, Tool, text_result, tool_error
+from ..protocol import (
+    IDEMPOTENCY_KEY_SCHEMA,
+    IdempotencyStore,
+    RequestContext,
+    Server,
+    Tool,
+    text_result,
+    tool_error,
+)
 from ..protocol import errors
 from .data import ACCOUNTS
 from .risk import build_server as build_risk_server
@@ -211,3 +219,69 @@ def _owns(ctx: RequestContext, basket: Basket) -> bool:
     if basket.owner is None:
         return True
     return basket.owner == (ctx.auth or {}).get("sub")
+
+
+# ---------------------------------------------------------------------------
+# Idempotency, for a tool that moves money
+# ---------------------------------------------------------------------------
+
+# One booking must not happen twice because a response stream broke. Process-
+# local here; shared across the fleet in anything real, or a retry landing on
+# another replica books the facility a second time.
+BOOKINGS = IdempotencyStore()
+
+
+def build_booking_server() -> Server:
+    """Chapter 11's idempotency example, as running code.
+
+    Deliberately outside the four servers the benchmark wires, so that adding
+    a worked example does not move the catalogue-cost numbers the book quotes.
+    """
+    server = Server("meridian-booking", "1.0.0", instructions=(
+        "Books approved facilities. Every mutating call takes an "
+        "idempotencyKey; generate one per intent and reuse it on retries."
+    ))
+
+    @server.tool(
+        "book_facility",
+        "Book an approved facility onto the account. This moves money and "
+        "cannot be undone, so it requires an idempotencyKey.",
+        {
+            "type": "object",
+            "properties": {
+                "accountId": {"type": "string", "pattern": "^ACC-[0-9]{4}$"},
+                "amountUsd": {"type": "number", "minimum": 1000},
+                "idempotencyKey": IDEMPOTENCY_KEY_SCHEMA,
+            },
+            "required": ["accountId", "amountUsd", "idempotencyKey"],
+        },
+        annotations={"readOnlyHint": False, "destructiveHint": False,
+                     "idempotentHint": True},
+    )
+    def book_facility(ctx: RequestContext):
+        account = ACCOUNTS.get(ctx.arguments["accountId"])
+        if account is None:
+            return tool_error(f"No account {ctx.arguments['accountId']}.")
+
+        # Everything the key covers goes into the fingerprint, and the key
+        # itself does not. Reusing a key with different arguments is a client
+        # bug, and returning the first booking's result would hide it.
+        booked = {k: v for k, v in ctx.arguments.items() if k != "idempotencyKey"}
+
+        def work():
+            reference = "FAC-" + str(abs(hash(
+                (account.account_id, ctx.arguments["idempotencyKey"]))) % 10**8)
+            return {
+                "accountId": account.account_id,
+                "amountUsd": ctx.arguments["amountUsd"],
+                "reference": reference,
+                "status": "booked",
+            }
+
+        payload = BOOKINGS.run(ctx.arguments["idempotencyKey"],
+                               (ctx.auth or {}).get("sub"), booked, work)
+        return text_result(
+            f"Booked {payload['reference']} for {account.account_id}.",
+            structured=payload)
+
+    return server
