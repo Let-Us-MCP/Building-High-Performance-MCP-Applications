@@ -1,0 +1,384 @@
+{
+  "machine": {
+    "python": "3.14.6",
+    "platform": "macOS-15.7.3-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "processor": "arm"
+  },
+  "scenarios": {
+    "transport": {
+      "results": [
+        {
+          "label": "in-process",
+          "n": 400,
+          "meanMs": 0.031,
+          "p50Ms": 0.03,
+          "p95Ms": 0.034,
+          "p99Ms": 0.037,
+          "minMs": 0.03,
+          "maxMs": 0.041
+        },
+        {
+          "label": "stdio",
+          "n": 300,
+          "meanMs": 0.06,
+          "p50Ms": 0.059,
+          "p95Ms": 0.065,
+          "p99Ms": 0.092,
+          "minMs": 0.056,
+          "maxMs": 0.12
+        },
+        {
+          "label": "streamable http",
+          "n": 300,
+          "meanMs": 0.161,
+          "p50Ms": 0.155,
+          "p95Ms": 0.203,
+          "p99Ms": 0.258,
+          "minMs": 0.132,
+          "maxMs": 0.306
+        }
+      ],
+      "derived": {
+        "stdioOverheadMs": 0.029,
+        "httpOverheadMs": 0.13,
+        "serverExecutionMs": 0.031
+      },
+      "elapsedS": 0.63
+    },
+    "coldstart": {
+      "results": [
+        {
+          "label": "cold start to first response",
+          "n": 12,
+          "meanMs": 44.647,
+          "p50Ms": 44.599,
+          "p95Ms": 45.075,
+          "p99Ms": 45.2,
+          "minMs": 44.262,
+          "maxMs": 45.2
+        },
+        {
+          "label": "warm call",
+          "n": 200,
+          "meanMs": 0.06,
+          "p50Ms": 0.06,
+          "p95Ms": 0.063,
+          "p99Ms": 0.068,
+          "minMs": 0.052,
+          "maxMs": 0.078
+        }
+      ],
+      "derived": {
+        "coldStartMs": 44.6,
+        "warmCallMs": 0.06,
+        "callsToAmortiseColdStart": 746
+      },
+      "elapsedS": 0.73
+    },
+    "catalogue": {
+      "results": [
+        {
+          "label": "slim catalogue",
+          "tools": 10,
+          "tokens": 1246
+        },
+        {
+          "label": "fat catalogue",
+          "tools": 38,
+          "tokens": 5617
+        }
+      ],
+      "derived": {
+        "extraTokensPerTurn": 4371,
+        "extraTokensPerTask": 8738,
+        "extraUsdPer1000Tasks": 26.214,
+        "catalogueRatio": 4.51
+      },
+      "elapsedS": 0.0
+    },
+    "cache": {
+      "results": [
+        {
+          "label": "tools/list uncached",
+          "n": 300,
+          "meanMs": 0.035,
+          "p50Ms": 0.035,
+          "p95Ms": 0.036,
+          "p99Ms": 0.041,
+          "minMs": 0.034,
+          "maxMs": 0.051
+        },
+        {
+          "label": "tools/list cached",
+          "n": 300,
+          "meanMs": 0.002,
+          "p50Ms": 0.002,
+          "p95Ms": 0.002,
+          "p99Ms": 0.002,
+          "minMs": 0.002,
+          "maxMs": 0.002
+        }
+      ],
+      "derived": {
+        "readsIssued": 600,
+        "uncachedMs": 12.4,
+        "cachedMs": 1.8,
+        "requestsAvoided": 577,
+        "hitRatePct": 96.2,
+        "speedup": 6.82
+      },
+      "elapsedS": 0.03
+    },
+    "fanout": {
+      "results": [
+        {
+          "perCallLatencyMs": 2.0,
+          "serialMs": 18.63,
+          "parallelMs": 7.03,
+          "savedMs": 11.6,
+          "speedup": 2.65
+        },
+        {
+          "perCallLatencyMs": 10.0,
+          "serialMs": 85.8,
+          "parallelMs": 30.5,
+          "savedMs": 55.29,
+          "speedup": 2.81
+        },
+        {
+          "perCallLatencyMs": 40.0,
+          "serialMs": 286.67,
+          "parallelMs": 98.09,
+          "savedMs": 188.58,
+          "speedup": 2.92
+        }
+      ],
+      "derived": {
+        "calls": 3
+      },
+      "elapsedS": 12.11
+    },
+    "mrtr": {
+      "results": [
+        {
+          "label": "no elicitation",
+          "n": 40,
+          "meanMs": 33.983,
+          "p50Ms": 34.963,
+          "p95Ms": 36.812,
+          "p99Ms": 36.84,
+          "minMs": 25.971,
+          "maxMs": 36.84
+        },
+        {
+          "label": "with elicitation",
+          "n": 40,
+          "meanMs": 68.465,
+          "p50Ms": 69.089,
+          "p95Ms": 73.45,
+          "p99Ms": 73.67,
+          "minMs": 60.246,
+          "maxMs": 73.67
+        }
+      ],
+      "derived": {
+        "extraTransportMs": 34.48,
+        "requestsPerCallWithMrtr": 2.0,
+        "requestsPerCallWithout": 1.0,
+        "estimatedTotalCostMs": 374.5
+      },
+      "elapsedS": 4.61
+    },
+    "loop": {
+      "results": [
+        {
+          "label": "serial fan-out",
+          "stoppedBecause": "completed",
+          "iterations": 3,
+          "roundTrips": 3,
+          "wallMs": 1366.4,
+          "modelMs": 1312.5,
+          "transportMs": 53.9,
+          "modelSharePct": 96.1,
+          "totalTokens": 4009,
+          "costUsd": 0.012495,
+          "steps": [
+            {
+              "i": 0,
+              "modelMs": 430.0,
+              "transportMs": 18.01,
+              "consentMs": 0.0,
+              "totalMs": 448.01,
+              "toolCalls": 1,
+              "parallel": false,
+              "inputTokens": 1252,
+              "outputTokens": 12,
+              "costUsd": 0.003936
+            },
+            {
+              "i": 1,
+              "modelMs": 482.5,
+              "transportMs": 35.91,
+              "consentMs": 0.0,
+              "totalMs": 518.41,
+              "toolCalls": 2,
+              "parallel": false,
+              "inputTokens": 1318,
+              "outputTokens": 19,
+              "costUsd": 0.004239
+            },
+            {
+              "i": 2,
+              "modelMs": 400.0,
+              "transportMs": 0.0,
+              "consentMs": 0.0,
+              "totalMs": 400.0,
+              "toolCalls": 0,
+              "parallel": false,
+              "inputTokens": 1400,
+              "outputTokens": 8,
+              "costUsd": 0.00432
+            }
+          ]
+        },
+        {
+          "label": "parallel fan-out",
+          "stoppedBecause": "completed",
+          "iterations": 3,
+          "roundTrips": 3,
+          "wallMs": 1349.5,
+          "modelMs": 1312.5,
+          "transportMs": 37.0,
+          "modelSharePct": 97.3,
+          "totalTokens": 4009,
+          "costUsd": 0.012495,
+          "steps": [
+            {
+              "i": 0,
+              "modelMs": 430.0,
+              "transportMs": 17.49,
+              "consentMs": 0.0,
+              "totalMs": 447.49,
+              "toolCalls": 1,
+              "parallel": false,
+              "inputTokens": 1252,
+              "outputTokens": 12,
+              "costUsd": 0.003936
+            },
+            {
+              "i": 1,
+              "modelMs": 482.5,
+              "transportMs": 19.53,
+              "consentMs": 0.0,
+              "totalMs": 502.03,
+              "toolCalls": 2,
+              "parallel": true,
+              "inputTokens": 1318,
+              "outputTokens": 19,
+              "costUsd": 0.004239
+            },
+            {
+              "i": 2,
+              "modelMs": 400.0,
+              "transportMs": 0.0,
+              "consentMs": 0.0,
+              "totalMs": 400.0,
+              "toolCalls": 0,
+              "parallel": false,
+              "inputTokens": 1400,
+              "outputTokens": 8,
+              "costUsd": 0.00432
+            }
+          ]
+        }
+      ],
+      "derived": {
+        "modelSharePct": 96.1,
+        "transportSharePct": 3.9,
+        "savedMs": 16.9
+      },
+      "elapsedS": 0.1
+    },
+    "optimization": {
+      "results": [
+        {
+          "label": "baseline",
+          "note": "38-tool catalogue, one call per turn",
+          "iterations": 4,
+          "roundTrips": 3,
+          "wallMs": 1752.9,
+          "transportMs": 100.4,
+          "tokens": 22846,
+          "costUsd": 0.069006
+        },
+        {
+          "label": "trim the catalogue",
+          "note": "38 tools -> 10",
+          "iterations": 4,
+          "roundTrips": 3,
+          "wallMs": 1751.1,
+          "transportMs": 98.6,
+          "tokens": 5370,
+          "costUsd": 0.016578
+        },
+        {
+          "label": "batch into one turn",
+          "note": "4 iterations -> 2",
+          "iterations": 2,
+          "roundTrips": 3,
+          "wallMs": 1067.2,
+          "transportMs": 87.2,
+          "tokens": 2692,
+          "costUsd": 0.008556
+        },
+        {
+          "label": "fan out in parallel",
+          "note": "sum of latencies -> max",
+          "iterations": 2,
+          "roundTrips": 3,
+          "wallMs": 1014.0,
+          "transportMs": 34.0,
+          "tokens": 2692,
+          "costUsd": 0.008556
+        }
+      ],
+      "derived": {
+        "setupTasks": 20,
+        "setupRequestsNaive": 164,
+        "setupRequestsWithTtl": 8,
+        "setupMsNaive": 274.12,
+        "setupMsWithTtl": 2.52,
+        "wallReductionPct": 42.2,
+        "tokenReductionPct": 88.2,
+        "costReductionPct": 87.6,
+        "iterationsBefore": 4,
+        "iterationsAfter": 2
+      },
+      "elapsedS": 5.88
+    },
+    "serialisation": {
+      "results": [
+        {
+          "label": "payload only",
+          "bytes": 123
+        },
+        {
+          "label": "with _meta envelope",
+          "bytes": 320
+        },
+        {
+          "label": "tools/list catalogue",
+          "bytes": 5856,
+          "tokens": 1464
+        }
+      ],
+      "derived": {
+        "envelopeBytes": 197,
+        "envelopeOverheadPct": 160.2,
+        "envelopeTokens": 47
+      },
+      "elapsedS": 0.0
+    }
+  }
+}

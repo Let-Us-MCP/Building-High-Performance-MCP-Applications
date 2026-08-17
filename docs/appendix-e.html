@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E. The Meridian Companion Repository &middot; Building Awesome MCP Apps</title>
+<meta name="description" content="E. The Meridian Companion Repository. What every AI application developer should know about the Model Context Protocol">
+<meta property="og:title" content="E. The Meridian Companion Repository">
+<meta property="og:description" content="E. The Meridian Companion Repository. What every AI application developer should know about the Model Context Protocol">
+<style>
+:root{
+  --ink:#15181D; --muted:#5B6472; --rule:#D8DDE4; --wash:#F5F6F8;
+  --paper:#FFFFFF; --accent:#0F5C8C; --accent-soft:#E7F0F6;
+  --warm:#B4531A; --warm-soft:#FBF0E7; --good:#2C6E49; --good-soft:#E9F2EC;
+  --danger:#9B2226; --danger-soft:#FAECEC;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#E7EAEE; --muted:#98A2B0; --rule:#2C333D; --wash:#171B21;
+    --paper:#0F1216; --accent:#63AEDC; --accent-soft:#14232E;
+    --warm:#E08B4F; --warm-soft:#2A1D13; --good:#6FBF8E; --good-soft:#13221A;
+    --danger:#E4796F; --danger-soft:#291516;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--serif);font-size:18px;line-height:1.62;
+  -webkit-text-size-adjust:100%}
+.layout{display:grid;grid-template-columns:288px minmax(0,1fr);
+  max-width:1280px;margin:0 auto;gap:0}
+nav.toc{position:sticky;top:0;height:100vh;overflow-y:auto;padding:26px 20px 60px;
+  border-right:1px solid var(--rule);font-family:var(--sans);font-size:14px}
+nav.toc .brand{display:block;font-weight:700;font-size:16px;color:var(--ink);
+  text-decoration:none;line-height:1.3;margin-bottom:4px}
+nav.toc .tagline{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.45}
+nav.toc .part{margin:18px 0 6px;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);font-weight:700}
+nav.toc a{display:block;padding:4px 8px;margin-left:-8px;border-radius:5px;
+  color:var(--muted);text-decoration:none}
+nav.toc a:hover{background:var(--wash);color:var(--ink)}
+nav.toc a.current{background:var(--accent-soft);color:var(--accent);font-weight:600}
+main{padding:44px 52px 120px;min-width:0;max-width:78ch}
+h1,h2,h3,h4{font-family:var(--sans);line-height:1.25;color:var(--ink)}
+h1{font-size:2.05em;margin:0 0 .55em;letter-spacing:-.015em}
+h2{font-size:1.42em;margin:2em 0 .5em;padding-top:.35em}
+h3{font-size:1.14em;margin:1.7em 0 .4em}
+h4{font-size:1em;margin:1.4em 0 .3em;color:var(--muted)}
+p{margin:0 0 1.05em}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.855em;background:var(--wash);
+  padding:.12em .36em;border-radius:4px;word-break:break-word}
+pre{background:var(--wash);border-left:3px solid var(--rule);
+  border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+  font-size:13.5px;line-height:1.5;margin:1.3em 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+pre.json,pre.http{background:var(--accent-soft);border-left-color:var(--accent)}
+aside.box{border-left:3px solid var(--rule);background:var(--wash);
+  padding:14px 18px;margin:1.5em 0;border-radius:0 6px 6px 0;font-size:.955em}
+aside.box .box-title{font-family:var(--sans);font-weight:700;font-size:12px;
+  letter-spacing:.07em;text-transform:uppercase;margin:0 0 .55em}
+aside.box.legacy{border-left-color:var(--warm);background:var(--warm-soft)}
+aside.box.legacy .box-title{color:var(--warm)}
+aside.box.measured{border-left-color:var(--good);background:var(--good-soft)}
+aside.box.measured .box-title{color:var(--good)}
+aside.box.threat{border-left-color:var(--danger);background:var(--danger-soft)}
+aside.box.threat .box-title{color:var(--danger)}
+aside.box.note .box-title{color:var(--muted)}
+aside.keyidea{border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:14px 18px;margin:1.6em 0;border-radius:0 6px 6px 0;
+  font-family:var(--sans);font-style:italic;font-size:.97em}
+aside.keyidea p:last-child,aside.box p:last-child{margin-bottom:0}
+aside.keyidea pre,aside.keyidea code,aside.keyidea table{font-style:normal}
+aside.epigraph{border:0;margin:0 0 2em;padding:0 0 0 clamp(0px,7%,52px);
+  color:var(--muted);font-size:.97em}
+aside.epigraph p{margin:0 0 .3em}
+main figure{margin:2em 0;text-align:center}
+main figure img{max-width:100%;height:auto;border-radius:6px}
+@media (prefers-color-scheme: dark){
+  main figure img{background:#fff;padding:10px;border-radius:8px}
+}
+figcaption{font-family:var(--sans);font-size:13.5px;color:var(--muted);
+  margin-top:.7em;text-align:left;line-height:1.5}
+.table-wrap{overflow-x:auto;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:14.5px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+thead th{border-bottom:2px solid var(--rule);font-weight:700}
+caption{caption-side:bottom;font-size:13.5px;color:var(--muted);
+  text-align:left;padding-top:.7em;line-height:1.5}
+ul,ol{padding-left:1.35em;margin:0 0 1.05em}
+li{margin-bottom:.32em}
+dl{margin:0 0 1.05em}
+dt{font-weight:700;font-family:var(--sans);font-size:.95em;margin-top:.75em}
+dd{margin:.15em 0 0 1.35em}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
+.pager{display:flex;justify-content:space-between;gap:16px;margin-top:4em;
+  padding-top:1.5em;border-top:1px solid var(--rule);font-family:var(--sans);
+  font-size:14px}
+.pager a{text-decoration:none;max-width:46%}
+.pager .dir{display:block;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted)}
+.masthead{border-bottom:1px solid var(--rule);padding-bottom:1.8em;margin-bottom:2.2em}
+.masthead .kicker{font-family:var(--sans);font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);font-weight:700}
+.lede{font-size:1.12em;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:14px;margin:1.8em 0}
+.card{border:1px solid var(--rule);border-radius:9px;padding:15px 17px;
+  font-family:var(--sans);font-size:14px}
+.card h3{margin:0 0 .35em;font-size:15px}
+.card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+.menu-btn{display:none}
+@media (max-width:940px){
+  body{font-size:17px}
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:0;
+    border-bottom:1px solid var(--rule);max-height:none}
+  nav.toc.collapsed .toc-body{display:none}
+  main{padding:28px 20px 90px}
+  .menu-btn{display:inline-block;font-family:var(--sans);font-size:13px;
+    background:var(--wash);border:1px solid var(--rule);color:var(--ink);
+    border-radius:6px;padding:6px 11px;cursor:pointer;margin-bottom:10px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc"><button class="menu-btn" type="button">Contents</button>
+<div class="toc-body">
+<a class="brand" href="index.html">Building Awesome MCP Apps</a>
+<p class="tagline">What every AI application developer should know about the Model Context Protocol</p>
+<a href="preface.html">Preface</a>
+<a href="how-to-read.html">How to read this book</a>
+<div class="part">Part I. Protocol Fundamentals</div>
+<a href="ch01.html">A Primer on Latency, Tokens, and Context</a>
+<a href="ch02.html">The MCP Architectural Model</a>
+<a href="ch03.html">Building Blocks of the Transport</a>
+<a href="ch04.html">Authorization on the Wire</a>
+<div class="part">Part II. The Primitives</div>
+<a href="ch05.html">Tools: The Execution Layer</a>
+<a href="ch06.html">Resources: The Context Layer</a>
+<a href="ch07.html">Prompts: Workflow Blueprints</a>
+<a href="ch08.html">Multi Round-Trip Requests</a>
+<a href="ch09.html">Extensions and Tasks</a>
+<a href="ch10.html">MCP Apps: Interactive Interfaces</a>
+<div class="part">Part III. Building MCP Applications</div>
+<a href="ch11.html">Building Servers</a>
+<a href="ch12.html">Building Hosts and Clients</a>
+<a href="ch13.html">The Agent Loop, State, and Memory</a>
+<a href="ch14.html">Multi-Agent Topologies</a>
+<div class="part">Part IV. Performance Engineering</div>
+<a href="ch15.html">Testing and Debugging</a>
+<a href="ch16.html">Measuring MCP Applications</a>
+<a href="ch17.html">Optimizing for Latency, Tokens, and Cost</a>
+<a href="ch18.html">Deployment and Operations</a>
+<div class="part">Part V. Security and Trust</div>
+<a href="ch19.html">Threat Modeling Agentic Applications</a>
+<a href="ch20.html">Access Control, Audit, and MCP in the Enterprise</a>
+<div class="part">Back matter</div>
+<a href="epilogue.html">Epilogue: The Evolving Protocol</a>
+<div class="part">Appendices</div>
+<a href="appendix-a.html">A. Method and Message Reference</a>
+<a href="appendix-b.html">B. Transport Decision Matrix</a>
+<a href="appendix-c.html">C. Performance Checklist</a>
+<a href="appendix-d.html">D. Security Hardening Checklist</a>
+<a href="appendix-e.html" class="current">E. The Meridian Companion Repository</a>
+<a href="about.html">About the author</a>
+</div></nav>
+<main>
+<section id="ch:companion" class="level1">
+<h1>The Meridian Companion Repository</h1>
+<p>Every listing in this book was extracted from here. Every number was produced here. It has no third-party runtime dependencies, which means you can clone it and run everything with a stock Python.</p>
+<div class="center">
+<p><code>https://github.com/krimler/Building-Awesome-MCP-Apps</code></p>
+</div>
+<section id="two-minutes" class="level2">
+<h2>Two minutes</h2>
+<pre class="bash" data-language="bash"><code>git clone https://github.com/krimler/Building-Awesome-MCP-Apps
+cd Building-Awesome-MCP-Apps
+
+make test      # 134 tests, about two seconds
+make bench     # every measurement printed in this book
+make lint      # prose rules and cross-reference integrity
+make book      # build the PDF</code></pre>
+<p>Python 3.11 or later. Nothing else for the code. The book build additionally wants a TeX distribution and, for the figures, matplotlib.</p>
+</section>
+<section id="layout" class="level2">
+<h2>Layout</h2>
+<pre class="text" data-language="text"><code>meridian/
+  protocol/          3,892 lines. A complete 2026-07-28 implementation
+    jsonrpc.py         framing, resultType, SSE parsing
+    meta.py            the _meta envelope, capabilities, RequestContext
+    errors.py          the error-code allocation
+    server.py          routing, primitives, schema validation
+    client.py          the MRTR loop, caching, era detection
+    stdio.py           subprocess transport, both sides
+    http.py            Streamable HTTP, header validation, SSE
+    inproc.py          the control group for benchmarks
+    mrtr.py            input_required, elicitation, StateSealer
+    subscriptions.py   subscriptions/listen
+    cache.py           ttlMs and cacheScope
+    tasks.py           the Tasks extension
+    legacy.py          the dual-era bridge
+  servers/           the four Meridian servers, plus fixtures
+  host/              Host, AgentLoop, StubModel
+  bench/             the measurement harness and results.json
+  tests/             134 tests across four files
+  serve.py           the launcher</code></pre>
+</section>
+<section id="running-the-servers" class="level2">
+<h2>Running the servers</h2>
+<pre class="bash" data-language="bash"><code>python3 -m meridian.serve risk                 # dual-era stdio
+python3 -m meridian.serve risk --modern-only   # refuses the handshake
+python3 -m meridian.serve risk --http 8931     # Streamable HTTP
+python3 -m meridian.serve all --http 8931      # all four, sequential ports</code></pre>
+<p>Dual-era is the default, because that is what connects to the clients shipping in 2026 (<a href="ch02.html#ch:architecture">Chapter 2</a>).</p>
+<section id="the-scenario-flags" class="level3">
+<h3>The scenario flags</h3>
+<table id="tab:meridian-flags">
+<caption>Each flag reproduces a specific measurement or attack from the book.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Flag</strong></td>
+<td style="text-align: left;"><strong>What it does</strong></td>
+<td style="text-align: left;"><strong>Chapter</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>--fat</code></td>
+<td style="text-align: left;">Serves the 38-tool REST mirror</td>
+<td style="text-align: left;"><a href="ch05.html#ch:tools">5</a></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>--poisoned</code></td>
+<td style="text-align: left;">Plants the injection in the guidance corpus</td>
+<td style="text-align: left;"><a href="ch19.html#ch:threats">19</a></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>--modern-only</code></td>
+<td style="text-align: left;">Refuses <code>initialize</code></td>
+<td style="text-align: left;"><a href="ch02.html#ch:architecture">2</a></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="with-claude-code" class="level2">
+<h2>With Claude Code</h2>
+<p>The repository ships a <code>.mcp.json</code>:</p>
+<pre class="bash" data-language="bash"><code>claude -p &quot;Assess ACC-1042 for risk, screen it for fraud, and get the 1Y
+and 5Y reference rates.&quot; --mcp-config .mcp.json</code></pre>
+<pre class="text" data-language="text"><code>RISK:  55.4 elevated
+FRAUD: watch 1
+CURVE: 1Y=3.96 5Y=3.68</code></pre>
+<p>Those values come straight from the fixtures. The full transcript, and what is <em>not</em> verifiable this way and why, is in <code>meridian/VERIFICATION.md</code>.</p>
+</section>
+<section id="the-four-servers" class="level2">
+<h2>The four servers</h2>
+<table id="tab:meridian-servers">
+<caption>Each server exists to carry specific arguments in the book.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Server</strong></td>
+<td style="text-align: left;"><strong>Demonstrates</strong></td>
+<td style="text-align: left;"><strong>Chapters</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>risk</code></td>
+<td style="text-align: left;">Task-shaped tools, MRTR approvals, Tasks, an App template, TTL’d resources</td>
+<td style="text-align: left;"><a href="ch05.html#ch:tools">5</a>, <a href="ch08.html#ch:mrtr">8</a>, <a href="ch09.html#ch:tasks">9</a>, <a href="ch10.html#ch:apps">10</a></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>compliance</code></td>
+<td style="text-align: left;">Human-in-the-loop, audit logging, the injection payload</td>
+<td style="text-align: left;"><a href="ch08.html#ch:mrtr">8</a>, <a href="ch19.html#ch:threats">19</a>, <a href="ch20.html#ch:access-control">20</a></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>fraud</code></td>
+<td style="text-align: left;">Fast read-only calls, runtime <code>listChanged</code></td>
+<td style="text-align: left;"><a href="ch05.html#ch:tools">5</a>, <a href="ch06.html#ch:resources">6</a></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>marketdata</code></td>
+<td style="text-align: left;"><code>cacheScope: public</code>, pagination</td>
+<td style="text-align: left;"><a href="ch06.html#ch:resources">6</a></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="the-benchmark-harness" class="level2">
+<h2>The benchmark harness</h2>
+<pre class="bash" data-language="bash"><code>make bench                                       # everything
+python3 -m meridian.bench.run cache fanout       # named scenarios
+python3 -m meridian.bench.run --list             # scenario names
+python3 -m meridian.bench.run --json out.json    # machine-readable</code></pre>
+<table id="tab:bench-reference">
+<caption>The canonical run lives in <code>meridian/bench/results.json</code>, and every figure in this book that plots data reads it.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Scenario</strong></td>
+<td style="text-align: left;"><strong>Answers</strong></td>
+<td style="text-align: left;"><strong>Chapter</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>transport</code></td>
+<td style="text-align: left;">What does each transport cost, minus execution?</td>
+<td style="text-align: left;"><a href="ch03.html#ch:transport">3</a></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>coldstart</code></td>
+<td style="text-align: left;">Spawn per call, or warm pool?</td>
+<td style="text-align: left;"><a href="ch03.html#ch:transport">3</a></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>catalogue</code></td>
+<td style="text-align: left;">What does catalogue bloat cost per turn?</td>
+<td style="text-align: left;"><a href="ch05.html#ch:tools">5</a></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>cache</code></td>
+<td style="text-align: left;">What is honouring <code>ttlMs</code> worth?</td>
+<td style="text-align: left;"><a href="ch06.html#ch:resources">6</a></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>fanout</code></td>
+<td style="text-align: left;">What does parallelism buy, at what latency?</td>
+<td style="text-align: left;"><a href="ch05.html#ch:tools">5</a></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>mrtr</code></td>
+<td style="text-align: left;">What does one elicitation really cost?</td>
+<td style="text-align: left;"><a href="ch08.html#ch:mrtr">8</a></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>loop</code></td>
+<td style="text-align: left;">Where does a whole task’s time go?</td>
+<td style="text-align: left;"><a href="ch16.html#ch:measuring">16</a></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>optimization</code></td>
+<td style="text-align: left;">The full pass, attributed change by change</td>
+<td style="text-align: left;"><a href="ch17.html#ch:optimizing">17</a></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>serialisation</code></td>
+<td style="text-align: left;">How much of a request is envelope?</td>
+<td style="text-align: left;"><a href="ch02.html#ch:architecture">2</a></td>
+</tr>
+</tbody>
+</table>
+<section id="what-is-simulated" class="level3">
+<h3>What is simulated</h3>
+<p>Stated here as well as at every point of use.</p>
+<p>Model inference latency and token pricing are <strong>modelled</strong>, from the constants in <code>meridian/host/model.py</code>:</p>
+<pre class="python" data-language="python"><code>TTFT_MEAN_MS         = 340.0
+TTFT_STDEV_MS        = 90.0
+MS_PER_OUTPUT_TOKEN  = 7.5
+CHARS_PER_TOKEN      = 4.0
+INPUT_USD_PER_MTOK   = 3.00
+OUTPUT_USD_PER_MTOK  = 15.00</code></pre>
+<p>Everything else is <strong>measured</strong>: serialisation, transport, server execution, cache behaviour, round-trip counts, catalogue token cost, process cold starts.</p>
+<p>Transport figures are loopback figures, deliberately, so protocol overhead is visible without a network in the way. Chapter <a href="ch16.html#ch:measuring">16</a> explains how to add your own.</p>
+<p>Edit those constants, rerun <code>make bench</code>, and every number in the book moves with you.</p>
+</section>
+</section>
+<section id="the-test-suite" class="level2">
+<h2>The test suite</h2>
+<table id="tab:test-files">
+<caption>134 tests, roughly two seconds, no model required.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>File</strong></td>
+<td style="text-align: right;"><strong>Tests</strong></td>
+<td style="text-align: left;"><strong>Covers</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>test_protocol.py</code></td>
+<td style="text-align: right;">57</td>
+<td style="text-align: left;">Envelope, <code>resultType</code>, error codes, caching, pagination, schemas, MRTR, <code>StateSealer</code>, <code>x-mcp-header</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>test_transports.py</code></td>
+<td style="text-align: right;">28</td>
+<td style="text-align: left;">Header encoding and validation, removed endpoints, SSE progress, subscriptions, real stdio subprocesses</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>test_integration.py</code></td>
+<td style="text-align: right;">33</td>
+<td style="text-align: left;">Host routing, consent, MRTR end to end, Tasks, caching, loop budgets</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>test_legacy.py</code></td>
+<td style="text-align: right;">16</td>
+<td style="text-align: left;">Era selection, legacy translation, bridge transparency</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="reading-it-in-an-evening" class="level2">
+<h2>Reading it in an evening</h2>
+<p>If you want to understand the protocol from the code, this order works:</p>
+<ol>
+<li><p><code>protocol/meta.py</code>   The envelope. This is the 2026 change.</p></li>
+<li><p><code>protocol/jsonrpc.py</code>   Framing, and <code>resultType</code>.</p></li>
+<li><p><code>protocol/server.py</code>   <code>handle()</code> is the whole server.</p></li>
+<li><p><code>protocol/client.py</code>   <code>call()</code> is the MRTR loop.</p></li>
+<li><p><code>protocol/mrtr.py</code>   <code>StateSealer</code>, and why each binding exists.</p></li>
+<li><p><code>protocol/http.py</code>   Header validation. The security-critical part.</p></li>
+<li><p><code>servers/risk.py</code>   All of it, applied.</p></li>
+<li><p><code>tests/test_protocol.py</code>   The specification, as assertions.</p></li>
+</ol>
+<p>Roughly two thousand lines for the first six, and they contain every mechanism this book describes.</p>
+</section>
+<section id="using-it-as-a-starting-point" class="level2">
+<h2>Using it as a starting point</h2>
+<p>You may. It is a teaching implementation, so before production:</p>
+<ul>
+<li><p>Replace <code>TaskStore</code> with something shared and durable (<a href="ch09.html#ch:tasks">Chapter 9</a>).</p></li>
+<li><p>Load the <code>StateSealer</code> secret from a secret manager, fleet-wide (<a href="ch08.html#ch:mrtr">Chapter 8</a>).</p></li>
+<li><p>Add real authorization; the authenticator hook is a callable and does nothing by default (<a href="ch04.html#ch:authorization">Chapter 4</a>).</p></li>
+<li><p>Replace <code>ThreadingHTTPServer</code> with a production server.</p></li>
+<li><p>Add real observability. The built-in counters are deliberately crude (<a href="ch16.html#ch:measuring">Chapter 16</a>).</p></li>
+<li><p>Consider an SDK instead. By the time you read this they will have caught up with <code>2026-07-28</code>, and this exists to show you the wire rather than to compete with them.</p></li>
+</ul>
+</section>
+<section id="reproducing-the-book-itself" class="level2">
+<h2>Reproducing the book itself</h2>
+<pre class="bash" data-language="bash"><code>make figures    # regenerate every figure to PDF and SVG
+make book       # the PDF
+make site       # the website
+make lint       # prose rules and reference integrity
+make verify     # tests, benchmarks, and the Claude Code runs</code></pre>
+<p>The figure pipeline builds each figure to <em>both</em> PDF and SVG from one source, so the printed book and the website cannot drift. The website is generated from the same LaTeX as the PDF, so there is exactly one copy of every sentence.</p>
+</section>
+<section id="contributing" class="level2">
+<h2>Contributing</h2>
+<p>Corrections welcome, and reproduction failures most of all. The entire premise is that the numbers are checkable, so a number you cannot reproduce is the most useful bug report available. Include your platform, your Python version, and the output of <code>make bench</code>.</p>
+</section>
+</section>
+<div class="pager">
+<a href="appendix-d.html"><span class="dir">Previous</span>D. Security Hardening Checklist</a>
+<a href="about.html" style="text-align:right"><span class="dir">Next</span>About the author</a>
+</div>
+</main>
+</div>
+<script>
+(function(){
+  var nav = document.querySelector('nav.toc');
+  var btn = document.querySelector('.menu-btn');
+  if(btn && nav){
+    if(window.innerWidth <= 940) nav.classList.add('collapsed');
+    btn.addEventListener('click', function(){ nav.classList.toggle('collapsed'); });
+  }
+  // Wrap tables so wide ones scroll rather than overflowing the page.
+  document.querySelectorAll('main table').forEach(function(t){
+    if(t.parentElement.classList.contains('table-wrap')) return;
+    var w = document.createElement('div');
+    w.className = 'table-wrap';
+    t.parentNode.insertBefore(w, t);
+    w.appendChild(t);
+  });
+})();
+</script>
+</body>
+</html>

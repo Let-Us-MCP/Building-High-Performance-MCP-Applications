@@ -1,0 +1,169 @@
+\chapter{Transport Decision Matrix}
+\label{ch:transport-matrix}
+
+Two transports, one decision, and a migration path from the deprecated third.
+Chapter~\ref{ch:transport} has the mechanics; this is the summary you consult
+while drawing an architecture diagram.
+
+\section{Choose}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}XX@{}}
+\toprule
+\thead{Use stdio when} & \thead{Use Streamable HTTP when} \\
+\midrule
+The server runs on the user's machine
+  & More than one user, or more than one host \\
+It touches the local filesystem or local processes
+  & It needs to scale horizontally \\
+The user's own credentials are the right credentials
+  & It needs OAuth \\
+You want process isolation for free
+  & You want a gateway cache, routing, or rate limits \\
+You are developing, and ports are a nuisance
+  & It is deployed anywhere at all \\
+\bottomrule
+\end{tabularx}
+\caption{The short version: local means stdio, shared means HTTP.}
+\label{tab:transport-choose}
+\end{table}
+
+\section{Compare}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXX@{}}
+\toprule
+& \thead{stdio} & \thead{Streamable HTTP} \\
+\midrule
+Framing & Newline-delimited JSON & One POST per message \\
+Channels & One shared pipe & One stream per request \\
+Startup & 44.6\,ms per spawn & Connection setup, then reused \\
+Overhead vs in-process & +0.029\,ms & +0.130\,ms \\
+Cancellation & \texttt{notifications/cancelled} & Close the stream \\
+Progress & On the shared pipe & On that request's SSE stream \\
+Subscriptions & Shared pipe, demux by \texttt{subscriptionId} & Its own SSE stream \\
+Auth & Environment variables & OAuth 2.1 (\chapref{authorization}) \\
+Isolation & Process boundary & Process, container, or host \\
+Scaling & One process per host & Round robin, any replica \\
+Logging & \texttt{stderr} & Your normal stack \\
+\bottomrule
+\end{tabularx}
+\caption{Measurements from \texttt{make bench} on the machine in
+Chapter~\ref{ch:primer}.}
+\label{tab:transport-compare}
+\end{table}
+
+\keyidea{Transport overhead is fractions of a millisecond. A cross-region network
+hop is 68\,ms. Choose your transport on operational grounds and spend your
+optimisation effort on round-trip counts.}
+
+\section{stdio checklist}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item[$\square$] \texttt{stdout} carries MCP messages and nothing else. Check
+your dependencies, not just your code.
+\item[$\square$] No embedded newlines in any message.
+\item[$\square$] Logs go to \texttt{stderr}.
+\item[$\square$] The process exits promptly on EOF from \texttt{stdin}.
+\item[$\square$] Nothing expensive at module scope, or every spawn pays for it.
+\item[$\square$] No per-connection state. The pipe is not a conversation.
+\item[$\square$] A warm pool, not spawn-per-call. Cold start is roughly 750 warm
+calls.
+\item[$\square$] Handle \texttt{notifications/cancelled} and send nothing further
+for that request.
+\item[$\square$] Explicit environment allowlist, not the parent's whole
+environment.
+\end{itemize}
+
+\section{Streamable HTTP checklist}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item[$\square$] One endpoint, POST only. \texttt{405} for GET and DELETE.
+\item[$\square$] \texttt{Origin} validated; \texttt{403} when it is not allowed.
+\item[$\square$] Bind to \texttt{127.0.0.1} when running locally.
+\item[$\square$] \texttt{MCP-Protocol-Version}, \texttt{Mcp-Method}, and
+\texttt{Mcp-Name} required and validated against the body.
+\item[$\square$] Header mismatch returns \texttt{400} with \texttt{-32020}.
+\item[$\square$] Base64 sentinel encoding for values that need it, including
+values that merely resemble the sentinel.
+\item[$\square$] \texttt{X-Accel-Buffering: no} on every SSE response.
+\item[$\square$] Keep-alive comments on long-lived streams.
+\item[$\square$] Notifications get \texttt{202} with no body.
+\item[$\square$] Unknown method gets \texttt{404} with a JSON-RPC error body.
+\item[$\square$] \texttt{Mcp-Session-Id} ignored, never minted, never echoed.
+\item[$\square$] \texttt{Last-Event-ID} ignored. Streams are not resumable.
+\item[$\square$] Mutating tools accept an idempotency key, because retries are
+routine.
+\item[$\square$] Connection reuse on the client side.
+\end{itemize}
+
+\section{Migrating from HTTP+SSE}
+
+Deprecated since \texttt{2025-03-26} and formally Deprecated under the lifecycle
+policy. Its earliest removal is sooner than the other deprecated features.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}XX@{}}
+\toprule
+\thead{HTTP+SSE (2024-11-05)} & \thead{Streamable HTTP (2026-07-28)} \\
+\midrule
+GET opens a stream, first event carries the POST endpoint & One endpoint, known in advance \\
+Two endpoints & One \\
+Server pushes on the standing stream & \texttt{subscriptions/listen}, opted into \\
+Server sends its own requests & MRTR \texttt{input\_required} \\
+Session implied by the stream & No session \\
+\bottomrule
+\end{tabularx}
+\caption{See Chapter~\ref{ch:transport}.}
+\label{tab:sse-migration}
+\end{table}
+
+Client-side detection, when you must support both:
+
+\begin{enumerate}[leftmargin=1.6em, itemsep=3pt]
+\item POST a modern request with \texttt{Accept} listing JSON and SSE.
+\item On success, the server is modern.
+\item On \texttt{400}, \texttt{404}, or \texttt{405}, \textbf{read the body}. A
+recognised modern JSON-RPC error means modern; fix the request rather than
+falling back.
+\item Otherwise GET the URL and look for an \texttt{endpoint} event. That is
+HTTP+SSE.
+\end{enumerate}
+
+Step three is the one people skip, and skipping it makes every modern server
+with a version mismatch look like a legacy server.
+
+\section{Era detection, both transports}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXX@{}}
+\toprule
+\thead{Transport} & \thead{Probe} & \thead{Fall back when} \\
+\midrule
+stdio & \texttt{server/discover} & Any error that is not a recognised modern one, or a timeout \\
+HTTP & Any modern request & \texttt{4xx} whose body is not a recognised modern error \\
+\bottomrule
+\end{tabularx}
+\caption{Cache the verdict per server process or origin. Re-probe only if the
+cached assumption fails. See Chapter~\ref{ch:architecture}.}
+\label{tab:era-detection}
+\end{table}
+
+\section{Custom transports}
+
+Nothing in the stdio binding depends on standard streams except the process
+lifecycle. One newline-delimited JSON-RPC message per line over a reliable
+bidirectional byte stream works unchanged over Unix domain sockets, TCP, or
+anything similar.
+
+If you build one, reuse the framing and the message rules. Only the
+subprocess-specific parts (launch, \texttt{stderr}, shutdown by closing the
+stream, restart) need channel-specific equivalents.

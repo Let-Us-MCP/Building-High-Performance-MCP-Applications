@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Epilogue: The Evolving Protocol &middot; Building Awesome MCP Apps</title>
+<meta name="description" content="Epilogue: The Evolving Protocol. What every AI application developer should know about the Model Context Protocol">
+<meta property="og:title" content="Epilogue: The Evolving Protocol">
+<meta property="og:description" content="Epilogue: The Evolving Protocol. What every AI application developer should know about the Model Context Protocol">
+<style>
+:root{
+  --ink:#15181D; --muted:#5B6472; --rule:#D8DDE4; --wash:#F5F6F8;
+  --paper:#FFFFFF; --accent:#0F5C8C; --accent-soft:#E7F0F6;
+  --warm:#B4531A; --warm-soft:#FBF0E7; --good:#2C6E49; --good-soft:#E9F2EC;
+  --danger:#9B2226; --danger-soft:#FAECEC;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#E7EAEE; --muted:#98A2B0; --rule:#2C333D; --wash:#171B21;
+    --paper:#0F1216; --accent:#63AEDC; --accent-soft:#14232E;
+    --warm:#E08B4F; --warm-soft:#2A1D13; --good:#6FBF8E; --good-soft:#13221A;
+    --danger:#E4796F; --danger-soft:#291516;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--serif);font-size:18px;line-height:1.62;
+  -webkit-text-size-adjust:100%}
+.layout{display:grid;grid-template-columns:288px minmax(0,1fr);
+  max-width:1280px;margin:0 auto;gap:0}
+nav.toc{position:sticky;top:0;height:100vh;overflow-y:auto;padding:26px 20px 60px;
+  border-right:1px solid var(--rule);font-family:var(--sans);font-size:14px}
+nav.toc .brand{display:block;font-weight:700;font-size:16px;color:var(--ink);
+  text-decoration:none;line-height:1.3;margin-bottom:4px}
+nav.toc .tagline{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.45}
+nav.toc .part{margin:18px 0 6px;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);font-weight:700}
+nav.toc a{display:block;padding:4px 8px;margin-left:-8px;border-radius:5px;
+  color:var(--muted);text-decoration:none}
+nav.toc a:hover{background:var(--wash);color:var(--ink)}
+nav.toc a.current{background:var(--accent-soft);color:var(--accent);font-weight:600}
+main{padding:44px 52px 120px;min-width:0;max-width:78ch}
+h1,h2,h3,h4{font-family:var(--sans);line-height:1.25;color:var(--ink)}
+h1{font-size:2.05em;margin:0 0 .55em;letter-spacing:-.015em}
+h2{font-size:1.42em;margin:2em 0 .5em;padding-top:.35em}
+h3{font-size:1.14em;margin:1.7em 0 .4em}
+h4{font-size:1em;margin:1.4em 0 .3em;color:var(--muted)}
+p{margin:0 0 1.05em}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.855em;background:var(--wash);
+  padding:.12em .36em;border-radius:4px;word-break:break-word}
+pre{background:var(--wash);border-left:3px solid var(--rule);
+  border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+  font-size:13.5px;line-height:1.5;margin:1.3em 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+pre.json,pre.http{background:var(--accent-soft);border-left-color:var(--accent)}
+aside.box{border-left:3px solid var(--rule);background:var(--wash);
+  padding:14px 18px;margin:1.5em 0;border-radius:0 6px 6px 0;font-size:.955em}
+aside.box .box-title{font-family:var(--sans);font-weight:700;font-size:12px;
+  letter-spacing:.07em;text-transform:uppercase;margin:0 0 .55em}
+aside.box.legacy{border-left-color:var(--warm);background:var(--warm-soft)}
+aside.box.legacy .box-title{color:var(--warm)}
+aside.box.measured{border-left-color:var(--good);background:var(--good-soft)}
+aside.box.measured .box-title{color:var(--good)}
+aside.box.threat{border-left-color:var(--danger);background:var(--danger-soft)}
+aside.box.threat .box-title{color:var(--danger)}
+aside.box.note .box-title{color:var(--muted)}
+aside.keyidea{border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:14px 18px;margin:1.6em 0;border-radius:0 6px 6px 0;
+  font-family:var(--sans);font-style:italic;font-size:.97em}
+aside.keyidea p:last-child,aside.box p:last-child{margin-bottom:0}
+aside.keyidea pre,aside.keyidea code,aside.keyidea table{font-style:normal}
+aside.epigraph{border:0;margin:0 0 2em;padding:0 0 0 clamp(0px,7%,52px);
+  color:var(--muted);font-size:.97em}
+aside.epigraph p{margin:0 0 .3em}
+main figure{margin:2em 0;text-align:center}
+main figure img{max-width:100%;height:auto;border-radius:6px}
+@media (prefers-color-scheme: dark){
+  main figure img{background:#fff;padding:10px;border-radius:8px}
+}
+figcaption{font-family:var(--sans);font-size:13.5px;color:var(--muted);
+  margin-top:.7em;text-align:left;line-height:1.5}
+.table-wrap{overflow-x:auto;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:14.5px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+thead th{border-bottom:2px solid var(--rule);font-weight:700}
+caption{caption-side:bottom;font-size:13.5px;color:var(--muted);
+  text-align:left;padding-top:.7em;line-height:1.5}
+ul,ol{padding-left:1.35em;margin:0 0 1.05em}
+li{margin-bottom:.32em}
+dl{margin:0 0 1.05em}
+dt{font-weight:700;font-family:var(--sans);font-size:.95em;margin-top:.75em}
+dd{margin:.15em 0 0 1.35em}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
+.pager{display:flex;justify-content:space-between;gap:16px;margin-top:4em;
+  padding-top:1.5em;border-top:1px solid var(--rule);font-family:var(--sans);
+  font-size:14px}
+.pager a{text-decoration:none;max-width:46%}
+.pager .dir{display:block;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted)}
+.masthead{border-bottom:1px solid var(--rule);padding-bottom:1.8em;margin-bottom:2.2em}
+.masthead .kicker{font-family:var(--sans);font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);font-weight:700}
+.lede{font-size:1.12em;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:14px;margin:1.8em 0}
+.card{border:1px solid var(--rule);border-radius:9px;padding:15px 17px;
+  font-family:var(--sans);font-size:14px}
+.card h3{margin:0 0 .35em;font-size:15px}
+.card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+.menu-btn{display:none}
+@media (max-width:940px){
+  body{font-size:17px}
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:0;
+    border-bottom:1px solid var(--rule);max-height:none}
+  nav.toc.collapsed .toc-body{display:none}
+  main{padding:28px 20px 90px}
+  .menu-btn{display:inline-block;font-family:var(--sans);font-size:13px;
+    background:var(--wash);border:1px solid var(--rule);color:var(--ink);
+    border-radius:6px;padding:6px 11px;cursor:pointer;margin-bottom:10px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc"><button class="menu-btn" type="button">Contents</button>
+<div class="toc-body">
+<a class="brand" href="index.html">Building Awesome MCP Apps</a>
+<p class="tagline">What every AI application developer should know about the Model Context Protocol</p>
+<a href="preface.html">Preface</a>
+<a href="how-to-read.html">How to read this book</a>
+<div class="part">Part I. Protocol Fundamentals</div>
+<a href="ch01.html">A Primer on Latency, Tokens, and Context</a>
+<a href="ch02.html">The MCP Architectural Model</a>
+<a href="ch03.html">Building Blocks of the Transport</a>
+<a href="ch04.html">Authorization on the Wire</a>
+<div class="part">Part II. The Primitives</div>
+<a href="ch05.html">Tools: The Execution Layer</a>
+<a href="ch06.html">Resources: The Context Layer</a>
+<a href="ch07.html">Prompts: Workflow Blueprints</a>
+<a href="ch08.html">Multi Round-Trip Requests</a>
+<a href="ch09.html">Extensions and Tasks</a>
+<a href="ch10.html">MCP Apps: Interactive Interfaces</a>
+<div class="part">Part III. Building MCP Applications</div>
+<a href="ch11.html">Building Servers</a>
+<a href="ch12.html">Building Hosts and Clients</a>
+<a href="ch13.html">The Agent Loop, State, and Memory</a>
+<a href="ch14.html">Multi-Agent Topologies</a>
+<div class="part">Part IV. Performance Engineering</div>
+<a href="ch15.html">Testing and Debugging</a>
+<a href="ch16.html">Measuring MCP Applications</a>
+<a href="ch17.html">Optimizing for Latency, Tokens, and Cost</a>
+<a href="ch18.html">Deployment and Operations</a>
+<div class="part">Part V. Security and Trust</div>
+<a href="ch19.html">Threat Modeling Agentic Applications</a>
+<a href="ch20.html">Access Control, Audit, and MCP in the Enterprise</a>
+<div class="part">Back matter</div>
+<a href="epilogue.html" class="current">Epilogue: The Evolving Protocol</a>
+<div class="part">Appendices</div>
+<a href="appendix-a.html">A. Method and Message Reference</a>
+<a href="appendix-b.html">B. Transport Decision Matrix</a>
+<a href="appendix-c.html">C. Performance Checklist</a>
+<a href="appendix-d.html">D. Security Hardening Checklist</a>
+<a href="appendix-e.html">E. The Meridian Companion Repository</a>
+<a href="about.html">About the author</a>
+</div></nav>
+<main>
+<section id="ch:epilogue" class="level1 unnumbered">
+<h1 class="unnumbered">Epilogue: The Evolving Protocol</h1>
+<aside class="epigraph">
+<p><em>“I’ll be right here.”</em></p>
+<p>E.T., <em>E.T. the Extra-Terrestrial</em> (1982)</p>
+</aside>
+<p>Every book about a moving target ends the same way, with the author waving vaguely at the future and hoping. I want to do slightly better than that, so this epilogue is about which parts of what you just read will survive, and why I think so.</p>
+<section id="reading-the-trajectory" class="level2">
+<h2>Reading the trajectory</h2>
+<p>Three bets are visible in <code>2026-07-28</code>, and they tell you where this is going.</p>
+<section id="statelessness-as-an-infrastructure-bet" class="level3">
+<h3>Statelessness as an infrastructure bet</h3>
+<p>Deleting the handshake was not a tidying-up exercise. It was a decision that MCP servers should be ordinary web services, deployable on the same infrastructure, scaled by the same tools, operated by the same people.</p>
+<p>Everything followed from it. No sessions, no resumability, no server-initiated requests, MRTR instead of callbacks, explicit handles instead of implicit state. Five deletions and one addition, all serving one idea.</p>
+<p>That bet is unlikely to be reversed. It is far easier to add a stateful extension later than to remove statefulness from a core, and the whole point of the extensions framework is that the stateful things now have somewhere to live.</p>
+</section>
+<section id="extensions-as-the-growth-mechanism" class="level3">
+<h3>Extensions as the growth mechanism</h3>
+<p>The core got <em>smaller</em> in this revision. Tasks moved out. That almost never happens to a protocol, and it happened because there was somewhere for it to go.</p>
+<p>Tasks and Apps are the template. Both are official, both negotiated through capabilities, both versioned on their own schedule. Expect more: durable subscriptions, richer authorization, capability attestation. Expect them as extensions, and expect the core to stay boring.</p>
+<p>Boring is the correct ambition for a core protocol. HTTP/1.1’s core is boring. TCP’s core is boring. The interesting parts live above.</p>
+</section>
+<section id="the-registry-as-distribution" class="level3">
+<h3>The registry as distribution</h3>
+<p>The least developed of the three and probably the most consequential.</p>
+<p>A protocol without distribution is a specification. A protocol with a registry is an ecosystem, and the shape of that registry decides who gets to participate and on what terms. Chapter <a href="ch20.html#ch:access-control">20</a> treated it as a governance artefact, which is what it is: the place where ownership, data classification, and approval records live.</p>
+<p>Watch this one. The technical decisions are mostly made; the distribution decisions are not.</p>
+</section>
+</section>
+<section id="cross-protocol-convergence" class="level2">
+<h2>Cross-protocol convergence</h2>
+<p>The question people ask most: how does this fit with everything else?</p>
+<table id="tab:convergence">
+<caption>Three different problems. The middle column is the whole distinction.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Protocol</strong></td>
+<td style="text-align: left;"><strong>Connects</strong></td>
+<td style="text-align: left;"><strong>Boundary</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">MCP</td>
+<td style="text-align: left;">An agent to capabilities</td>
+<td style="text-align: left;">Tools, resources, prompts</td>
+</tr>
+<tr>
+<td style="text-align: left;">A2A</td>
+<td style="text-align: left;">An agent to other agents</td>
+<td style="text-align: left;">Task delegation between peers</td>
+</tr>
+<tr>
+<td style="text-align: left;">Provider function calling</td>
+<td style="text-align: left;">One model to one app’s functions</td>
+<td style="text-align: left;">In-process</td>
+</tr>
+</tbody>
+</table>
+<p>My read is that these settle rather than merge. MCP owns the agent-to-capability boundary. A2A owns agent-to-agent. Provider-native function calling owns the single-application case where no boundary exists and none is needed.</p>
+<p>Chapter <a href="ch14.html#ch:multi-agent">14</a> showed the composition: an agent that consumes MCP tools on one side and exposes MCP tools on the other is an ordinary thing, and it needed no extension. Whether the peer-to-peer case ends up as A2A or as MCP with another extension is, honestly, a coin flip, and it will be decided by which ecosystem gets there first rather than by which design is better.</p>
+</section>
+<section id="open-problems" class="level2">
+<h2>Open problems</h2>
+<p>Three things nobody has solved, in rough order of how much they will hurt.</p>
+<section id="prompt-injection" class="level3">
+<h3>Prompt injection</h3>
+<p>Chapter <a href="ch19.html#ch:threats">19</a> was pessimistic on purpose. There is no known reliable defence, and everything in that chapter was about limiting blast radius rather than preventing the attack.</p>
+<p>The honest position is that this is a property of the technology rather than a bug in anyone’s implementation. Language models process instructions and data in one stream. Until that changes, or until something at the model layer provides a real boundary, the trifecta framing is the best tool available, and it is a mitigation strategy rather than a solution.</p>
+<p>If someone solves this properly, a good third of Chapter <a href="ch19.html#ch:threats">19</a> becomes obsolete and I will be delighted.</p>
+</section>
+<section id="standardised-evals" class="level3">
+<h3>Standardised evals</h3>
+<p>Chapter <a href="ch16.html#ch:measuring">16</a> argued that evals are the only way to know whether your system works. It could not tell you which evals, because there is no shared suite, no shared scoring, and no way to compare your tool-selection accuracy with anybody else’s.</p>
+<p>Which means every team builds their own, and none of the results transfer. The protocol has a conformance-test story for wire behaviour. It has nothing for behavioural quality, and that gap is where most of the actual difficulty lives.</p>
+</section>
+<section id="capability-attestation" class="level3">
+<h3>Capability attestation</h3>
+<p>Chapter <a href="ch02.html#ch:architecture">2</a> was blunt: <code>serverInfo</code> is self-reported and unverified, and you must not make security decisions with it.</p>
+<p>That is correct and unsatisfying. In a registry-mediated ecosystem you want to know that this server is the one that was reviewed, that its tool definitions are the ones that were approved, and that the App template is the one that was scanned. Chapter <a href="ch19.html#ch:threats">19</a> suggested pinning hashes, which works and is entirely local. A shared attestation mechanism would be better, and does not exist.</p>
+</section>
+</section>
+<section id="what-will-still-be-true" class="level2">
+<h2>What will still be true</h2>
+<p>The part I am willing to be held to.</p>
+<p><strong>Round trips will still be the enemy.</strong> It is arithmetic, not fashion. Every extra loop iteration costs a full model turn, and that ratio holds whatever the wire format is.</p>
+<p><strong>Context will still be the scarce resource.</strong> Windows get bigger; so do catalogues, and so do the results people stuff into them. The discipline in Chapter <a href="ch13.html#ch:agent-loop">13</a> outlives any particular limit.</p>
+<p><strong>The host will still be the trust boundary.</strong> It follows from the architecture rather than from a version. Any design where the model is the security boundary is broken, and will still be broken when the models are better.</p>
+<p><strong>Measurement will still beat intuition.</strong> Chapter <a href="ch17.html#ch:optimizing">17</a> included a section on what did not work, and that section is the most durable thing in the chapter. The specific numbers will age. The habit will not.</p>
+<p><strong>Deprecated features will still be deprecated.</strong> Twelve months minimum, published in a registry. That promise is the reason a book can be pinned to a revision at all.</p>
+</section>
+<section id="what-will-change" class="level2">
+<h2>What will change</h2>
+<p><strong>The version number</strong>, obviously.</p>
+<p><strong>The extensions.</strong> Tasks and Apps are the first two. There will be more, and some of what is an extension today will be core tomorrow.</p>
+<p><strong>The SDKs.</strong> By the time you read this they will have caught up with <code>2026-07-28</code>, and <code>meridian/protocol/</code> will be a teaching artefact rather than a practical necessity. Use the SDKs. Read the wire when something is confusing, which will be often enough to justify having learned it.</p>
+<p><strong>The dual-era bridge.</strong> Chapter <a href="ch02.html#ch:architecture">2</a> built one because Claude Code and most 2026 clients still open with <code>initialize</code>. That is transitional. When your clients have moved, delete <code>meridian/protocol/legacy.py</code> and enjoy the diff. Building it as a separate wrapper rather than as patches to the core was entirely so that day is a deletion rather than an archaeology project.</p>
+</section>
+<section id="to-the-reader" class="level2">
+<h2>To the reader</h2>
+<p>Here is what I would actually like you to take away.</p>
+<p>The specific numbers in this book are from my machine on a particular Tuesday. They will not match yours, and that is fine, because the point was never the numbers. The point was that the numbers exist, that they came from a program you can run, and that when somebody claims an optimisation you can ask them for theirs.</p>
+<p>The protocol will move. It has told you how it intends to move, which is more than most protocols manage, and the mechanisms underneath the syntax are stable: statelessness, capability negotiation, the trust boundary, the interception points, the three budgets.</p>
+<p>Build on those. Pin your version, read the changelog, keep the deprecation registry open in a tab, and measure everything you can afford to measure.</p>
+<p>And when your agent takes forty seconds to do something that ought to take four, you will now know exactly where to look. That was the whole idea.</p>
+<p><em>Krimler</em><br />
+<em>July 2026</em></p>
+</section>
+</section>
+<div class="pager">
+<a href="ch20.html"><span class="dir">Previous</span>Access Control, Audit, and MCP in the Enterprise</a>
+<a href="appendix-a.html" style="text-align:right"><span class="dir">Next</span>A. Method and Message Reference</a>
+</div>
+</main>
+</div>
+<script>
+(function(){
+  var nav = document.querySelector('nav.toc');
+  var btn = document.querySelector('.menu-btn');
+  if(btn && nav){
+    if(window.innerWidth <= 940) nav.classList.add('collapsed');
+    btn.addEventListener('click', function(){ nav.classList.toggle('collapsed'); });
+  }
+  // Wrap tables so wide ones scroll rather than overflowing the page.
+  document.querySelectorAll('main table').forEach(function(t){
+    if(t.parentElement.classList.contains('table-wrap')) return;
+    var w = document.createElement('div');
+    w.className = 'table-wrap';
+    t.parentNode.insertBefore(w, t);
+    w.appendChild(t);
+  });
+})();
+</script>
+</body>
+</html>

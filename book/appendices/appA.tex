@@ -1,0 +1,298 @@
+\chapter{Method and Message Reference}
+\label{ch:method-reference}
+
+Everything in protocol revision \texttt{2026-07-28}, on a few pages. Where a
+chapter covers something properly, it is cross-referenced rather than repeated.
+
+\section{Methods}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXccl@{}}
+\toprule
+\thead{Method} & \thead{Purpose} & \thead{Page} & \thead{Cache} & \thead{MRTR} \\
+\midrule
+\texttt{server/discover}          & Versions, capabilities, identity & no  & yes & no \\
+\texttt{tools/list}               & Available tools                  & yes & yes & no \\
+\texttt{tools/call}               & Invoke a tool                    & no  & no  & \textbf{yes} \\
+\texttt{resources/list}           & Available resources              & yes & yes & no \\
+\texttt{resources/templates/list} & Parameterised resource families  & yes & yes & no \\
+\texttt{resources/read}           & Resource contents                & no  & yes & \textbf{yes} \\
+\texttt{prompts/list}             & Available prompts                & yes & yes & no \\
+\texttt{prompts/get}              & Render a prompt                  & no  & no  & \textbf{yes} \\
+\texttt{subscriptions/listen}     & Long-lived notification stream   & no  & no  & no \\
+\bottomrule
+\end{tabularx}
+\caption{The complete core surface. ``Page'' means the operation supports
+cursor pagination; ``Cache'' means results carry \texttt{ttlMs} and
+\texttt{cacheScope}; ``MRTR'' means the server may answer
+\texttt{input\_required}.}
+\label{tab:all-methods}
+\end{table}
+
+Nine methods. That is the entire core protocol.
+
+\subsection{Tasks extension (\texttt{io.modelcontextprotocol/tasks})}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+\texttt{tasks/get}    & Poll a task. Honour \texttt{pollIntervalMs} \\
+\texttt{tasks/update} & Supply \texttt{inputResponses}. Must be idempotent \\
+\texttt{tasks/cancel} & Request cancellation. Cooperative, not binding \\
+\bottomrule
+\end{tabularx}
+\caption{See Chapter~\ref{ch:tasks}.}
+\label{tab:tasks-methods}
+\end{table}
+
+\subsection{Removed in this revision}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+\thead{Gone} & \thead{Replacement} \\
+\midrule
+\texttt{initialize} & Per-request \texttt{\_meta} \\
+\texttt{notifications/initialized} & nothing \\
+\texttt{ping} & nothing; use a transport-level check \\
+\texttt{logging/setLevel} & \texttt{io.modelcontextprotocol/logLevel} per request \\
+\texttt{resources/subscribe} & \texttt{subscriptions/listen} \\
+\texttt{resources/unsubscribe} & close the stream \\
+\texttt{notifications/roots/list\_changed} & nothing; Roots is deprecated \\
+\texttt{tasks/result}, \texttt{tasks/list} & \texttt{tasks/get} \\
+\bottomrule
+\end{tabularx}
+\caption{Sending any of these to a strictly modern server yields
+\texttt{-32601}.}
+\label{tab:removed-methods}
+\end{table}
+
+\section{Notifications}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXl@{}}
+\toprule
+\thead{Notification} & \thead{Meaning} & \thead{Channel} \\
+\midrule
+\texttt{notifications/progress} & Progress on a request & that request's stream \\
+\texttt{notifications/message} & A log line & that request's stream \\
+\texttt{notifications/subscriptions/acknowledged} & Subscription accepted & listen stream \\
+\texttt{notifications/tools/list\_changed} & Catalogue changed & listen stream \\
+\texttt{notifications/prompts/list\_changed} & Prompts changed & listen stream \\
+\texttt{notifications/resources/list\_changed} & Resource list changed & listen stream \\
+\texttt{notifications/resources/updated} & One resource changed & listen stream \\
+\texttt{notifications/cancelled} & Client cancels a request & stdio only \\
+\bottomrule
+\end{tabularx}
+\caption{The channel column is the part people get wrong. Request-scoped
+notifications never appear on the listen stream.}
+\label{tab:notifications}
+\end{table}
+
+\section{The \texttt{\_meta} envelope}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXcl@{}}
+\toprule
+\thead{Key} & \thead{Purpose} & \thead{Req.} & \thead{On} \\
+\midrule
+\texttt{io.modelcontextprotocol/protocolVersion} & Version for this request & \textbf{yes} & requests \\
+\texttt{io.modelcontextprotocol/clientCapabilities} & What the client supports & \textbf{yes} & requests \\
+\texttt{io.modelcontextprotocol/clientInfo} & Client name and version & no & requests \\
+\texttt{io.modelcontextprotocol/logLevel} & Minimum log level & no & requests \\
+\texttt{io.modelcontextprotocol/serverInfo} & Server name and version & no & results \\
+\texttt{io.modelcontextprotocol/subscriptionId} & Correlates a notification & yes & listen stream \\
+\texttt{progressToken} & Opts into progress & no & requests \\
+\texttt{traceparent} & W3C trace context & no & requests \\
+\texttt{tracestate} & W3C trace state & no & requests \\
+\texttt{baggage} & W3C baggage & no & requests \\
+\bottomrule
+\end{tabularx}
+\caption{See Chapter~\ref{ch:architecture}. The last three are an explicit
+exception to the reverse-DNS prefix rule.}
+\label{tab:meta-reference}
+\end{table}
+
+\subsection{Key naming}
+
+Prefixes are reverse DNS with a trailing slash. A prefix whose \emph{second}
+label is \texttt{modelcontextprotocol} or \texttt{mcp} is reserved.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\texttt{io.modelcontextprotocol/x} & reserved \\
+\texttt{dev.mcp/x} & reserved \\
+\texttt{org.modelcontextprotocol.api/x} & reserved \\
+\texttt{com.mcp.tools/x} & reserved \\
+\texttt{com.example.mcp/x} & \textbf{yours} \\
+\texttt{com.meridian/promptVersion} & \textbf{yours} \\
+\bottomrule
+\end{tabular}
+\caption{The second label is what counts.}
+\label{tab:meta-prefixes}
+\end{table}
+
+\section{Error codes}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}llXl@{}}
+\toprule
+\thead{Code} & \thead{Name} & \thead{Meaning} & \thead{HTTP} \\
+\midrule
+\texttt{-32700} & ParseError & Invalid JSON & 400 \\
+\texttt{-32600} & InvalidRequest & Bad JSON-RPC framing & 400 \\
+\texttt{-32601} & MethodNotFound & Unknown method & 404 \\
+\texttt{-32602} & InvalidParams & Bad params, unknown tool, missing resource & 400 \\
+\texttt{-32603} & InternalError & Server fault & 500 \\
+\texttt{-32020} & HeaderMismatch & Header disagrees with body & 400 \\
+\texttt{-32021} & MissingRequiredClientCapability & Client lacks a capability & 400 \\
+\texttt{-32022} & UnsupportedProtocolVersion & Version not supported & 400 \\
+\bottomrule
+\end{tabularx}
+\caption{See Chapter~\ref{ch:transport}.}
+\label{tab:error-reference}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+\thead{Range} & \thead{Rule} \\
+\midrule
+\texttt{-32000} to \texttt{-32019} & Legacy. Do not allocate; assume no meaning \\
+\texttt{-32020} to \texttt{-32099} & \textbf{Reserved for the specification} \\
+Outside \texttt{-32768..-32000} & Yours \\
+\bottomrule
+\end{tabularx}
+\caption{Retired and never reissued: \texttt{-32002} (resource not found,
+now \texttt{-32602}) and \texttt{-32042} (URL elicitation required).}
+\label{tab:error-ranges-ref}
+\end{table}
+
+\section{Result types}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}llX@{}}
+\toprule
+\thead{\texttt{resultType}} & \thead{Source} & \thead{Client does} \\
+\midrule
+\texttt{"complete"} & core & Reads the result \\
+\texttt{"input\_required"} & core & Gathers input, retries with a new id \\
+\texttt{"task"} & Tasks ext. & Polls \texttt{tasks/get} \\
+absent & pre-2026 servers & Treats as \texttt{"complete"} \\
+unrecognised & anywhere & \textbf{Treats as invalid} \\
+\bottomrule
+\end{tabularx}
+\caption{See Chapter~\ref{ch:architecture}.}
+\label{tab:result-types}
+\end{table}
+
+\section{HTTP headers}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXl@{}}
+\toprule
+\thead{Header} & \thead{Mirrors} & \thead{Required} \\
+\midrule
+\texttt{MCP-Protocol-Version} & \texttt{\_meta} protocol version & every POST \\
+\texttt{Mcp-Method} & \texttt{method} & every POST \\
+\texttt{Mcp-Name} & \texttt{params.name} or \texttt{params.uri} & \texttt{tools/call}, \texttt{prompts/get}, \texttt{resources/read} \\
+\texttt{Mcp-Param-\{Name\}} & An \texttt{x-mcp-header} argument & when the schema declares one \\
+\texttt{Accept} & & must list both JSON and SSE \\
+\texttt{X-Accel-Buffering: no} & & response header on every SSE stream \\
+\bottomrule
+\end{tabularx}
+\caption{Any mismatch between header and body must be rejected with 400 and
+\texttt{-32020}. See Chapter~\ref{ch:transport}.}
+\label{tab:header-reference}
+\end{table}
+
+Values outside printable ASCII, with surrounding whitespace, or resembling the
+sentinel, are wrapped: \texttt{=?base64?\{payload\}?=}.
+
+\section{Capabilities}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}llX@{}}
+\toprule
+\thead{Side} & \thead{Capability} & \thead{Settings} \\
+\midrule
+Server & \texttt{tools} & \texttt{listChanged} \\
+Server & \texttt{resources} & \texttt{listChanged}, \texttt{subscribe} \\
+Server & \texttt{prompts} & \texttt{listChanged} \\
+Server & \texttt{completions} & \\
+Both & \texttt{extensions} & map of identifier to settings \\
+Client & \texttt{elicitation} & \texttt{form}, \texttt{url} \\
+Client & \texttt{sampling} & \emph{deprecated} \\
+Client & \texttt{roots} & \emph{deprecated} \\
+\bottomrule
+\end{tabularx}
+\caption{An empty \texttt{elicitation} object means form mode only, for
+backwards compatibility.}
+\label{tab:capabilities-reference}
+\end{table}
+
+\section{The deprecated features registry}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXl@{}}
+\toprule
+\thead{Feature} & \thead{Migrate to} & \thead{Earliest removal} \\
+\midrule
+Roots & Tool parameters, resource URIs, or server config & 2027-07-28 \\
+Sampling & Direct provider APIs & 2027-07-28 \\
+Logging & \texttt{stderr} on stdio; OpenTelemetry elsewhere & 2027-07-28 \\
+Dynamic Client Registration & Client ID Metadata Documents & 2027-07-28 \\
+\texttt{includeContext: "thisServer"} / \texttt{"allServers"} & Omit, or \texttt{"none"} & with Sampling \\
+HTTP+SSE transport & Streamable HTTP & sooner \\
+\bottomrule
+\end{tabularx}
+\caption{Deprecated features remain functional. New implementations should not
+adopt them. Twelve-month minimum window. See Chapter~\ref{ch:architecture}.}
+\label{tab:deprecated-reference}
+\end{table}
+
+\section{Version history}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}llX@{}}
+\toprule
+\thead{Version} & \thead{Era} & \thead{Headline} \\
+\midrule
+\texttt{2024-11-05} & legacy & First release. HTTP+SSE transport \\
+\texttt{2025-03-26} & legacy & Streamable HTTP; HTTP+SSE deprecated \\
+\texttt{2025-06-18} & legacy & Elicitation, structured output, \texttt{MCP-Protocol-Version} \\
+\texttt{2025-11-25} & legacy & URL-mode elicitation, task experiments \\
+\texttt{2026-07-28} & \textbf{modern} & Stateless core, MRTR, extensions, lifecycle policy \\
+\bottomrule
+\end{tabularx}
+\caption{``Era'' is the distinction that matters for interoperability: legacy
+versions open with \texttt{initialize}. See Chapter~\ref{ch:architecture}.}
+\label{tab:version-history}
+\end{table}

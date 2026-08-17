@@ -1,0 +1,683 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multi Round-Trip Requests &middot; Building Awesome MCP Apps</title>
+<meta name="description" content="Multi Round-Trip Requests. What every AI application developer should know about the Model Context Protocol">
+<meta property="og:title" content="Multi Round-Trip Requests">
+<meta property="og:description" content="Multi Round-Trip Requests. What every AI application developer should know about the Model Context Protocol">
+<style>
+:root{
+  --ink:#15181D; --muted:#5B6472; --rule:#D8DDE4; --wash:#F5F6F8;
+  --paper:#FFFFFF; --accent:#0F5C8C; --accent-soft:#E7F0F6;
+  --warm:#B4531A; --warm-soft:#FBF0E7; --good:#2C6E49; --good-soft:#E9F2EC;
+  --danger:#9B2226; --danger-soft:#FAECEC;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#E7EAEE; --muted:#98A2B0; --rule:#2C333D; --wash:#171B21;
+    --paper:#0F1216; --accent:#63AEDC; --accent-soft:#14232E;
+    --warm:#E08B4F; --warm-soft:#2A1D13; --good:#6FBF8E; --good-soft:#13221A;
+    --danger:#E4796F; --danger-soft:#291516;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--serif);font-size:18px;line-height:1.62;
+  -webkit-text-size-adjust:100%}
+.layout{display:grid;grid-template-columns:288px minmax(0,1fr);
+  max-width:1280px;margin:0 auto;gap:0}
+nav.toc{position:sticky;top:0;height:100vh;overflow-y:auto;padding:26px 20px 60px;
+  border-right:1px solid var(--rule);font-family:var(--sans);font-size:14px}
+nav.toc .brand{display:block;font-weight:700;font-size:16px;color:var(--ink);
+  text-decoration:none;line-height:1.3;margin-bottom:4px}
+nav.toc .tagline{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.45}
+nav.toc .part{margin:18px 0 6px;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);font-weight:700}
+nav.toc a{display:block;padding:4px 8px;margin-left:-8px;border-radius:5px;
+  color:var(--muted);text-decoration:none}
+nav.toc a:hover{background:var(--wash);color:var(--ink)}
+nav.toc a.current{background:var(--accent-soft);color:var(--accent);font-weight:600}
+main{padding:44px 52px 120px;min-width:0;max-width:78ch}
+h1,h2,h3,h4{font-family:var(--sans);line-height:1.25;color:var(--ink)}
+h1{font-size:2.05em;margin:0 0 .55em;letter-spacing:-.015em}
+h2{font-size:1.42em;margin:2em 0 .5em;padding-top:.35em}
+h3{font-size:1.14em;margin:1.7em 0 .4em}
+h4{font-size:1em;margin:1.4em 0 .3em;color:var(--muted)}
+p{margin:0 0 1.05em}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.855em;background:var(--wash);
+  padding:.12em .36em;border-radius:4px;word-break:break-word}
+pre{background:var(--wash);border-left:3px solid var(--rule);
+  border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+  font-size:13.5px;line-height:1.5;margin:1.3em 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+pre.json,pre.http{background:var(--accent-soft);border-left-color:var(--accent)}
+aside.box{border-left:3px solid var(--rule);background:var(--wash);
+  padding:14px 18px;margin:1.5em 0;border-radius:0 6px 6px 0;font-size:.955em}
+aside.box .box-title{font-family:var(--sans);font-weight:700;font-size:12px;
+  letter-spacing:.07em;text-transform:uppercase;margin:0 0 .55em}
+aside.box.legacy{border-left-color:var(--warm);background:var(--warm-soft)}
+aside.box.legacy .box-title{color:var(--warm)}
+aside.box.measured{border-left-color:var(--good);background:var(--good-soft)}
+aside.box.measured .box-title{color:var(--good)}
+aside.box.threat{border-left-color:var(--danger);background:var(--danger-soft)}
+aside.box.threat .box-title{color:var(--danger)}
+aside.box.note .box-title{color:var(--muted)}
+aside.keyidea{border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:14px 18px;margin:1.6em 0;border-radius:0 6px 6px 0;
+  font-family:var(--sans);font-style:italic;font-size:.97em}
+aside.keyidea p:last-child,aside.box p:last-child{margin-bottom:0}
+aside.keyidea pre,aside.keyidea code,aside.keyidea table{font-style:normal}
+aside.epigraph{border:0;margin:0 0 2em;padding:0 0 0 clamp(0px,7%,52px);
+  color:var(--muted);font-size:.97em}
+aside.epigraph p{margin:0 0 .3em}
+main figure{margin:2em 0;text-align:center}
+main figure img{max-width:100%;height:auto;border-radius:6px}
+@media (prefers-color-scheme: dark){
+  main figure img{background:#fff;padding:10px;border-radius:8px}
+}
+figcaption{font-family:var(--sans);font-size:13.5px;color:var(--muted);
+  margin-top:.7em;text-align:left;line-height:1.5}
+.table-wrap{overflow-x:auto;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:14.5px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+thead th{border-bottom:2px solid var(--rule);font-weight:700}
+caption{caption-side:bottom;font-size:13.5px;color:var(--muted);
+  text-align:left;padding-top:.7em;line-height:1.5}
+ul,ol{padding-left:1.35em;margin:0 0 1.05em}
+li{margin-bottom:.32em}
+dl{margin:0 0 1.05em}
+dt{font-weight:700;font-family:var(--sans);font-size:.95em;margin-top:.75em}
+dd{margin:.15em 0 0 1.35em}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
+.pager{display:flex;justify-content:space-between;gap:16px;margin-top:4em;
+  padding-top:1.5em;border-top:1px solid var(--rule);font-family:var(--sans);
+  font-size:14px}
+.pager a{text-decoration:none;max-width:46%}
+.pager .dir{display:block;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted)}
+.masthead{border-bottom:1px solid var(--rule);padding-bottom:1.8em;margin-bottom:2.2em}
+.masthead .kicker{font-family:var(--sans);font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);font-weight:700}
+.lede{font-size:1.12em;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:14px;margin:1.8em 0}
+.card{border:1px solid var(--rule);border-radius:9px;padding:15px 17px;
+  font-family:var(--sans);font-size:14px}
+.card h3{margin:0 0 .35em;font-size:15px}
+.card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+.menu-btn{display:none}
+@media (max-width:940px){
+  body{font-size:17px}
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:0;
+    border-bottom:1px solid var(--rule);max-height:none}
+  nav.toc.collapsed .toc-body{display:none}
+  main{padding:28px 20px 90px}
+  .menu-btn{display:inline-block;font-family:var(--sans);font-size:13px;
+    background:var(--wash);border:1px solid var(--rule);color:var(--ink);
+    border-radius:6px;padding:6px 11px;cursor:pointer;margin-bottom:10px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc"><button class="menu-btn" type="button">Contents</button>
+<div class="toc-body">
+<a class="brand" href="index.html">Building Awesome MCP Apps</a>
+<p class="tagline">What every AI application developer should know about the Model Context Protocol</p>
+<a href="preface.html">Preface</a>
+<a href="how-to-read.html">How to read this book</a>
+<div class="part">Part I. Protocol Fundamentals</div>
+<a href="ch01.html">A Primer on Latency, Tokens, and Context</a>
+<a href="ch02.html">The MCP Architectural Model</a>
+<a href="ch03.html">Building Blocks of the Transport</a>
+<a href="ch04.html">Authorization on the Wire</a>
+<div class="part">Part II. The Primitives</div>
+<a href="ch05.html">Tools: The Execution Layer</a>
+<a href="ch06.html">Resources: The Context Layer</a>
+<a href="ch07.html">Prompts: Workflow Blueprints</a>
+<a href="ch08.html" class="current">Multi Round-Trip Requests</a>
+<a href="ch09.html">Extensions and Tasks</a>
+<a href="ch10.html">MCP Apps: Interactive Interfaces</a>
+<div class="part">Part III. Building MCP Applications</div>
+<a href="ch11.html">Building Servers</a>
+<a href="ch12.html">Building Hosts and Clients</a>
+<a href="ch13.html">The Agent Loop, State, and Memory</a>
+<a href="ch14.html">Multi-Agent Topologies</a>
+<div class="part">Part IV. Performance Engineering</div>
+<a href="ch15.html">Testing and Debugging</a>
+<a href="ch16.html">Measuring MCP Applications</a>
+<a href="ch17.html">Optimizing for Latency, Tokens, and Cost</a>
+<a href="ch18.html">Deployment and Operations</a>
+<div class="part">Part V. Security and Trust</div>
+<a href="ch19.html">Threat Modeling Agentic Applications</a>
+<a href="ch20.html">Access Control, Audit, and MCP in the Enterprise</a>
+<div class="part">Back matter</div>
+<a href="epilogue.html">Epilogue: The Evolving Protocol</a>
+<div class="part">Appendices</div>
+<a href="appendix-a.html">A. Method and Message Reference</a>
+<a href="appendix-b.html">B. Transport Decision Matrix</a>
+<a href="appendix-c.html">C. Performance Checklist</a>
+<a href="appendix-d.html">D. Security Hardening Checklist</a>
+<a href="appendix-e.html">E. The Meridian Companion Repository</a>
+<a href="about.html">About the author</a>
+</div></nav>
+<main>
+<section id="ch:mrtr" class="level1">
+<h1>Multi Round-Trip Requests</h1>
+<aside class="epigraph">
+<p><em>“What we’ve got here is failure to communicate.”</em></p>
+<p>The Captain, <em>Cool Hand Luke</em> (1967)</p>
+</aside>
+<p>The Captain says it right before demonstrating that he has no interest in communicating at all. Which is roughly what a 2025-era MCP server did when it needed something from you: it stopped, held the connection hostage, and sent its own request back down the pipe.</p>
+<p>That mechanism is gone. What replaced it is one of the cleanest pieces of design in the whole revision, and it costs more than people expect. Both halves of that sentence matter, so this chapter does the mechanism first and the price second.</p>
+<section id="the-problem" class="level2">
+<h2>The problem</h2>
+<p>A server is halfway through a tool call and needs something only the client can supply. A username. An approval. A confirmation from a human who has authority the server does not.</p>
+<p>The old answer was control-flow inversion. The server sent a JSON-RPC <em>request</em> back to the client, mid-call, on the same connection, and blocked until the answer arrived.</p>
+<figure id="fig:mrtr-sequence">
+<img src="figures/mrtr-sequence.svg" />
+<figcaption>Above, the server holds a request open and owns state for its duration. Below, the request finishes, the state travels with the retry, and a different replica can answer.</figcaption>
+</figure>
+<p>That worked, and it had a fatal property for 2026: the connection meant something. The server held state for the life of the request. Which meant no load balancing without stickiness, no serverless, and no surviving a dropped connection.</p>
+<p>Statelessness and server-initiated requests cannot coexist. One of them had to go.</p>
+</section>
+<section id="the-mrtr-pattern" class="level2">
+<h2>The MRTR pattern</h2>
+<p>Four steps, and the third one is the clever bit.</p>
+<ol>
+<li><p>Client sends a request.</p></li>
+<li><p>Server realises it needs more, and <strong>answers</strong>. Not with the result, with <code>resultType: "input_required"</code>, carrying the questions and an opaque <code>requestState</code>. The original request is now complete and forgotten.</p></li>
+<li><p>Client gathers what was asked for, then <strong>re-sends the original request</strong>, with a <em>new</em> id, carrying <code>inputResponses</code> and echoing <code>requestState</code> unchanged.</p></li>
+<li><p>Server has enough, and returns the real result.</p></li>
+</ol>
+<p>The server holds nothing between steps 2 and 3. Whatever it needs to remember, it seals into <code>requestState</code> and hands to the client to carry back.</p>
+<section id="on-the-wire" class="level3">
+<h3>On the wire</h3>
+<p>The interim result:</p>
+<pre class="json" data-language="json"><code>{
+  &quot;jsonrpc&quot;: &quot;2.0&quot;,
+  &quot;id&quot;: 1,
+  &quot;result&quot;: {
+    &quot;resultType&quot;: &quot;input_required&quot;,
+    &quot;inputRequests&quot;: {
+      &quot;approval&quot;: {
+        &quot;method&quot;: &quot;elicitation/create&quot;,
+        &quot;params&quot;: {
+          &quot;mode&quot;: &quot;form&quot;,
+          &quot;message&quot;: &quot;Exposure of $9,000,000 on ACC-1042 exceeds the
+                      $5,000,000 threshold. Who is approving?&quot;,
+          &quot;requestedSchema&quot;: {
+            &quot;type&quot;: &quot;object&quot;,
+            &quot;properties&quot;: {
+              &quot;approver&quot;: { &quot;type&quot;: &quot;string&quot;, &quot;title&quot;: &quot;Approver&quot;,
+                            &quot;minLength&quot;: 2 },
+              &quot;rationale&quot;: { &quot;type&quot;: &quot;string&quot;, &quot;title&quot;: &quot;Rationale&quot;,
+                             &quot;maxLength&quot;: 400 }
+            },
+            &quot;required&quot;: [&quot;approver&quot;]
+          }
+        }
+      }
+    },
+    &quot;requestState&quot;: &quot;v1.eyJkIjp7ImFjY291bnRJZCI6...?=.mXK9Fz...&quot;
+  }
+}</code></pre>
+<p>And the retry:</p>
+<pre class="json" data-language="json"><code>{
+  &quot;jsonrpc&quot;: &quot;2.0&quot;,
+  &quot;id&quot;: 2,
+  &quot;method&quot;: &quot;tools/call&quot;,
+  &quot;params&quot;: {
+    &quot;name&quot;: &quot;assess_account_risk&quot;,
+    &quot;arguments&quot;: { &quot;accountId&quot;: &quot;ACC-1042&quot;, &quot;exposureUsd&quot;: 9000000 },
+    &quot;inputResponses&quot;: {
+      &quot;approval&quot;: {
+        &quot;action&quot;: &quot;accept&quot;,
+        &quot;content&quot;: { &quot;approver&quot;: &quot;j.okonjo&quot;, &quot;rationale&quot;: &quot;board approved&quot; }
+      }
+    },
+    &quot;requestState&quot;: &quot;v1.eyJkIjp7ImFjY291bnRJZCI6...?=.mXK9Fz...&quot;
+  }
+}</code></pre>
+<p>Three things to notice, all of them enforced:</p>
+<p><strong>The id changed.</strong> 1 to 2. These are independent requests, not a continuation, and the specification requires the ids to differ. Meridian tests it:</p>
+<pre class="python" data-language="python"><code>def test_retry_uses_a_different_id(self):
+    &quot;&quot;&quot;The retry is an independent request, so it must not reuse the id.&quot;&quot;&quot;
+    ...
+    result = client.call_tool(&quot;ask&quot;, {})
+    self.assertEqual(result[&quot;content&quot;][0][&quot;text&quot;], &quot;hello ada&quot;)
+    self.assertEqual(len(ids), 2)
+    self.assertNotEqual(ids[0], ids[1])</code></pre>
+<p><strong>The arguments are repeated in full.</strong> The server does not remember them.</p>
+<p><strong><code>requestState</code> is echoed byte for byte.</strong> The client must not inspect it, parse it, or modify it. If there was no <code>requestState</code>, the client must not invent one.</p>
+</section>
+<section id="the-three-requests-a-server-may-make" class="level3">
+<h3>The three requests a server may make</h3>
+<p><code>inputRequests</code> is a map from server-chosen keys to request objects, and exactly three kinds are permitted:</p>
+<table id="tab:input-requests">
+<caption>Two of the three are on their way out. Elicitation is the one to build on.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Method</strong></td>
+<td style="text-align: left;"><strong>Asks for</strong></td>
+<td style="text-align: left;"><strong>Status</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>elicitation/create</code></td>
+<td style="text-align: left;">Input from the <em>user</em></td>
+<td style="text-align: left;">Active</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>sampling/createMessage</code></td>
+<td style="text-align: left;">A completion from the <em>model</em></td>
+<td style="text-align: left;">Deprecated</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>roots/list</code></td>
+<td style="text-align: left;">The client’s directory roots</td>
+<td style="text-align: left;">Deprecated</td>
+</tr>
+</tbody>
+</table>
+<p>A map rather than a list, because a server can ask several things at once and the keys correlate answers to questions. Asking for everything in one interim result costs one round trip; asking one at a time costs one each.</p>
+<p>And a hard rule: <strong>never send a request the client did not declare support for.</strong> Meridian checks and degrades:</p>
+<pre class="python" data-language="python"><code>def _ask_for_approval(self, ctx, account_id, exposure):
+    if not ctx.capabilities.supports_elicitation(&quot;form&quot;):
+        # Never send a request shape the client did not declare. Degrade
+        # to a plain error the model can relay to the user instead.
+        return tool_error(
+            f&quot;Exposure of ${exposure:,.0f} exceeds the &quot;
+            f&quot;${APPROVAL_THRESHOLD_USD:,.0f} threshold and this client &quot;
+            &quot;cannot collect an approval.&quot;)
+    return input_required(...)</code></pre>
+<p>Note what that does. It does not fail silently, and it does not send a shape the client will choke on. It returns a tool execution error explaining exactly why the operation cannot proceed, which the model can relay to the user, who can go and use a client that supports elicitation.</p>
+</section>
+</section>
+<section id="requeststate-is-attacker-controlled" class="level2">
+<h2><code>requestState</code> is attacker-controlled</h2>
+<p>Here is the part that deserves your full attention.</p>
+<p><code>requestState</code> leaves your server, passes through a client you do not control, and comes back. It may come back modified. It may come back from a different user. It may come back attached to a different tool call. It may come back next week.</p>
+<aside class="box threat"><p class="box-title">Threat: Three attacks on a naive <code>requestState</code></p>
+<p><strong>Tampering.</strong> Server seals <code>{"exposure": 9000000}</code>. Client edits it to <code>{"exposure": 100}</code> to slip under the approval threshold.</p>
+<p><strong>Cross-user replay.</strong> Alice triggers an approval and captures the state. Bob presents it and inherits her half-completed privileged operation.</p>
+<p><strong>Cross-request replay.</strong> State minted for <code>approve_refund</code> is presented on <code>transfer_funds</code>, and the server accepts an approval that was never given for that operation.</p>
+</aside>
+<p>The specification’s requirement: if <code>requestState</code> influences authorization, resource access, or business logic, servers <strong>must</strong> protect its integrity and <strong>must</strong> reject state that fails verification. Integrity protection may be omitted only when tampering can cause nothing worse than the request failing.</p>
+<p>Meridian’s implementation closes all three, plus a window:</p>
+<pre class="python" data-language="python"><code>class StateSealer:
+    &quot;&quot;&quot;Authenticated, expiring, principal-bound `requestState`.
+
+    The format is `v1.&lt;payload-b64&gt;.&lt;mac-b64&gt;`, with the MAC over the payload
+    bytes. HMAC-SHA256 gives integrity, which is what the specification
+    requires. It does not give confidentiality: anyone holding the blob can
+    read it. So put correlation data in here, never secrets.
+    &quot;&quot;&quot;
+
+    def seal(self, data, *, principal=None, method=None, params=None,
+             ttl_seconds=None, now=None) -&gt; str:
+        now = time.time() if now is None else now
+        envelope = {
+            &quot;d&quot;: data,
+            &quot;exp&quot;: now + (ttl_seconds if ttl_seconds is not None
+                          else self.ttl_seconds),
+            &quot;sub&quot;: principal,
+            &quot;req&quot;: self.request_digest(method, params or {}) if method else None,
+        }
+        payload = json.dumps(envelope, sort_keys=True,
+                             separators=(&quot;,&quot;, &quot;:&quot;)).encode()
+        return (f&quot;{self.VERSION}.{self._b64e(payload)}&quot;
+                f&quot;.{self._b64e(self._mac(payload))}&quot;)</code></pre>
+<p>Four bindings, each closing one door:</p>
+<dl>
+<dt>The MAC</dt>
+<dd>
+<p>stops tampering. Verified in constant time, so a timing oracle cannot walk the signature out of you.</p>
+</dd>
+<dt><code>sub</code>, the principal</dt>
+<dd>
+<p>stops cross-user replay.</p>
+</dd>
+<dt><code>req</code>, a request digest</dt>
+<dd>
+<p>stops cross-request replay. Note carefully what it covers: the method, the name, and the arguments, but <em>not</em> <code>inputResponses</code>, because those change between the mint and the redeem.</p>
+</dd>
+<dt><code>exp</code></dt>
+<dd>
+<p>bounds the window when the other three are not enough.</p>
+</dd>
+</dl>
+<pre class="python" data-language="python"><code>if not hmac.compare_digest(mac, self._mac(payload)):
+    raise StateTampered()
+if envelope.get(&quot;exp&quot;, 0) &lt; now:
+    raise StateExpired()
+bound_sub = envelope.get(&quot;sub&quot;)
+if bound_sub is not None and bound_sub != principal:
+    raise StateTampered(&quot;requestState was issued to a different principal&quot;)
+bound_req = envelope.get(&quot;req&quot;)
+if bound_req is not None:
+    if not hmac.compare_digest(bound_req,
+                               self.request_digest(method, params or {})):
+        raise StateTampered(&quot;requestState was issued for a different request&quot;)</code></pre>
+<p>Each binding gets its own test, because a security control that is not tested is a security control that will be refactored away:</p>
+<pre class="python" data-language="python"><code>def test_principal_binding_blocks_cross_user_replay(self):
+    token = self.sealer.seal({&quot;txn&quot;: &quot;T1&quot;}, principal=&quot;alice&quot;)
+    self.assertEqual(self.sealer.open(token, principal=&quot;alice&quot;), {&quot;txn&quot;: &quot;T1&quot;})
+    with self.assertRaises(McpError):
+        self.sealer.open(token, principal=&quot;bob&quot;)
+
+def test_request_binding_blocks_cross_request_replay(self):
+    params = {&quot;name&quot;: &quot;approve_refund&quot;, &quot;arguments&quot;: {&quot;amount&quot;: 10}}
+    token = self.sealer.seal({&quot;ok&quot;: True}, method=&quot;tools/call&quot;, params=params)
+    other = {&quot;name&quot;: &quot;transfer_funds&quot;, &quot;arguments&quot;: {&quot;amount&quot;: 10}}
+    with self.assertRaises(McpError):
+        self.sealer.open(token, method=&quot;tools/call&quot;, params=other)</code></pre>
+<p>And an end-to-end test that checks both directions, because a check that rejects everything is not a check:</p>
+<pre class="python" data-language="python"><code>first = post({&quot;name&quot;: &quot;assess_account_risk&quot;, &quot;arguments&quot;: args}, 1)[&quot;result&quot;]
+forged = first[&quot;requestState&quot;][:-4] + &quot;AAAA&quot;
+second = post({..., &quot;requestState&quot;: forged}, 2)
+self.assertIn(&quot;error&quot;, second, &quot;a forged requestState was accepted&quot;)
+
+# And the untampered state still works, so the check is not just
+# rejecting everything.
+third = post({..., &quot;requestState&quot;: first[&quot;requestState&quot;]}, 3)
+self.assertIn(&quot;structuredContent&quot;, third[&quot;result&quot;])</code></pre>
+<aside class="box note"><p class="box-title">None of this makes it single-use</p>
+<p>Expiry and binding bound the replay window and stop cross-user and cross-request reuse. They do not guarantee at-most-once.</p>
+<p>If an operation must happen at most once (a payment, a one-time redemption), the server has to track consumption itself. There is no protocol feature that will do it for you, and the specification says so explicitly.</p>
+</aside>
+<p>Two more rules that fall out of the format. Sign with a secret shared across your fleet, not a per-process one, or a retry that lands on another replica cannot open state its sibling sealed. And put no secrets inside: HMAC gives integrity, not confidentiality, and anyone holding the blob can read it.</p>
+</section>
+<section id="elicitation" class="level2">
+<h2>Elicitation</h2>
+<p>The one input request you should actually build on. Two modes, and the choice between them is a security decision.</p>
+<section id="form-mode" class="level3">
+<h3>Form mode</h3>
+<p>Structured data, collected through the client, validated against a schema. The schema is restricted to flat objects of primitives, deliberately, so that any client can render a form without implementing a JSON Schema editor.</p>
+<p>Strings, numbers, integers, booleans, and enums (single and multi-select, with or without display titles). No nested objects. No arrays of objects.</p>
+<pre class="python" data-language="python"><code>&quot;approval&quot;: elicit_form(
+    f&quot;Exposure of ${exposure:,.0f} on {account_id} exceeds the &quot;
+    f&quot;${APPROVAL_THRESHOLD_USD:,.0f} threshold. Who is approving?&quot;,
+    {
+        &quot;type&quot;: &quot;object&quot;,
+        &quot;properties&quot;: {
+            &quot;approver&quot;: {
+                &quot;type&quot;: &quot;string&quot;,
+                &quot;title&quot;: &quot;Approver&quot;,
+                &quot;description&quot;: &quot;Name or employee id of the approver&quot;,
+                &quot;minLength&quot;: 2,
+            },
+            &quot;rationale&quot;: {&quot;type&quot;: &quot;string&quot;, &quot;title&quot;: &quot;Rationale&quot;,
+                          &quot;maxLength&quot;: 400},
+        },
+        &quot;required&quot;: [&quot;approver&quot;],
+    },
+)</code></pre>
+<aside class="box threat"><p class="box-title">Threat: Never use form mode for secrets</p>
+<p>The specification is a MUST NOT: no passwords, API keys, access tokens, or payment credentials through form mode.</p>
+<p>The reason is architectural. Form data passes through the client, is rendered in a UI, and lands in logs. Contact details are a judgement call. Credentials are not.</p>
+<p>For anything sensitive, use URL mode.</p>
+</aside>
+</section>
+<section id="the-three-response-actions" class="level3">
+<h3>The three response actions</h3>
+<table id="tab:elicit-actions">
+<caption><code>decline</code> and <code>cancel</code> are different signals and deserve different handling. Collapsing them into “no” loses the distinction between “I refuse” and “I pressed Escape”.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Action</strong></td>
+<td style="text-align: left;"><strong>Means</strong></td>
+<td style="text-align: left;"><strong>Server should</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>accept</code></td>
+<td style="text-align: left;">Submitted, with data</td>
+<td style="text-align: left;">Process it</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>decline</code></td>
+<td style="text-align: left;">Explicitly refused</td>
+<td style="text-align: left;">Offer an alternative, or fail clearly</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>cancel</code></td>
+<td style="text-align: left;">Dismissed without choosing</td>
+<td style="text-align: left;">Consider asking again later</td>
+</tr>
+</tbody>
+</table>
+<pre class="python" data-language="python"><code>if answer.declined:
+    return tool_error(
+        f&quot;Exposure of ${exposure:,.0f} was declined by the approver.&quot;)
+if answer.cancelled:
+    return tool_error(&quot;Approval dialog was dismissed. Nothing was scored.&quot;)</code></pre>
+<p>And one case that is neither: the user accepted but left a required field blank. The specification’s guidance is to <em>ask again</em>, not to error:</p>
+<pre class="python" data-language="python"><code>approver = (answer.content or {}).get(&quot;approver&quot;, &quot;&quot;).strip()
+if not approver:
+    # Missing a value we need is not an error. Ask again.
+    return _ask_for_approval(ctx, account_id, exposure)</code></pre>
+</section>
+<section id="url-mode" class="level3">
+<h3>URL mode</h3>
+<p>For anything that must not touch the client. The server returns a URL, the client shows it, gets consent, and opens it somewhere it cannot read.</p>
+<pre class="json" data-language="json"><code>{
+  &quot;method&quot;: &quot;elicitation/create&quot;,
+  &quot;params&quot;: {
+    &quot;mode&quot;: &quot;url&quot;,
+    &quot;url&quot;: &quot;https://mcp.meridian.example/ui/connect-bank&quot;,
+    &quot;message&quot;: &quot;Connect your bank account to continue.&quot;
+  }
+}</code></pre>
+<p>The response says only <code>{"action": "accept"}</code>, and that means “the user agreed to look”, not “the interaction succeeded”. The client never learns the outcome. The server finds out by other means and reports on the retry.</p>
+<p>The client-side rules are strict, and they exist because a server-supplied URL rendered in a trusted UI is a phishing vector:</p>
+<ul>
+<li><p>Must not pre-fetch the URL or its metadata.</p></li>
+<li><p>Must not open it without explicit consent.</p></li>
+<li><p>Must show the full URL before consent.</p></li>
+<li><p>Must open it where neither the client nor the model can inspect the contents. On iOS that means <code>SFSafariViewController</code>, not <code>WKWebView</code>.</p></li>
+<li><p>Should highlight the domain, and warn on Punycode.</p></li>
+</ul>
+<aside class="box threat"><p class="box-title">Threat: The URL-mode phishing attack</p>
+<p>Alice, a legitimate user of a benign server, triggers a URL-mode elicitation that starts a third-party OAuth flow. Her client shows the link. Instead of clicking it, Alice sends it to Bob. Bob opens it, authorizes, and believes he has connected his own account. The server receives the callback, assumes it belongs to Alice’s pending elicitation, and binds <em>Bob’s</em> third-party tokens to <em>Alice’s</em> identity.</p>
+<p>The fix is that the server must verify that the user who <em>opens</em> the URL is the user for whom it was minted. In practice: point the elicitation at your own <code>/connect</code> route, check a session cookie against the <code>sub</code> claim from your authorization server, and only then redirect onward.</p>
+</aside>
+</section>
+</section>
+<section id="the-cost" class="level2">
+<h2>The cost</h2>
+<p>Now the number, which is the reason this chapter exists in a performance book.</p>
+<figure id="fig:xkcd-elicitation">
+<img src="figures/xkcd-elicitation.svg" />
+<figcaption>The transport cost of an elicitation is small. The model turn it forces is not.</figcaption>
+</figure>
+<aside class="box measured"><p class="box-title">Measured: One elicitation, measured</p>
+<table>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong></strong></td>
+<td style="text-align: right;"><strong>Requests</strong></td>
+<td style="text-align: right;"><strong>Latency</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Tool call, no elicitation</td>
+<td style="text-align: right;">1.0</td>
+<td style="text-align: right;">34.3 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;">Tool call with elicitation</td>
+<td style="text-align: right;">2.0</td>
+<td style="text-align: right;">68.8 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;">Extra transport</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;">+34.5 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;">Plus one model turn to read the answer</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;">+340 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>True cost</strong></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"><strong>+375 ms</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Measured at 12 ms simulated per-call latency. The transport half is measured; the model turn is the stated TTFT mean from <a href="ch01.html#sec:simulated">§1.6.2</a>.</p>
+</aside>
+<p>Plus the human, who is not in that table and who takes seconds.</p>
+<aside class="keyidea">
+<p>Every MRTR round trip is at least one extra client round trip and usually one extra model turn. The transport cost is around a tenth of the total. Optimising the transport is missing the point; the answer is to not need the round trip.</p>
+</aside>
+<section id="four-ways-to-not-need-it" class="level3">
+<h3>Four ways to not need it</h3>
+<p><strong>Put it in the schema.</strong> The best elicitation is the one that never happens. If a tool always needs an approver for large exposures, make <code>approver</code> an optional argument and let the model supply it when the user already said it. Zero round trips when it works.</p>
+<p><strong>Ask for everything at once.</strong> <code>inputRequests</code> is a map. Three questions in one interim result cost one round trip; three separate interim results cost three.</p>
+<p><strong>Ask early, not late.</strong> An elicitation on step one of a five-step task costs one model turn. On step four, it costs a model turn plus the risk that the user has wandered off and the context has gone stale.</p>
+<p><strong>Consider whether you need to ask at all.</strong> Chapter <a href="ch05.html#ch:tools">5</a> put it as a question: should the tool schema have captured this? Often yes. The elicitation is sometimes a symptom of a tool that was designed around an existing API rather than around the task.</p>
+<table id="tab:ask-who">
+<caption>Elicitation versus prompting versus neither. The third row is more common than people admit.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Ask the...</strong></td>
+<td style="text-align: left;"><strong>When</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">User, via elicitation</td>
+<td style="text-align: left;">Only a human can supply it: authority, preference, consent, a credential</td>
+</tr>
+<tr>
+<td style="text-align: left;">Model, via a better schema</td>
+<td style="text-align: left;">It is derivable from the conversation the model is already holding</td>
+</tr>
+<tr>
+<td style="text-align: left;">Nobody</td>
+<td style="text-align: left;">The tool should have taken it as a parameter, and you are papering over a design gap</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="why-sampling-and-roots-lost" class="level2">
+<h2>Why Sampling and Roots lost</h2>
+<p>A design post-mortem, because the reasoning generalises.</p>
+<section id="sampling" class="level3">
+<h3>Sampling</h3>
+<p>The idea: a server asks the client to run a completion on its behalf. The server gets model access without an API key, the user’s provider and quota are used, and the host keeps control over what the model sees.</p>
+<p>Genuinely elegant. It lost anyway, for three reasons.</p>
+<p><strong>The control-flow inversion was the whole problem.</strong> Sampling was the main justification for server-initiated requests, and server-initiated requests are what statelessness could not accommodate.</p>
+<p><strong>Direct provider integration won on the ground.</strong> It is 2026. A server that wants a model call adds three lines and an API key. The indirection bought less than it cost.</p>
+<p><strong>Quality control is impossible through the indirection.</strong> The server cannot choose the model, cannot see the system prompt, and cannot verify what actually ran. <code>modelPreferences</code> was a hint, and hints are not a contract.</p>
+<aside class="box legacy"><p class="box-title">Legacy: Sampling</p>
+<p>Deprecated as of <code>2026-07-28</code>, eligible for removal no earlier than 2027-07-28. It still works, delivered through MRTR rather than as a server request.</p>
+<p>Maintaining a server that uses it: it functions unchanged during the window.</p>
+<p>Migrating: call your provider’s API directly. You will need your own key and your own budget, and you will gain control over model choice and the ability to test what you shipped.</p>
+<p>Also deprecated alongside it: <code>includeContext: "thisServer"</code> and <code>"allServers"</code>. Omit the field or use <code>"none"</code>.</p>
+</aside>
+</section>
+<section id="roots" class="level3">
+<h3>Roots</h3>
+<p>The idea: the client tells the server which directories it may work in.</p>
+<p>It lost for a simpler reason. It was a capability that looked like a security boundary and was not one. A server that respects roots is a server that was going to behave anyway; a malicious one ignores the list. Meanwhile it added a client-side concept, a notification, and a round trip.</p>
+<aside class="box legacy"><p class="box-title">Legacy: Roots</p>
+<p>Deprecated as of <code>2026-07-28</code>, eligible for removal no earlier than 2027-07-28. <code>notifications/roots/list_changed</code> was removed outright.</p>
+<p>Migrate by passing directories and files as ordinary tool parameters, as resource URIs, or through server configuration. All three are explicit, all three are visible in an audit log, and none of them pretends to be a security boundary.</p>
+</aside>
+<p>The generalisable lesson: <strong>a protocol feature that depends on the other party’s goodwill is documentation, not enforcement.</strong> Roots described an intention. The host’s consent gate enforces one.</p>
+</section>
+</section>
+<section id="meridians-approval-flow-end-to-end" class="level2">
+<h2>Meridian’s approval flow, end to end</h2>
+<p>Two round trips, and Meridian asserts exactly that:</p>
+<pre class="python" data-language="python"><code>def test_approval_flow_completes_in_two_round_trips(self):
+    host = wire_host(inputs={
+        &quot;approval&quot;: {&quot;action&quot;: &quot;accept&quot;,
+                     &quot;content&quot;: {&quot;approver&quot;: &quot;j.okonjo&quot;,
+                                 &quot;rationale&quot;: &quot;board ok&quot;}},
+    })
+    binding = host.bindings[&quot;risk&quot;]
+    before = binding.client.stats.requests
+
+    result = host.call_tool(&quot;risk.assess_account_risk&quot;,
+                            {&quot;accountId&quot;: &quot;ACC-1000&quot;, &quot;exposureUsd&quot;: 9_000_000})
+
+    self.assertFalse(result.get(&quot;isError&quot;))
+    self.assertIn(&quot;score&quot;, result[&quot;structuredContent&quot;])
+    self.assertEqual(binding.client.stats.requests - before, 2)
+    self.assertEqual(binding.client.stats.mrtr_rounds, 1)</code></pre>
+<p>And crucially, the sub-threshold path costs one:</p>
+<pre class="python" data-language="python"><code>def test_below_threshold_needs_no_round_trip(self):
+    ...
+    host.call_tool(&quot;risk.assess_account_risk&quot;,
+                   {&quot;accountId&quot;: &quot;ACC-1000&quot;, &quot;exposureUsd&quot;: 100_000})
+    self.assertEqual(binding.client.stats.requests - before, 1)</code></pre>
+<p>That second test is the one that matters operationally. The expensive path should be reachable only when it is genuinely needed, and a test is the only thing that stops a refactor from making it unconditional.</p>
+<p>The client-side loop is bounded, because a server can legitimately ask again and a buggy one can ask forever:</p>
+<pre class="python" data-language="python"><code>for round_no in range(MAX_MRTR_ROUNDS):
+    ...
+    if result.get(&quot;resultType&quot;) != jsonrpc.RESULT_INPUT_REQUIRED:
+        return result
+    self.stats.mrtr_rounds += 1
+    requests = result.get(&quot;inputRequests&quot;) or {}
+    pending_state = result.get(&quot;requestState&quot;)
+    pending_responses = self._answer(requests) if requests else {}
+    if requests and not pending_responses:
+        # Nothing could be answered. Retrying would loop forever.
+        raise errors.InvalidParams(
+            &quot;server requested input this client cannot provide&quot;)
+
+raise errors.InternalError(
+    f&quot;{method} still asking for input after {MAX_MRTR_ROUNDS} rounds&quot;)</code></pre>
+</section>
+<section id="what-to-remember" class="level2">
+<h2>What to remember</h2>
+<ul>
+<li><p>Servers answer with <code>input_required</code> instead of asking mid-call. The original request finishes.</p></li>
+<li><p>The retry uses a new id, repeats the arguments, and echoes <code>requestState</code> unmodified.</p></li>
+<li><p><code>requestState</code> is attacker-controlled. Seal it with a MAC, bind it to the principal and the request, and expire it. None of that makes it single-use.</p></li>
+<li><p>Sign with a fleet-wide secret, and put no secrets inside.</p></li>
+<li><p>Never send an input request the client did not declare support for. Degrade with a clear tool error.</p></li>
+<li><p>Form mode for ordinary input, URL mode for anything sensitive. Verify that the user who opens a URL is the user it was minted for.</p></li>
+<li><p><code>decline</code> and <code>cancel</code> are different. A blank required field means ask again, not error.</p></li>
+<li><p>One elicitation costs about 375 ms, of which only 35 is transport. Ask for everything at once, ask early, or design so you need not ask.</p></li>
+<li><p>Sampling and Roots are deprecated. Both depended on the other party’s goodwill or on a stateful connection.</p></li>
+</ul>
+<p>Next: extensions, and the Tasks extension, which is what you use when the work takes longer than anyone wants to hold a connection open for.</p>
+</section>
+</section>
+<div class="pager">
+<a href="ch07.html"><span class="dir">Previous</span>Prompts: Workflow Blueprints</a>
+<a href="ch09.html" style="text-align:right"><span class="dir">Next</span>Extensions and Tasks</a>
+</div>
+</main>
+</div>
+<script>
+(function(){
+  var nav = document.querySelector('nav.toc');
+  var btn = document.querySelector('.menu-btn');
+  if(btn && nav){
+    if(window.innerWidth <= 940) nav.classList.add('collapsed');
+    btn.addEventListener('click', function(){ nav.classList.toggle('collapsed'); });
+  }
+  // Wrap tables so wide ones scroll rather than overflowing the page.
+  document.querySelectorAll('main table').forEach(function(t){
+    if(t.parentElement.classList.contains('table-wrap')) return;
+    var w = document.createElement('div');
+    w.className = 'table-wrap';
+    t.parentNode.insertBefore(w, t);
+    w.appendChild(t);
+  });
+})();
+</script>
+</body>
+</html>

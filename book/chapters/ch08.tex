@@ -1,0 +1,659 @@
+\chapter{Multi Round-Trip Requests}
+\label{ch:mrtr}
+
+\epigraph{``What we've got here is failure to communicate.''}{The Captain,
+\emph{Cool Hand Luke} (1967)}
+
+The Captain says it right before demonstrating that he has no interest in
+communicating at all. Which is roughly what a 2025-era MCP server did when it
+needed something from you: it stopped, held the connection hostage, and sent its
+own request back down the pipe.
+
+That mechanism is gone. What replaced it is one of the cleanest pieces of design
+in the whole revision, and it costs more than people expect. Both halves of that
+sentence matter, so this chapter does the mechanism first and the price second.
+
+\section{The problem}
+
+A server is halfway through a tool call and needs something only the client can
+supply. A username. An approval. A confirmation from a human who has authority
+the server does not.
+
+The old answer was control-flow inversion. The server sent a JSON-RPC
+\emph{request} back to the client, mid-call, on the same connection, and blocked
+until the answer arrived.
+
+\bookfig[0.90]{mrtr-sequence}{Above, the server holds a request open and owns
+state for its duration. Below, the request finishes, the state travels with the
+retry, and a different replica can answer.}{mrtr-sequence}
+
+That worked, and it had a fatal property for 2026: the connection meant
+something. The server held state for the life of the request. Which meant no
+load balancing without stickiness, no serverless, and no surviving a dropped
+connection.
+
+Statelessness and server-initiated requests cannot coexist. One of them had to
+go.
+
+\section{The MRTR pattern}
+
+Four steps, and the third one is the clever bit.
+
+\begin{enumerate}[leftmargin=1.6em, itemsep=3pt]
+\item Client sends a request.
+\item Server realises it needs more, and \textbf{answers}. Not with the result,
+with \texttt{resultType: "input\_required"}, carrying the questions and an opaque
+\texttt{requestState}. The original request is now complete and forgotten.
+\item Client gathers what was asked for, then \textbf{re-sends the original
+request}, with a \emph{new} id, carrying \texttt{inputResponses} and echoing
+\texttt{requestState} unchanged.
+\item Server has enough, and returns the real result.
+\end{enumerate}
+
+The server holds nothing between steps 2 and 3. Whatever it needs to remember,
+it seals into \texttt{requestState} and hands to the client to carry back.
+
+\subsection{On the wire}
+
+The interim result:
+
+\begin{wire}
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "resultType": "input_required",
+    "inputRequests": {
+      "approval": {
+        "method": "elicitation/create",
+        "params": {
+          "mode": "form",
+          "message": "Exposure of $9,000,000 on ACC-1042 exceeds the
+                      $5,000,000 threshold. Who is approving?",
+          "requestedSchema": {
+            "type": "object",
+            "properties": {
+              "approver": { "type": "string", "title": "Approver",
+                            "minLength": 2 },
+              "rationale": { "type": "string", "title": "Rationale",
+                             "maxLength": 400 }
+            },
+            "required": ["approver"]
+          }
+        }
+      }
+    },
+    "requestState": "v1.eyJkIjp7ImFjY291bnRJZCI6...?=.mXK9Fz..."
+  }
+}
+\end{wire}
+
+And the retry:
+
+\begin{wire}
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/call",
+  "params": {
+    "name": "assess_account_risk",
+    "arguments": { "accountId": "ACC-1042", "exposureUsd": 9000000 },
+    "inputResponses": {
+      "approval": {
+        "action": "accept",
+        "content": { "approver": "j.okonjo", "rationale": "board approved" }
+      }
+    },
+    "requestState": "v1.eyJkIjp7ImFjY291bnRJZCI6...?=.mXK9Fz..."
+  }
+}
+\end{wire}
+
+Three things to notice, all of them enforced:
+
+\textbf{The id changed.} 1 to 2. These are independent requests, not a
+continuation, and the specification requires the ids to differ. Meridian tests
+it:
+
+\begin{py}
+def test_retry_uses_a_different_id(self):
+    """The retry is an independent request, so it must not reuse the id."""
+    ...
+    result = client.call_tool("ask", {})
+    self.assertEqual(result["content"][0]["text"], "hello ada")
+    self.assertEqual(len(ids), 2)
+    self.assertNotEqual(ids[0], ids[1])
+\end{py}
+
+\textbf{The arguments are repeated in full.} The server does not remember them.
+
+\textbf{\texttt{requestState} is echoed byte for byte.} The client must not
+inspect it, parse it, or modify it. If there was no \texttt{requestState}, the
+client must not invent one.
+
+\subsection{The three requests a server may make}
+
+\texttt{inputRequests} is a map from server-chosen keys to request objects, and
+exactly three kinds are permitted:
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXl@{}}
+\toprule
+\thead{Method} & \thead{Asks for} & \thead{Status} \\
+\midrule
+\texttt{elicitation/create}   & Input from the \emph{user} & Active \\
+\texttt{sampling/createMessage} & A completion from the \emph{model} & Deprecated \\
+\texttt{roots/list}           & The client's directory roots & Deprecated \\
+\bottomrule
+\end{tabularx}
+\caption{Two of the three are on their way out. Elicitation is the one to build
+on.}
+\label{tab:input-requests}
+\end{table}
+
+A map rather than a list, because a server can ask several things at once and
+the keys correlate answers to questions. Asking for everything in one interim
+result costs one round trip; asking one at a time costs one each.
+
+And a hard rule: \textbf{never send a request the client did not declare support
+for.} Meridian checks and degrades:
+
+\begin{py}
+def _ask_for_approval(self, ctx, account_id, exposure):
+    if not ctx.capabilities.supports_elicitation("form"):
+        # Never send a request shape the client did not declare. Degrade
+        # to a plain error the model can relay to the user instead.
+        return tool_error(
+            f"Exposure of ${exposure:,.0f} exceeds the "
+            f"${APPROVAL_THRESHOLD_USD:,.0f} threshold and this client "
+            "cannot collect an approval.")
+    return input_required(...)
+\end{py}
+
+Note what that does. It does not fail silently, and it does not send a shape the
+client will choke on. It returns a tool execution error explaining exactly why
+the operation cannot proceed, which the model can relay to the user, who can go
+and use a client that supports elicitation.
+
+\section{\texttt{requestState} is attacker-controlled}
+
+Here is the part that deserves your full attention.
+
+\texttt{requestState} leaves your server, passes through a client you do not
+control, and comes back. It may come back modified. It may come back from a
+different user. It may come back attached to a different tool call. It may come
+back next week.
+
+\begin{dangerbox}{Three attacks on a naive \texttt{requestState}}
+\textbf{Tampering.} Server seals \texttt{\{"exposure": 9000000\}}. Client edits
+it to \texttt{\{"exposure": 100\}} to slip under the approval threshold.
+
+\textbf{Cross-user replay.} Alice triggers an approval and captures the state.
+Bob presents it and inherits her half-completed privileged operation.
+
+\textbf{Cross-request replay.} State minted for \texttt{approve\_refund} is
+presented on \texttt{transfer\_funds}, and the server accepts an approval that
+was never given for that operation.
+\end{dangerbox}
+
+The specification's requirement: if \texttt{requestState} influences
+authorization, resource access, or business logic, servers \textbf{must} protect
+its integrity and \textbf{must} reject state that fails verification. Integrity
+protection may be omitted only when tampering can cause nothing worse than the
+request failing.
+
+Meridian's implementation closes all three, plus a window:
+
+\begin{py}
+class StateSealer:
+    """Authenticated, expiring, principal-bound `requestState`.
+
+    The format is `v1.<payload-b64>.<mac-b64>`, with the MAC over the payload
+    bytes. HMAC-SHA256 gives integrity, which is what the specification
+    requires. It does not give confidentiality: anyone holding the blob can
+    read it. So put correlation data in here, never secrets.
+    """
+
+    def seal(self, data, *, principal=None, method=None, params=None,
+             ttl_seconds=None, now=None) -> str:
+        now = time.time() if now is None else now
+        envelope = {
+            "d": data,
+            "exp": now + (ttl_seconds if ttl_seconds is not None
+                          else self.ttl_seconds),
+            "sub": principal,
+            "req": self.request_digest(method, params or {}) if method else None,
+        }
+        payload = json.dumps(envelope, sort_keys=True,
+                             separators=(",", ":")).encode()
+        return (f"{self.VERSION}.{self._b64e(payload)}"
+                f".{self._b64e(self._mac(payload))}")
+\end{py}
+
+Four bindings, each closing one door:
+
+\begin{description}[leftmargin=1.4em, style=nextline, itemsep=3pt]
+\item[The MAC] stops tampering. Verified in constant time, so a timing oracle
+cannot walk the signature out of you.
+\item[\texttt{sub}, the principal] stops cross-user replay.
+\item[\texttt{req}, a request digest] stops cross-request replay. Note carefully
+what it covers: the method, the name, and the arguments, but \emph{not}
+\texttt{inputResponses}, because those change between the mint and the redeem.
+\item[\texttt{exp}] bounds the window when the other three are not enough.
+\end{description}
+
+\begin{py}
+if not hmac.compare_digest(mac, self._mac(payload)):
+    raise StateTampered()
+if envelope.get("exp", 0) < now:
+    raise StateExpired()
+bound_sub = envelope.get("sub")
+if bound_sub is not None and bound_sub != principal:
+    raise StateTampered("requestState was issued to a different principal")
+bound_req = envelope.get("req")
+if bound_req is not None:
+    if not hmac.compare_digest(bound_req,
+                               self.request_digest(method, params or {})):
+        raise StateTampered("requestState was issued for a different request")
+\end{py}
+
+Each binding gets its own test, because a security control that is not tested is
+a security control that will be refactored away:
+
+\begin{py}
+def test_principal_binding_blocks_cross_user_replay(self):
+    token = self.sealer.seal({"txn": "T1"}, principal="alice")
+    self.assertEqual(self.sealer.open(token, principal="alice"), {"txn": "T1"})
+    with self.assertRaises(McpError):
+        self.sealer.open(token, principal="bob")
+
+def test_request_binding_blocks_cross_request_replay(self):
+    params = {"name": "approve_refund", "arguments": {"amount": 10}}
+    token = self.sealer.seal({"ok": True}, method="tools/call", params=params)
+    other = {"name": "transfer_funds", "arguments": {"amount": 10}}
+    with self.assertRaises(McpError):
+        self.sealer.open(token, method="tools/call", params=other)
+\end{py}
+
+And an end-to-end test that checks both directions, because a check that rejects
+everything is not a check:
+
+\begin{py}
+first = post({"name": "assess_account_risk", "arguments": args}, 1)["result"]
+forged = first["requestState"][:-4] + "AAAA"
+second = post({..., "requestState": forged}, 2)
+self.assertIn("error", second, "a forged requestState was accepted")
+
+# And the untampered state still works, so the check is not just
+# rejecting everything.
+third = post({..., "requestState": first["requestState"]}, 3)
+self.assertIn("structuredContent", third["result"])
+\end{py}
+
+\begin{notebox}{None of this makes it single-use}
+Expiry and binding bound the replay window and stop cross-user and
+cross-request reuse. They do not guarantee at-most-once.
+
+If an operation must happen at most once (a payment, a one-time redemption), the
+server has to track consumption itself. There is no protocol feature that will
+do it for you, and the specification says so explicitly.
+\end{notebox}
+
+Two more rules that fall out of the format. Sign with a secret shared across
+your fleet, not a per-process one, or a retry that lands on another replica
+cannot open state its sibling sealed. And put no secrets inside: HMAC gives
+integrity, not confidentiality, and anyone holding the blob can read it.
+
+\section{Elicitation}
+
+The one input request you should actually build on. Two modes, and the choice
+between them is a security decision.
+
+\subsection{Form mode}
+
+Structured data, collected through the client, validated against a schema. The
+schema is restricted to flat objects of primitives, deliberately, so that any
+client can render a form without implementing a JSON Schema editor.
+
+Strings, numbers, integers, booleans, and enums (single and multi-select, with
+or without display titles). No nested objects. No arrays of objects.
+
+\begin{py}
+"approval": elicit_form(
+    f"Exposure of ${exposure:,.0f} on {account_id} exceeds the "
+    f"${APPROVAL_THRESHOLD_USD:,.0f} threshold. Who is approving?",
+    {
+        "type": "object",
+        "properties": {
+            "approver": {
+                "type": "string",
+                "title": "Approver",
+                "description": "Name or employee id of the approver",
+                "minLength": 2,
+            },
+            "rationale": {"type": "string", "title": "Rationale",
+                          "maxLength": 400},
+        },
+        "required": ["approver"],
+    },
+)
+\end{py}
+
+\begin{dangerbox}{Never use form mode for secrets}
+The specification is a MUST NOT: no passwords, API keys, access tokens, or
+payment credentials through form mode.
+
+The reason is architectural. Form data passes through the client, is rendered in
+a UI, and lands in logs. Contact details are a judgement call. Credentials are
+not.
+
+For anything sensitive, use URL mode.
+\end{dangerbox}
+
+\subsection{The three response actions}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}llX@{}}
+\toprule
+\thead{Action} & \thead{Means} & \thead{Server should} \\
+\midrule
+\texttt{accept}  & Submitted, with data & Process it \\
+\texttt{decline} & Explicitly refused & Offer an alternative, or fail clearly \\
+\texttt{cancel}  & Dismissed without choosing & Consider asking again later \\
+\bottomrule
+\end{tabularx}
+\caption{\texttt{decline} and \texttt{cancel} are different signals and deserve
+different handling. Collapsing them into ``no'' loses the distinction between
+``I refuse'' and ``I pressed Escape''.}
+\label{tab:elicit-actions}
+\end{table}
+
+\begin{py}
+if answer.declined:
+    return tool_error(
+        f"Exposure of ${exposure:,.0f} was declined by the approver.")
+if answer.cancelled:
+    return tool_error("Approval dialog was dismissed. Nothing was scored.")
+\end{py}
+
+And one case that is neither: the user accepted but left a required field blank.
+The specification's guidance is to \emph{ask again}, not to error:
+
+\begin{py}
+approver = (answer.content or {}).get("approver", "").strip()
+if not approver:
+    # Missing a value we need is not an error. Ask again.
+    return _ask_for_approval(ctx, account_id, exposure)
+\end{py}
+
+\subsection{URL mode}
+
+For anything that must not touch the client. The server returns a URL, the
+client shows it, gets consent, and opens it somewhere it cannot read.
+
+\begin{wire}
+{
+  "method": "elicitation/create",
+  "params": {
+    "mode": "url",
+    "url": "https://mcp.meridian.example/ui/connect-bank",
+    "message": "Connect your bank account to continue."
+  }
+}
+\end{wire}
+
+The response says only \texttt{\{"action": "accept"\}}, and that means ``the user
+agreed to look'', not ``the interaction succeeded''. The client never learns the
+outcome. The server finds out by other means and reports on the retry.
+
+The client-side rules are strict, and they exist because a server-supplied URL
+rendered in a trusted UI is a phishing vector:
+
+\begin{itemize}[leftmargin=1.6em, itemsep=2pt]
+\item Must not pre-fetch the URL or its metadata.
+\item Must not open it without explicit consent.
+\item Must show the full URL before consent.
+\item Must open it where neither the client nor the model can inspect the
+contents. On iOS that means \texttt{SFSafariViewController}, not
+\texttt{WKWebView}.
+\item Should highlight the domain, and warn on Punycode.
+\end{itemize}
+
+\begin{dangerbox}{The URL-mode phishing attack}
+Alice, a legitimate user of a benign server, triggers a URL-mode elicitation
+that starts a third-party OAuth flow. Her client shows the link. Instead of
+clicking it, Alice sends it to Bob. Bob opens it, authorizes, and believes he
+has connected his own account. The server receives the callback, assumes it
+belongs to Alice's pending elicitation, and binds \emph{Bob's} third-party
+tokens to \emph{Alice's} identity.
+
+The fix is that the server must verify that the user who \emph{opens} the URL is
+the user for whom it was minted. In practice: point the elicitation at your own
+\texttt{/connect} route, check a session cookie against the \texttt{sub} claim
+from your authorization server, and only then redirect onward.
+\end{dangerbox}
+
+\section{The cost}
+
+Now the number, which is the reason this chapter exists in a performance book.
+
+\bookfig[0.84]{xkcd-elicitation}{The transport cost of an elicitation is small.
+The model turn it forces is not.}{xkcd-elicitation}
+
+\begin{measurebox}{One elicitation, measured}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\thead{} & \thead{Requests} & \thead{Latency} \\
+\midrule
+Tool call, no elicitation            & 1.0 & 34.3\,ms \\
+Tool call with elicitation           & 2.0 & 68.8\,ms \\
+\midrule
+Extra transport                      &     & +34.5\,ms \\
+Plus one model turn to read the answer &   & +340\,ms \\
+\textbf{True cost}                   &     & \textbf{+375\,ms} \\
+\bottomrule
+\end{tabular}
+
+\vspace{6pt}
+\footnotesize
+Measured at 12\,ms simulated per-call latency. The transport half is measured;
+the model turn is the stated TTFT mean from \secref{simulated}.
+\end{measurebox}
+
+Plus the human, who is not in that table and who takes seconds.
+
+\keyidea{Every MRTR round trip is at least one extra client round trip and
+usually one extra model turn. The transport cost is around a tenth of the total.
+Optimising the transport is missing the point; the answer is to not need the
+round trip.}
+
+\subsection{Four ways to not need it}
+
+\textbf{Put it in the schema.} The best elicitation is the one that never
+happens. If a tool always needs an approver for large exposures, make
+\texttt{approver} an optional argument and let the model supply it when the user
+already said it. Zero round trips when it works.
+
+\textbf{Ask for everything at once.} \texttt{inputRequests} is a map. Three
+questions in one interim result cost one round trip; three separate interim
+results cost three.
+
+\textbf{Ask early, not late.} An elicitation on step one of a five-step task
+costs one model turn. On step four, it costs a model turn plus the risk that the
+user has wandered off and the context has gone stale.
+
+\textbf{Consider whether you need to ask at all.} Chapter~\ref{ch:tools} put it
+as a question: should the tool schema have captured this? Often yes. The
+elicitation is sometimes a symptom of a tool that was designed around an
+existing API rather than around the task.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+\thead{Ask the...} & \thead{When} \\
+\midrule
+User, via elicitation
+  & Only a human can supply it: authority, preference, consent, a credential \\
+Model, via a better schema
+  & It is derivable from the conversation the model is already holding \\
+Nobody
+  & The tool should have taken it as a parameter, and you are papering over a
+    design gap \\
+\bottomrule
+\end{tabularx}
+\caption{Elicitation versus prompting versus neither. The third row is more
+common than people admit.}
+\label{tab:ask-who}
+\end{table}
+
+\section{Why Sampling and Roots lost}
+
+A design post-mortem, because the reasoning generalises.
+
+\subsection{Sampling}
+
+The idea: a server asks the client to run a completion on its behalf. The server
+gets model access without an API key, the user's provider and quota are used,
+and the host keeps control over what the model sees.
+
+Genuinely elegant. It lost anyway, for three reasons.
+
+\textbf{The control-flow inversion was the whole problem.} Sampling was the main
+justification for server-initiated requests, and server-initiated requests are
+what statelessness could not accommodate.
+
+\textbf{Direct provider integration won on the ground.} It is 2026. A server
+that wants a model call adds three lines and an API key. The indirection bought
+less than it cost.
+
+\textbf{Quality control is impossible through the indirection.} The server
+cannot choose the model, cannot see the system prompt, and cannot verify what
+actually ran. \texttt{modelPreferences} was a hint, and hints are not a contract.
+
+\begin{legacybox}{Sampling}
+Deprecated as of \texttt{2026-07-28}, eligible for removal no earlier than
+2027-07-28. It still works, delivered through MRTR rather than as a server
+request.
+
+Maintaining a server that uses it: it functions unchanged during the window.
+
+Migrating: call your provider's API directly. You will need your own key and
+your own budget, and you will gain control over model choice and the ability to
+test what you shipped.
+
+Also deprecated alongside it: \texttt{includeContext: "thisServer"} and
+\texttt{"allServers"}. Omit the field or use \texttt{"none"}.
+\end{legacybox}
+
+\subsection{Roots}
+
+The idea: the client tells the server which directories it may work in.
+
+It lost for a simpler reason. It was a capability that looked like a security
+boundary and was not one. A server that respects roots is a server that was
+going to behave anyway; a malicious one ignores the list. Meanwhile it added a
+client-side concept, a notification, and a round trip.
+
+\begin{legacybox}{Roots}
+Deprecated as of \texttt{2026-07-28}, eligible for removal no earlier than
+2027-07-28. \texttt{notifications/roots/list\_changed} was removed outright.
+
+Migrate by passing directories and files as ordinary tool parameters, as
+resource URIs, or through server configuration. All three are explicit, all
+three are visible in an audit log, and none of them pretends to be a security
+boundary.
+\end{legacybox}
+
+The generalisable lesson: \textbf{a protocol feature that depends on the other
+party's goodwill is documentation, not enforcement.} Roots described an
+intention. The host's consent gate enforces one.
+
+\section{Meridian's approval flow, end to end}
+
+Two round trips, and Meridian asserts exactly that:
+
+\begin{py}
+def test_approval_flow_completes_in_two_round_trips(self):
+    host = wire_host(inputs={
+        "approval": {"action": "accept",
+                     "content": {"approver": "j.okonjo",
+                                 "rationale": "board ok"}},
+    })
+    binding = host.bindings["risk"]
+    before = binding.client.stats.requests
+
+    result = host.call_tool("risk.assess_account_risk",
+                            {"accountId": "ACC-1000", "exposureUsd": 9_000_000})
+
+    self.assertFalse(result.get("isError"))
+    self.assertIn("score", result["structuredContent"])
+    self.assertEqual(binding.client.stats.requests - before, 2)
+    self.assertEqual(binding.client.stats.mrtr_rounds, 1)
+\end{py}
+
+And crucially, the sub-threshold path costs one:
+
+\begin{py}
+def test_below_threshold_needs_no_round_trip(self):
+    ...
+    host.call_tool("risk.assess_account_risk",
+                   {"accountId": "ACC-1000", "exposureUsd": 100_000})
+    self.assertEqual(binding.client.stats.requests - before, 1)
+\end{py}
+
+That second test is the one that matters operationally. The expensive path
+should be reachable only when it is genuinely needed, and a test is the only
+thing that stops a refactor from making it unconditional.
+
+The client-side loop is bounded, because a server can legitimately ask again and
+a buggy one can ask forever:
+
+\begin{py}
+for round_no in range(MAX_MRTR_ROUNDS):
+    ...
+    if result.get("resultType") != jsonrpc.RESULT_INPUT_REQUIRED:
+        return result
+    self.stats.mrtr_rounds += 1
+    requests = result.get("inputRequests") or {}
+    pending_state = result.get("requestState")
+    pending_responses = self._answer(requests) if requests else {}
+    if requests and not pending_responses:
+        # Nothing could be answered. Retrying would loop forever.
+        raise errors.InvalidParams(
+            "server requested input this client cannot provide")
+
+raise errors.InternalError(
+    f"{method} still asking for input after {MAX_MRTR_ROUNDS} rounds")
+\end{py}
+
+\section{What to remember}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item Servers answer with \texttt{input\_required} instead of asking mid-call.
+The original request finishes.
+\item The retry uses a new id, repeats the arguments, and echoes
+\texttt{requestState} unmodified.
+\item \texttt{requestState} is attacker-controlled. Seal it with a MAC, bind it
+to the principal and the request, and expire it. None of that makes it
+single-use.
+\item Sign with a fleet-wide secret, and put no secrets inside.
+\item Never send an input request the client did not declare support for.
+Degrade with a clear tool error.
+\item Form mode for ordinary input, URL mode for anything sensitive. Verify that
+the user who opens a URL is the user it was minted for.
+\item \texttt{decline} and \texttt{cancel} are different. A blank required field
+means ask again, not error.
+\item One elicitation costs about 375\,ms, of which only 35 is transport. Ask
+for everything at once, ask early, or design so you need not ask.
+\item Sampling and Roots are deprecated. Both depended on the other party's
+goodwill or on a stateful connection.
+\end{itemize}
+
+Next: extensions, and the Tasks extension, which is what you use when the work
+takes longer than anyone wants to hold a connection open for.

@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Authorization on the Wire &middot; Building Awesome MCP Apps</title>
+<meta name="description" content="Authorization on the Wire. What every AI application developer should know about the Model Context Protocol">
+<meta property="og:title" content="Authorization on the Wire">
+<meta property="og:description" content="Authorization on the Wire. What every AI application developer should know about the Model Context Protocol">
+<style>
+:root{
+  --ink:#15181D; --muted:#5B6472; --rule:#D8DDE4; --wash:#F5F6F8;
+  --paper:#FFFFFF; --accent:#0F5C8C; --accent-soft:#E7F0F6;
+  --warm:#B4531A; --warm-soft:#FBF0E7; --good:#2C6E49; --good-soft:#E9F2EC;
+  --danger:#9B2226; --danger-soft:#FAECEC;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#E7EAEE; --muted:#98A2B0; --rule:#2C333D; --wash:#171B21;
+    --paper:#0F1216; --accent:#63AEDC; --accent-soft:#14232E;
+    --warm:#E08B4F; --warm-soft:#2A1D13; --good:#6FBF8E; --good-soft:#13221A;
+    --danger:#E4796F; --danger-soft:#291516;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--serif);font-size:18px;line-height:1.62;
+  -webkit-text-size-adjust:100%}
+.layout{display:grid;grid-template-columns:288px minmax(0,1fr);
+  max-width:1280px;margin:0 auto;gap:0}
+nav.toc{position:sticky;top:0;height:100vh;overflow-y:auto;padding:26px 20px 60px;
+  border-right:1px solid var(--rule);font-family:var(--sans);font-size:14px}
+nav.toc .brand{display:block;font-weight:700;font-size:16px;color:var(--ink);
+  text-decoration:none;line-height:1.3;margin-bottom:4px}
+nav.toc .tagline{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.45}
+nav.toc .part{margin:18px 0 6px;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);font-weight:700}
+nav.toc a{display:block;padding:4px 8px;margin-left:-8px;border-radius:5px;
+  color:var(--muted);text-decoration:none}
+nav.toc a:hover{background:var(--wash);color:var(--ink)}
+nav.toc a.current{background:var(--accent-soft);color:var(--accent);font-weight:600}
+main{padding:44px 52px 120px;min-width:0;max-width:78ch}
+h1,h2,h3,h4{font-family:var(--sans);line-height:1.25;color:var(--ink)}
+h1{font-size:2.05em;margin:0 0 .55em;letter-spacing:-.015em}
+h2{font-size:1.42em;margin:2em 0 .5em;padding-top:.35em}
+h3{font-size:1.14em;margin:1.7em 0 .4em}
+h4{font-size:1em;margin:1.4em 0 .3em;color:var(--muted)}
+p{margin:0 0 1.05em}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.855em;background:var(--wash);
+  padding:.12em .36em;border-radius:4px;word-break:break-word}
+pre{background:var(--wash);border-left:3px solid var(--rule);
+  border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+  font-size:13.5px;line-height:1.5;margin:1.3em 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+pre.json,pre.http{background:var(--accent-soft);border-left-color:var(--accent)}
+aside.box{border-left:3px solid var(--rule);background:var(--wash);
+  padding:14px 18px;margin:1.5em 0;border-radius:0 6px 6px 0;font-size:.955em}
+aside.box .box-title{font-family:var(--sans);font-weight:700;font-size:12px;
+  letter-spacing:.07em;text-transform:uppercase;margin:0 0 .55em}
+aside.box.legacy{border-left-color:var(--warm);background:var(--warm-soft)}
+aside.box.legacy .box-title{color:var(--warm)}
+aside.box.measured{border-left-color:var(--good);background:var(--good-soft)}
+aside.box.measured .box-title{color:var(--good)}
+aside.box.threat{border-left-color:var(--danger);background:var(--danger-soft)}
+aside.box.threat .box-title{color:var(--danger)}
+aside.box.note .box-title{color:var(--muted)}
+aside.keyidea{border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:14px 18px;margin:1.6em 0;border-radius:0 6px 6px 0;
+  font-family:var(--sans);font-style:italic;font-size:.97em}
+aside.keyidea p:last-child,aside.box p:last-child{margin-bottom:0}
+aside.keyidea pre,aside.keyidea code,aside.keyidea table{font-style:normal}
+aside.epigraph{border:0;margin:0 0 2em;padding:0 0 0 clamp(0px,7%,52px);
+  color:var(--muted);font-size:.97em}
+aside.epigraph p{margin:0 0 .3em}
+main figure{margin:2em 0;text-align:center}
+main figure img{max-width:100%;height:auto;border-radius:6px}
+@media (prefers-color-scheme: dark){
+  main figure img{background:#fff;padding:10px;border-radius:8px}
+}
+figcaption{font-family:var(--sans);font-size:13.5px;color:var(--muted);
+  margin-top:.7em;text-align:left;line-height:1.5}
+.table-wrap{overflow-x:auto;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:14.5px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+thead th{border-bottom:2px solid var(--rule);font-weight:700}
+caption{caption-side:bottom;font-size:13.5px;color:var(--muted);
+  text-align:left;padding-top:.7em;line-height:1.5}
+ul,ol{padding-left:1.35em;margin:0 0 1.05em}
+li{margin-bottom:.32em}
+dl{margin:0 0 1.05em}
+dt{font-weight:700;font-family:var(--sans);font-size:.95em;margin-top:.75em}
+dd{margin:.15em 0 0 1.35em}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
+.pager{display:flex;justify-content:space-between;gap:16px;margin-top:4em;
+  padding-top:1.5em;border-top:1px solid var(--rule);font-family:var(--sans);
+  font-size:14px}
+.pager a{text-decoration:none;max-width:46%}
+.pager .dir{display:block;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted)}
+.masthead{border-bottom:1px solid var(--rule);padding-bottom:1.8em;margin-bottom:2.2em}
+.masthead .kicker{font-family:var(--sans);font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);font-weight:700}
+.lede{font-size:1.12em;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:14px;margin:1.8em 0}
+.card{border:1px solid var(--rule);border-radius:9px;padding:15px 17px;
+  font-family:var(--sans);font-size:14px}
+.card h3{margin:0 0 .35em;font-size:15px}
+.card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+.menu-btn{display:none}
+@media (max-width:940px){
+  body{font-size:17px}
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:0;
+    border-bottom:1px solid var(--rule);max-height:none}
+  nav.toc.collapsed .toc-body{display:none}
+  main{padding:28px 20px 90px}
+  .menu-btn{display:inline-block;font-family:var(--sans);font-size:13px;
+    background:var(--wash);border:1px solid var(--rule);color:var(--ink);
+    border-radius:6px;padding:6px 11px;cursor:pointer;margin-bottom:10px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc"><button class="menu-btn" type="button">Contents</button>
+<div class="toc-body">
+<a class="brand" href="index.html">Building Awesome MCP Apps</a>
+<p class="tagline">What every AI application developer should know about the Model Context Protocol</p>
+<a href="preface.html">Preface</a>
+<a href="how-to-read.html">How to read this book</a>
+<div class="part">Part I. Protocol Fundamentals</div>
+<a href="ch01.html">A Primer on Latency, Tokens, and Context</a>
+<a href="ch02.html">The MCP Architectural Model</a>
+<a href="ch03.html">Building Blocks of the Transport</a>
+<a href="ch04.html" class="current">Authorization on the Wire</a>
+<div class="part">Part II. The Primitives</div>
+<a href="ch05.html">Tools: The Execution Layer</a>
+<a href="ch06.html">Resources: The Context Layer</a>
+<a href="ch07.html">Prompts: Workflow Blueprints</a>
+<a href="ch08.html">Multi Round-Trip Requests</a>
+<a href="ch09.html">Extensions and Tasks</a>
+<a href="ch10.html">MCP Apps: Interactive Interfaces</a>
+<div class="part">Part III. Building MCP Applications</div>
+<a href="ch11.html">Building Servers</a>
+<a href="ch12.html">Building Hosts and Clients</a>
+<a href="ch13.html">The Agent Loop, State, and Memory</a>
+<a href="ch14.html">Multi-Agent Topologies</a>
+<div class="part">Part IV. Performance Engineering</div>
+<a href="ch15.html">Testing and Debugging</a>
+<a href="ch16.html">Measuring MCP Applications</a>
+<a href="ch17.html">Optimizing for Latency, Tokens, and Cost</a>
+<a href="ch18.html">Deployment and Operations</a>
+<div class="part">Part V. Security and Trust</div>
+<a href="ch19.html">Threat Modeling Agentic Applications</a>
+<a href="ch20.html">Access Control, Audit, and MCP in the Enterprise</a>
+<div class="part">Back matter</div>
+<a href="epilogue.html">Epilogue: The Evolving Protocol</a>
+<div class="part">Appendices</div>
+<a href="appendix-a.html">A. Method and Message Reference</a>
+<a href="appendix-b.html">B. Transport Decision Matrix</a>
+<a href="appendix-c.html">C. Performance Checklist</a>
+<a href="appendix-d.html">D. Security Hardening Checklist</a>
+<a href="appendix-e.html">E. The Meridian Companion Repository</a>
+<a href="about.html">About the author</a>
+</div></nav>
+<main>
+<section id="ch:authorization" class="level1">
+<h1>Authorization on the Wire</h1>
+<aside class="epigraph">
+<p><em>“You shall not pass!”</em></p>
+<p>Gandalf, <em>The Fellowship of the Ring</em> (2001)</p>
+</aside>
+<p>Gandalf’s line is the most famous authorization decision in cinema, and it is worth noticing what it actually was. He did not check a credential. He asserted a boundary, at a chokepoint, against something that had every intention of walking straight through. That is the job. The credential is just the paperwork.</p>
+<p>This is a security chapter with a performance chapter hiding inside it, which is the same structure <em>High Performance Browser Networking</em> used for TLS, and for the same reason. Auth is not a policy you configure once. It is a sequence of network round trips that happen before your application does any work at all, and if you do not amortise them you will pay for them forever.</p>
+<section id="the-shape-of-it" class="level2">
+<h2>The shape of it</h2>
+<p>MCP does not invent an auth scheme. It profiles OAuth 2.1 and a stack of RFCs around it, taking a deliberately small subset. The roles map cleanly:</p>
+<dl>
+<dt>The MCP server is an OAuth resource server.</dt>
+<dd>
+<p>It accepts access tokens and validates them. It does not issue them.</p>
+</dd>
+<dt>The MCP client is an OAuth client.</dt>
+<dd>
+<p>It obtains tokens on behalf of a user.</p>
+</dd>
+<dt>The authorization server is somebody else’s problem.</dt>
+<dd>
+<p>Entra ID, Okta, Keycloak, or your own. MCP specifies how a client <em>finds</em> it, not how it works.</p>
+</dd>
+</dl>
+<p>Two scoping rules before we go further.</p>
+<p>Authorization is <strong>optional</strong>. Plenty of MCP servers need none.</p>
+<p>Authorization is <strong>for HTTP</strong>. On stdio the specification says explicitly that you should <em>not</em> do this, and should take credentials from the environment instead. The client launched the process; it can hand it an API key through the environment block. Running an OAuth flow against your own subprocess is theatre.</p>
+<pre class="python" data-language="python"><code>{
+  &quot;mcpServers&quot;: {
+    &quot;meridian-risk&quot;: {
+      &quot;command&quot;: &quot;python3&quot;,
+      &quot;args&quot;: [&quot;-m&quot;, &quot;meridian.serve&quot;, &quot;risk&quot;],
+      &quot;env&quot;: { &quot;MERIDIAN_API_KEY&quot;: &quot;...&quot; }
+    }
+  }
+}</code></pre>
+</section>
+<section id="the-full-flow-and-its-price-tag" class="level2">
+<h2>The full flow, and its price tag</h2>
+<figure id="fig:oauth-flow">
+<img src="figures/oauth-flow.svg" />
+<figcaption>OAuth 2.1 as MCP profiles it. Count the round trips on the left. Every one of them happens before your server does a single unit of useful work.</figcaption>
+</figure>
+<p>Walking it:</p>
+<p><strong>1. The challenge.</strong> The client makes an unauthenticated request. The server answers 401 with a <code>WWW-Authenticate</code> header that points at its metadata and, ideally, names the scopes needed:</p>
+<pre class="http" data-language="http"><code>HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer resource_metadata=&quot;https://mcp.meridian.example/.well-known/oauth-protected-resource&quot;,
+                         scope=&quot;risk:read&quot;</code></pre>
+<p>That <code>scope</code> parameter is a courtesy with real value. Without it the client falls back to requesting everything in <code>scopes_supported</code>, which means the user sees a consent screen asking for more than the operation needs, which means the user learns to click through consent screens.</p>
+<p><strong>2. Protected resource metadata.</strong> Required, by RFC 9728. The client fetches it and learns which authorization servers this resource trusts.</p>
+<p><strong>3. Authorization server metadata.</strong> The client tries OAuth 2.0 Authorization Server Metadata and OpenID Connect Discovery in priority order. Clients must support both, because the ecosystem is split and will stay split.</p>
+<p><strong>4. Authorization.</strong> PKCE, always. The <code>resource</code> parameter, always. Browser, consent, redirect with a code.</p>
+<p><strong>5. Token exchange.</strong> Code plus verifier plus resource, in exchange for an access token.</p>
+<p>Then, finally, the original request runs.</p>
+<aside class="box measured"><p class="box-title">Measured: What the handshake costs (modelled)</p>
+<table>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Step</strong></td>
+<td style="text-align: right;"><strong>Round trips</strong></td>
+<td style="text-align: right;"><strong>Typical</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">401 challenge</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">40 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;">Protected resource metadata</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">40 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;">Authorization server metadata</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">60 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;">Authorization (includes a human)</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">seconds</td>
+</tr>
+<tr>
+<td style="text-align: left;">Token exchange</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">80 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Machine time before first work</strong></td>
+<td style="text-align: right;"><strong>4</strong></td>
+<td style="text-align: right;"><strong>~220 ms</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Modelled at 40 ms per hop, not measured; Meridian’s benchmark auth is local and would flatter these badly. The number that matters is the round-trip count, which is exact.</p>
+</aside>
+<p>Four machine round trips, plus a human. If you pay that per request you have built something unusable. If you pay it once per session and cache aggressively, it disappears. That is the entire performance content of this chapter, and it is worth stating as a rule:</p>
+<aside class="keyidea">
+<p>Steps 1 through 3 are properties of the server, not of the request. Cache them per origin, for hours. The token is a property of the user and the scope set. Cache it until it expires, and refresh it before it does, not after.</p>
+</aside>
+</section>
+<section id="client-identity-in-2026" class="level2">
+<h2>Client identity in 2026</h2>
+<p>Here is the part that changed, and it changed for a good reason.</p>
+<p>MCP’s awkward case is a client and a server with no prior relationship. A user installs some MCP client, points it at some MCP server, and expects it to work. There is no administrator to pre-register an OAuth client.</p>
+<p>The 2025 answer was Dynamic Client Registration: the client POSTs to a registration endpoint and gets credentials. It works, and it has a nasty property. Every client instance registers separately, so an authorization server accumulates registrations forever, most of them belonging to a laptop that was reimaged eight months ago. It is a write endpoint open to the internet that grows without bound.</p>
+<section id="sec:client-identity" class="level3">
+<h3>Client ID Metadata Documents</h3>
+<p>The replacement is neat. The client id <em>is</em> an HTTPS URL, and that URL serves the client’s metadata:</p>
+<pre class="json" data-language="json"><code>{
+  &quot;client_id&quot;: &quot;https://app.example.com/oauth/client-metadata.json&quot;,
+  &quot;client_name&quot;: &quot;Example MCP Client&quot;,
+  &quot;client_uri&quot;: &quot;https://app.example.com&quot;,
+  &quot;logo_uri&quot;: &quot;https://app.example.com/logo.png&quot;,
+  &quot;redirect_uris&quot;: [
+    &quot;http://127.0.0.1:3000/callback&quot;,
+    &quot;http://localhost:3000/callback&quot;
+  ],
+  &quot;grant_types&quot;: [&quot;authorization_code&quot;],
+  &quot;response_types&quot;: [&quot;code&quot;],
+  &quot;token_endpoint_auth_method&quot;: &quot;none&quot;
+}</code></pre>
+<p>The authorization server sees a URL-shaped <code>client_id</code>, fetches it, validates that the document’s <code>client_id</code> matches the URL exactly, checks the <code>redirect_uri</code> against the list, and proceeds.</p>
+<p>What this buys:</p>
+<ul>
+<li><p><strong>No registration round trip.</strong> The zero-numbered step in <a href="#fig:oauth-flow">Figure 4.1</a> happens on the authorization server’s own time, and it is cacheable under ordinary HTTP cache headers.</p></li>
+<li><p><strong>No unbounded registration table.</strong> One document serves every instance of the client.</p></li>
+<li><p><strong>Portability.</strong> The same client id works at every authorization server, because it resolves on demand. Credentials from DCR are bound to the issuer that minted them and must be re-registered when it changes.</p></li>
+</ul>
+<p>Servers advertise support with one metadata field:</p>
+<pre class="json" data-language="json"><code>{ &quot;client_id_metadata_document_supported&quot;: true }</code></pre>
+<p>The client’s selection order, when it supports everything:</p>
+<ol>
+<li><p>Pre-registered credentials, if it has them for this server</p></li>
+<li><p>Client ID Metadata Documents, if the AS advertises support</p></li>
+<li><p>Dynamic Client Registration, if the AS has a <code>registration_endpoint</code></p></li>
+<li><p>Ask the user to paste a client id</p></li>
+</ol>
+<aside class="box legacy"><p class="box-title">Legacy: Dynamic Client Registration (RFC 7591)</p>
+<p>Deprecated as of <code>2026-07-28</code>, eligible for removal no earlier than 2027-07-28. Retained because plenty of 2025-era authorization servers speak nothing else.</p>
+<p>If you must use it, specify <code>application_type</code> explicitly. Omitting it defaults to <code>"web"</code> under OpenID Connect, which rejects the <code>localhost</code> redirect URIs that desktop and CLI clients need. Use <code>"native"</code> for anything local. This is a genuinely common failure and the error message is never helpful.</p>
+<p>Also: key persisted credentials by the authorization server’s <code>issuer</code>. Reusing a client id across authorization servers is a specification violation, and it fails in confusing ways rather than clean ones.</p>
+</aside>
+</section>
+</section>
+<section id="two-validations-that-stop-real-attacks" class="level2">
+<h2>Two validations that stop real attacks</h2>
+<p>Most of OAuth’s complexity is scar tissue. Two pieces of it are worth understanding rather than merely implementing.</p>
+<section id="audience-binding-or-do-not-be-a-confused-deputy" class="level3">
+<h3>Audience binding, or: do not be a confused deputy</h3>
+<p>RFC 8707. The client must send a <code>resource</code> parameter naming the server the token is for, on both the authorization request and the token request:</p>
+<pre class="text" data-language="text"><code>&amp;resource=https%3A%2F%2Fmcp.meridian.example</code></pre>
+<p>The server must then validate that tokens presented to it were issued for it.</p>
+<aside class="box threat"><p class="box-title">Threat: The confused deputy</p>
+<p>Without audience binding: a user authorizes a malicious MCP server. That server receives a token. It presents the same token to your server. If your server checks only that the token is valid and signed by an issuer it trusts, it now acts on the user’s behalf at the attacker’s direction.</p>
+<p>The token was real. The user did consent. They simply consented to something else.</p>
+</aside>
+<p>Three rules follow, and the specification states all three as MUST:</p>
+<ul>
+<li><p>Clients must not send a token to any server other than the one its authorization server issued it for.</p></li>
+<li><p>Servers must accept only tokens valid for their own resources.</p></li>
+<li><p>Servers must not accept or forward any other token.</p></li>
+</ul>
+<p>That third one forbids token passthrough, and it is worth being blunt: an MCP server that takes the client’s token and replays it at a third-party API is doing the forbidden thing. Chapter <a href="ch08.html#ch:mrtr">8</a> covers the correct pattern, which is URL-mode elicitation, and Chapter <a href="ch20.html#ch:access-control">20</a> covers why the shortcut is so tempting.</p>
+</section>
+<section id="issuer-validation-rfc-9207" class="level3">
+<h3>Issuer validation, RFC 9207</h3>
+<p>New in this revision, and small enough to skip by accident.</p>
+<p>Before redirecting the user, the client records the <code>issuer</code> from the authorization server’s validated metadata. When the authorization code comes back, the response should carry an <code>iss</code> parameter, and the client must compare it before redeeming the code.</p>
+<table id="tab:iss-validation">
+<caption>RFC 9207 validation. Row two is the one that exists specifically to stop mix-up attacks.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>AS advertises <code>iss</code></strong></td>
+<td style="text-align: left;"><strong><code>iss</code> present</strong></td>
+<td style="text-align: left;"><strong>Client action</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">true</td>
+<td style="text-align: left;">yes</td>
+<td style="text-align: left;">Compare, by simple string comparison</td>
+</tr>
+<tr>
+<td style="text-align: left;">true</td>
+<td style="text-align: left;">no</td>
+<td style="text-align: left;"><strong>Reject the response</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">false</td>
+<td style="text-align: left;">yes</td>
+<td style="text-align: left;">Compare anyway</td>
+</tr>
+<tr>
+<td style="text-align: left;">false</td>
+<td style="text-align: left;">no</td>
+<td style="text-align: left;">Proceed</td>
+</tr>
+</tbody>
+</table>
+<p>Two details people get wrong.</p>
+<p><strong>Simple string comparison.</strong> After URL-decoding, do not normalise. No case folding on scheme or host, no default-port elision, no trailing-slash adjustment, no percent-encoding normalisation. Normalising creates equivalence classes, and equivalence classes are where attackers live.</p>
+<p><strong>It applies to error responses too.</strong> If <code>iss</code> does not match, do not display <code>error_description</code>. That string is attacker-controlled and you were about to render it in your UI.</p>
+</section>
+</section>
+<section id="scopes-without-making-the-user-hate-you" class="level2">
+<h2>Scopes without making the user hate you</h2>
+<p>Scope design is where auth stops being mechanics and starts being product design.</p>
+<p>The principle is least privilege, and the mechanism is step-up: request the minimum, and ask for more when an operation actually needs it. When a call needs a scope the token lacks:</p>
+<pre class="http" data-language="http"><code>HTTP/1.1 403 Forbidden
+WWW-Authenticate: Bearer error=&quot;insufficient_scope&quot;,
+                         scope=&quot;risk:write&quot;,
+                         resource_metadata=&quot;https://mcp.meridian.example/.well-known/oauth-protected-resource&quot;,
+                         error_description=&quot;Writing a risk override requires risk:write&quot;</code></pre>
+<p>Note 403 rather than 401. A 401 means “I do not know who you are”; a 403 means “I know exactly who you are and you may not do that”. Clients branch on this, so getting it wrong sends them into a re-authentication loop that cannot succeed.</p>
+<p>Two rules for servers, both about not being annoying:</p>
+<p><strong>Challenge with everything the operation needs, at once.</strong> Returning one missing scope, then another on the retry, forces a separate consent round trip per scope. Determine the full set, then emit it together.</p>
+<p><strong>Be consistent.</strong> Whatever strategy you pick for constructing scope sets, apply it uniformly. Clients cache and predict; a server that varies its challenges defeats both.</p>
+<p>And one rule for clients, which is the one that gets forgotten:</p>
+<aside class="keyidea">
+<p>On a step-up, request the <em>union</em> of what you already had and what was just challenged. Requesting only the new scope silently drops the old ones, and the next operation fails in a way that looks like a server bug.</p>
+</aside>
+</section>
+<section id="failure-mid-loop" class="level2">
+<h2>Failure mid-loop</h2>
+<p>Now the operationally interesting part, which the specifications do not really address because it is an application concern.</p>
+<p>An agent loop runs for a while. Tokens expire. What happens when step 7 of a 12-step task gets a 401?</p>
+<p>The wrong answer is to fail the task. The user’s work is half done, the model holds context that took real money to build, and throwing it away to re-run an OAuth flow from scratch is the worst of both worlds.</p>
+<p>The right answer treats re-auth as a recoverable interruption:</p>
+<pre class="python" data-language="python"><code>def call_with_reauth(self, name, arguments, *, max_attempts=2):
+    &quot;&quot;&quot;Refresh once, retry once, then stop.
+
+    The retry limit matters. A server that returns 401 for a reason the
+    client cannot fix (a revoked grant, a disabled account) will do so
+    forever, and an unbounded retry turns that into an outage plus a
+    denial-of-service against your own authorization server.
+    &quot;&quot;&quot;
+    for attempt in range(max_attempts):
+        try:
+            return self.call_tool(name, arguments)
+        except Unauthorized:
+            if attempt + 1 == max_attempts:
+                raise
+            if not self.refresh_token():
+                raise            # refresh failed; a human is needed
+    raise Unauthorized(&quot;re-authentication did not help&quot;)</code></pre>
+<p>Better still, do not get there. Refresh proactively when a token is within some margin of expiry, so the refresh happens between loop iterations rather than inside one.</p>
+<table id="tab:auth-failures">
+<caption>Auth failure modes and their handling. Only the last one should ever lose the task.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Situation</strong></td>
+<td style="text-align: left;"><strong>What the host should do</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Access token expired, refresh token valid</td>
+<td style="text-align: left;">Refresh silently. The user sees nothing.</td>
+</tr>
+<tr>
+<td style="text-align: left;">Refresh token expired or revoked</td>
+<td style="text-align: left;">Pause the loop, keep the context, prompt for re-auth, resume.</td>
+</tr>
+<tr>
+<td style="text-align: left;">Insufficient scope (403)</td>
+<td style="text-align: left;">Step up with the union of scopes, then retry the one operation.</td>
+</tr>
+<tr>
+<td style="text-align: left;">Grant revoked entirely</td>
+<td style="text-align: left;">Fail cleanly and say so. Do not retry; you are attacking your own AS.</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="enterprise-identity-providers" class="level2">
+<h2>Enterprise identity providers</h2>
+<p>Brief, practical, and mostly reassurance.</p>
+<p>You almost certainly do not need to write an authorization server. Entra ID, Okta, Keycloak, and Auth0 are all OAuth 2.1 capable. The MCP-specific requirements are narrow:</p>
+<ol>
+<li><p><strong>Your MCP server publishes protected resource metadata</strong> at <code>/.well-known/oauth-protected-resource</code>. This is a static JSON document. It is the only piece of OAuth infrastructure you are obliged to build.</p></li>
+<li><p><strong>Your IdP supports RFC 8707 resource indicators.</strong> Most do now. If yours does not, audience binding has to be enforced by convention, which is weaker and worth pushing back on.</p></li>
+<li><p><strong>Your IdP supports CIMD, or you fall back to DCR or pre-registration.</strong> All three are legitimate; the priority order is in <a href="#sec:client-identity">§4.3.1</a>.</p></li>
+</ol>
+<p>What you should not do is fork your MCP server per identity provider. The provider is a URL in a metadata document. If provider-specific code is leaking into your request handlers, something has gone wrong upstream of the handlers.</p>
+</section>
+<section id="auth-in-meridian" class="level2">
+<h2>Auth in Meridian</h2>
+<p>Meridian’s HTTP transport takes an authenticator callable, so the protocol layer never learns what a token is:</p>
+<pre class="python" data-language="python"><code>def _handle_post(self, h) -&gt; None:
+    ...
+    auth = None
+    if self.authenticator is not None:
+        auth = self.authenticator(h.headers.get(&quot;Authorization&quot;))
+        if auth is None:
+            h.send_response(401)
+            h.send_header(
+                &quot;WWW-Authenticate&quot;,
+                &#39;Bearer resource_metadata=&#39;
+                f&#39;&quot;http://{self.host}:{self.port}&#39;
+                &#39;/.well-known/oauth-protected-resource&quot;&#39;)
+            h.send_header(&quot;Content-Length&quot;, &quot;0&quot;)
+            h.end_headers()
+            return</code></pre>
+<p>The resulting claims land on the request context, and from there they reach the two places that need them:</p>
+<p><strong>Filtering the catalogue.</strong> The specification is precise here, and the precision matters. A server’s tool list must not vary per <em>connection</em>, but it may vary by the <em>authorization presented on the request</em>. Those sound similar and are completely different: credentials are per-request input, so filtering on them is stateless, whereas filtering on connection identity is not.</p>
+<pre class="python" data-language="python"><code>def visible_tools(self, ctx: RequestContext) -&gt; list[Tool]:
+    &quot;&quot;&quot;Override to filter by scope. The set may vary by authorization,
+    never by connection.&quot;&quot;&quot;
+    return sorted(self._tools.values(), key=lambda t: t.name)</code></pre>
+<p><strong>Binding MRTR state to a principal.</strong> This is the one that stops a real attack. Meridian seals its <code>requestState</code> with the authenticated subject inside, and rejects state presented by anybody else:</p>
+<pre class="python" data-language="python"><code>return input_required(
+    input_requests={&quot;approval&quot;: elicit_form(...)},
+    request_state=SEALER.seal(
+        {&quot;accountId&quot;: account_id, &quot;exposureUsd&quot;: exposure},
+        principal=(ctx.auth or {}).get(&quot;sub&quot;),
+        method=ctx.method,
+        params=ctx.params,
+    ),
+)</code></pre>
+<p>Without the principal binding, Bob could replay Alice’s half-completed high-value approval and inherit it. Chapter <a href="ch08.html#ch:mrtr">8</a> covers the sealing scheme in full, and Meridian tests each binding separately:</p>
+<pre class="python" data-language="python"><code>def test_principal_binding_blocks_cross_user_replay(self):
+    token = self.sealer.seal({&quot;txn&quot;: &quot;T1&quot;}, principal=&quot;alice&quot;)
+    self.assertEqual(self.sealer.open(token, principal=&quot;alice&quot;),
+                     {&quot;txn&quot;: &quot;T1&quot;})
+    with self.assertRaises(McpError):
+        self.sealer.open(token, principal=&quot;bob&quot;)</code></pre>
+<aside class="box note"><p class="box-title">Cache scope and authorization are the same conversation</p>
+<p>A <code>private</code> cached response may only be reused within the same authorization context. A <code>public</code> one may be served to anyone, including across tokens, even when it came from an authenticated endpoint.</p>
+<p>So <code>cacheScope</code> is an access-control decision wearing performance clothing. Meridian keys <em>every</em> cache entry by principal, public or not, because the cost of a duplicate entry is a few kilobytes and the cost of being wrong is a data breach. Chapter <a href="ch06.html#ch:resources">6</a> has the measurements.</p>
+</aside>
+</section>
+<section id="what-to-remember" class="level2">
+<h2>What to remember</h2>
+<ul>
+<li><p>OAuth 2.1 with PKCE, for HTTP only. On stdio, use the environment.</p></li>
+<li><p>Four machine round trips before any work happens. Cache discovery per origin, cache tokens until expiry, refresh before you need to.</p></li>
+<li><p>Client ID Metadata Documents replace Dynamic Client Registration. The client id is an HTTPS URL that resolves to metadata.</p></li>
+<li><p>Audience binding via RFC 8707 is what stops the confused deputy. Never accept or forward a token issued for somebody else.</p></li>
+<li><p>Validate <code>iss</code> before redeeming a code, with simple string comparison and no normalisation, including on error responses.</p></li>
+<li><p>Challenge with all the scopes an operation needs at once; step up with the union, never the difference.</p></li>
+<li><p>Expired tokens are a recoverable interruption, not a failed task. Bound your retries.</p></li>
+<li><p>Tool visibility may vary by authorization, never by connection.</p></li>
+</ul>
+<p>That closes Part I. You now know the physics, the architecture, the wire, and the credentials. Part II is what you actually build with them, starting with the primitive that does the work.</p>
+</section>
+</section>
+<div class="pager">
+<a href="ch03.html"><span class="dir">Previous</span>Building Blocks of the Transport</a>
+<a href="ch05.html" style="text-align:right"><span class="dir">Next</span>Tools: The Execution Layer</a>
+</div>
+</main>
+</div>
+<script>
+(function(){
+  var nav = document.querySelector('nav.toc');
+  var btn = document.querySelector('.menu-btn');
+  if(btn && nav){
+    if(window.innerWidth <= 940) nav.classList.add('collapsed');
+    btn.addEventListener('click', function(){ nav.classList.toggle('collapsed'); });
+  }
+  // Wrap tables so wide ones scroll rather than overflowing the page.
+  document.querySelectorAll('main table').forEach(function(t){
+    if(t.parentElement.classList.contains('table-wrap')) return;
+    var w = document.createElement('div');
+    w.className = 'table-wrap';
+    t.parentNode.insertBefore(w, t);
+    w.appendChild(t);
+  });
+})();
+</script>
+</body>
+</html>

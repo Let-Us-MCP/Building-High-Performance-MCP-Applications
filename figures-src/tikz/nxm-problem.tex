@@ -1,0 +1,60 @@
+% Chapter 1. N x M integrations versus N + M.
+\documentclass[tikz,border=6pt]{standalone}
+\input{_style}
+\begin{document}
+\begin{tikzpicture}[x=1cm, y=1cm]
+
+  % =======================================================================
+  % LEFT: the N x M mess
+  % =======================================================================
+  \begin{scope}[xshift=0cm]
+    \node[lblink, font=\sffamily\bfseries] at (1.6,4.15) {Without a protocol};
+    \node[lbl] at (1.6,3.75) {4 hosts $\times$ 5 systems = 20 integrations};
+
+    \foreach \i/\y in {0/2.7, 1/1.8, 2/0.9, 3/0.0} {
+      \node[box, minimum width=15mm, minimum height=6mm, font=\sffamily\scriptsize]
+        (h\i) at (0,\y) {host \i};
+    }
+    \foreach \j/\y in {0/3.1, 1/2.3, 2/1.5, 3/0.7, 4/-0.1} {
+      \node[boxg, minimum width=15mm, minimum height=6mm, font=\sffamily\scriptsize]
+        (s\j) at (3.4,\y) {sys \j};
+    }
+    \foreach \i in {0,1,2,3} {
+      \foreach \j in {0,1,2,3,4} {
+        \draw[draw=danger, line width=0.35pt, opacity=0.45] (h\i) -- (s\j);
+      }
+    }
+    \node[note, text=danger, align=center] at (1.7,-1.15)
+      {every pair is bespoke code\\somebody has to maintain};
+  \end{scope}
+
+  % =======================================================================
+  % RIGHT: N + M through the protocol
+  % =======================================================================
+  \begin{scope}[xshift=7.6cm]
+    \node[lblink, font=\sffamily\bfseries] at (1.7,4.15) {With MCP};
+    \node[lbl] at (1.7,3.75) {4 clients + 5 servers = 9 implementations};
+
+    \foreach \i/\y in {0/2.7, 1/1.8, 2/0.9, 3/0.0} {
+      \node[box, minimum width=15mm, minimum height=6mm, font=\sffamily\scriptsize]
+        (H\i) at (0,\y) {host \i};
+    }
+    \foreach \j/\y in {0/3.1, 1/2.3, 2/1.5, 3/0.7, 4/-0.1} {
+      \node[boxg, minimum width=15mm, minimum height=6mm, font=\sffamily\scriptsize]
+        (S\j) at (3.4,\y) {sys \j};
+    }
+
+    % the waist
+    \node[boxa, minimum width=8mm, minimum height=42mm, align=center,
+          font=\sffamily\scriptsize] (mcp) at (1.7,1.35)
+      {\rotatebox{90}{\textbf{MCP}}};
+
+    \foreach \i in {0,1,2,3} { \draw[flow] (H\i) -- (mcp); }
+    \foreach \j in {0,1,2,3,4} { \draw[flow] (mcp) -- (S\j); }
+
+    \node[note, text=good, align=center] at (1.7,-1.15)
+      {one contract in the middle;\\each side implements it once};
+  \end{scope}
+
+\end{tikzpicture}
+\end{document}

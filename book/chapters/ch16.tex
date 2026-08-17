@@ -1,0 +1,540 @@
+\chapter{Measuring MCP Applications}
+\label{ch:measuring}
+
+\epigraph{``It's about getting things down to one number.''}{Peter Brand,
+\emph{Moneyball} (2011)}
+
+Brand's point was not that one number is enough. It was that an argument
+conducted in adjectives cannot be settled, and an argument conducted in numbers
+can. Everyone in that room had been scouting on instinct for thirty years and
+each of them was certain.
+
+This is the chapter the book was written for. Everything before it was
+mechanism. Everything after it is optimisation, and optimisation without
+measurement is superstition with a build pipeline.
+
+\section{The metrics that matter}
+
+Nine. Not twenty, because a dashboard nobody reads is a dashboard that does not
+exist.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXl@{}}
+\toprule
+\thead{Metric} & \thead{Why} & \thead{Meridian} \\
+\midrule
+Time to first token & What the user feels as ``is it working'' & 340\,ms \\
+Loop iterations per task & The unit that actually costs money & 3 \\
+Round trips per task & Tool calls plus MRTR retries & 3 \\
+Loop latency, decomposed & Model, transport, execution, consent & see below \\
+Tool-selection accuracy & Catalogue health & eval-only \\
+Call success rate & Server health, split by error kind & \\
+Context utilisation & Tokens used against the window & 4{,}009 \\
+Cache hit rate & Whether you honour \texttt{ttlMs} & 96.2\,\% \\
+Cost per task & The number finance will eventually ask about & \$0.0125 \\
+\bottomrule
+\end{tabularx}
+\caption{Nine numbers. If you can only have three, take iterations per task,
+cost per task, and cache hit rate.}
+\label{tab:metrics}
+\end{table}
+
+Two of these are unusual enough to justify.
+
+\textbf{Loop iterations per task} rather than requests per second. Requests per
+second is a server metric and it will look wonderful while your users wait eight
+seconds, because the expensive part is not the request.
+
+\textbf{Tool-selection accuracy} needs an eval to measure, so most people skip
+it. Do not. It is the leading indicator of catalogue rot, and it degrades slowly
+enough that nobody notices from the inside.
+
+\section{Decomposing the loop}
+
+The single most useful thing in this chapter.
+
+\begin{py}
+@dataclass
+class Iteration:
+    """One trip round the loop, with the milliseconds attributed."""
+    index: int
+    model_ms: float = 0.0
+    transport_ms: float = 0.0
+    consent_ms: float = 0.0
+    tool_calls: int = 0
+    parallel: bool = False
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cost_usd: float = 0.0
+\end{py}
+
+Four bands, and every millisecond belongs to exactly one. If you cannot say which
+band a millisecond went to, that is the bug: not a slow system, an unmeasurable
+one.
+
+\bookfig[0.98]{waterfall}{One Meridian task, drawn to scale. Three iterations,
+three tool calls, and the shape tells you where to spend your
+effort.}{waterfall}
+
+Read that figure like a trace, because that is what it is.
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item Three iterations, and iteration 2 does no tool calls at all. It exists so
+the model can read iteration 1's results and say it is finished, and it costs
+400\,ms.
+\item The two tool bands are 18.0\,ms and 35.9\,ms. Together, 3.9\,\% of the
+task.
+\item Iteration 1's two calls ran serially here. In parallel they cost 19.5\,ms
+instead of 35.9.
+\end{itemize}
+
+\keyidea{If your waterfall is mostly blue, you have a round-trip problem, and the
+fix is fewer iterations. If your waterfall has a fat green band, you have a
+server problem, and the fix is profiling. Most people assume the second and
+have the first.}
+
+\subsection{The subtraction that isolates transport}
+
+From Chapter~\ref{ch:transport}, and worth restating as a technique:
+
+\begin{measurebox}{Same call, three transports}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\thead{Transport} & \thead{Mean} & \thead{Minus control} \\
+\midrule
+In-process (control) & 0.031\,ms & \\
+stdio                & 0.060\,ms & 0.029\,ms \\
+Streamable HTTP      & 0.161\,ms & 0.130\,ms \\
+\bottomrule
+\end{tabular}
+\end{measurebox}
+
+The control still serialises and deserialises, so what remains after the
+subtraction is transport mechanics and nothing else. That is the only honest way
+to answer ``is my server slow or is my transport slow'', and it takes ten minutes
+to set up.
+
+\section{Distributed tracing, done properly}
+
+Here is where MCP gives you something genuinely nice.
+
+\texttt{traceparent}, \texttt{tracestate}, and \texttt{baggage} are reserved
+\texttt{\_meta} keys, carved out as an explicit exception to the reverse-DNS
+prefix rule specifically so W3C Trace Context works unchanged.
+
+\begin{wire}
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/call",
+  "params": {
+    "name": "assess_account_risk",
+    "arguments": { "accountId": "ACC-1042" },
+    "_meta": {
+      "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+      "io.modelcontextprotocol/clientCapabilities": {},
+      "traceparent": "00-0af7651916cd43dd8448eb211c80319c-00f067aa0ba902b7-01"
+    }
+  }
+}
+\end{wire}
+
+Client side it is one argument:
+
+\begin{py}
+body["_meta"] = build_request_meta(
+    self.capabilities, self.info,
+    protocol_version=self.protocol_version,
+    progress_token=progress_token,
+    traceparent=traceparent,
+)
+\end{py}
+
+Server side it lands on the context, ready to become a span parent:
+
+\begin{py}
+return RequestContext(
+    ...
+    traceparent=meta.get(KEY_TRACEPARENT),
+    tracestate=meta.get(KEY_TRACESTATE),
+    baggage=meta.get(KEY_BAGGAGE),
+)
+\end{py}
+
+That is the whole integration. Your existing OpenTelemetry backend now shows
+host-to-server spans without knowing what MCP is.
+
+\subsection{The span hierarchy worth building}
+
+\begin{plain}
+task                                    [ 1,366 ms]
+ |- iteration 0                         [   447 ms]
+ |   |- model.generate                  [   430 ms]
+ |   `- tool.risk.assess_account_risk   [    18 ms]
+ |       |- transport.http              [     4 ms]
+ |       `- server.execute              [    13 ms]
+ |- iteration 1                         [   518 ms]
+ |   |- model.generate                  [   482 ms]
+ |   |- tool.fraud.screen_account       [    18 ms]
+ |   `- tool.marketdata.get_curve       [    17 ms]
+ `- iteration 2                         [   400 ms]
+     `- model.generate                  [   400 ms]
+\end{plain}
+
+Three properties make this worth the effort:
+
+\textbf{Iterations are spans.} Not just tool calls. Otherwise your trace shows
+54\,ms of activity inside a 1,366\,ms task and a 1,312\,ms hole nobody can
+explain.
+
+\textbf{Transport and execution are separate spans.} That is the subtraction
+above, done automatically for every call rather than once in a benchmark.
+
+\textbf{Sibling spans that overlap in time reveal parallelism.} If you fanned
+out, the trace shows it. If you thought you fanned out and did not, the trace
+shows that too, which is more useful.
+
+\begin{notebox}{What to put in \texttt{baggage}}
+\texttt{baggage} propagates key-value pairs across every hop, which makes it
+tempting as a general-purpose channel. Resist.
+
+Good: tenant id, task id, environment. Things you want to slice traces by.
+
+Bad: anything sensitive. Baggage crosses every trust boundary in the system,
+including into servers you do not operate, and it lands in whatever tracing
+backend each of them uses.
+\end{notebox}
+
+\section{Instrumenting a server}
+
+Meridian keeps deliberately crude built-in counters, because something is
+enormously better than nothing and it costs four lines:
+
+\begin{py}
+finally:
+    elapsed = (time.perf_counter() - started) * 1000.0
+    self.call_count[method] = self.call_count.get(method, 0) + 1
+    self.total_ms[method] = self.total_ms.get(method, 0.0) + elapsed
+\end{py}
+
+\begin{py}
+def stats(self) -> dict:
+    return {
+        "calls": dict(self.call_count),
+        "meanMs": {
+            m: round(self.total_ms[m] / self.call_count[m], 3)
+            for m in self.call_count if self.call_count[m]
+        },
+    }
+\end{py}
+
+Means are a lie, of course. What you actually want is percentiles, because the
+p99 is what your users complain about and the mean is what hides it. The client
+keeps those:
+
+\begin{py}
+def percentile(self, p: float) -> float:
+    if not self.latency_ms:
+        return 0.0
+    ordered = sorted(self.latency_ms)
+    idx = min(len(ordered) - 1, int(round((p / 100.0) * (len(ordered) - 1))))
+    return ordered[idx]
+\end{py}
+
+\keyidea{Report p50, p95, and p99. A mean of 40\,ms with a p99 of 4\,s is a
+system where one user in a hundred thinks you are broken, and the mean will never
+tell you.}
+
+\section{Instrumenting the client}
+
+\begin{py}
+@dataclass
+class CallStats:
+    """The counters Chapter 16 turns into a dashboard."""
+    requests: int = 0
+    mrtr_rounds: int = 0
+    retries: int = 0
+    errors: int = 0
+    bytes_sent: int = 0
+    bytes_received: int = 0
+    latency_ms: list[float] = field(default_factory=list)
+\end{py}
+
+Three of these are worth more attention than they usually get.
+
+\textbf{\texttt{mrtr\_rounds}} is extra round trips forced by servers asking
+questions, at roughly 375\,ms each (Chapter~\ref{ch:mrtr}).
+Chapter~\ref{ch:building-hosts} called it the early warning for a missing schema
+field; on a dashboard it is also the fastest way to attribute a latency
+regression to a specific server deploy.
+
+\textbf{\texttt{bytes\_sent} against \texttt{bytes\_received}} tells you whether
+your requests or your responses are the problem. Meridian sends a 320-byte
+request and receives 5,856 bytes for a \texttt{tools/list}. Requests are never
+the issue; catalogues frequently are.
+
+\textbf{\texttt{errors}, split by kind.} Protocol errors and tool execution
+errors have completely different meanings. Protocol errors are bugs. Tool
+execution errors are normal operation, and a rate of zero means your validation
+is happening somewhere it should not be.
+
+\section{Cache metrics}
+
+\begin{py}
+@dataclass
+class CacheStats:
+    hits: int = 0
+    misses: int = 0
+    stale: int = 0
+    invalidations: int = 0
+    stores: int = 0
+    uncacheable: int = 0
+\end{py}
+
+Six counters, and the split between \texttt{misses} and \texttt{stale} is the
+one that pays.
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item High \texttt{misses}: you are seeing new things. Cold cache, or key
+cardinality is higher than you thought.
+\item High \texttt{stale}: TTLs are too short for your access pattern. This is
+tunable and usually free.
+\item High \texttt{invalidations}: the underlying data really is changing.
+Nothing to fix, but it explains the hit rate.
+\item High \texttt{uncacheable}: you are calling uncacheable methods, or making
+MRTR retries. Expected for \texttt{tools/call}; suspicious for anything else.
+\end{itemize}
+
+A hit rate alone cannot distinguish ``TTL too short'' from ``data genuinely
+volatile'', and those have opposite fixes.
+
+\begin{measurebox}{Meridian's cache, 600 reads over 40 URIs}
+\begin{tabular}{@{}lr@{}}
+\toprule
+Hit rate            & 96.2\,\% \\
+Requests avoided    & 577 of 600 \\
+Wall clock          & 12.4\,ms $\rightarrow$ 1.8\,ms \\
+Speedup             & 6.82$\times$ \\
+\bottomrule
+\end{tabular}
+\end{measurebox}
+
+\section{Token and cost accounting}
+
+\begin{py}
+def estimate_tokens(text: str) -> int:
+    return max(1, round(len(text) / CHARS_PER_TOKEN))
+
+def estimate_cost_usd(input_tokens: int, output_tokens: int) -> float:
+    return (input_tokens * INPUT_USD_PER_MTOK / 1_000_000.0
+            + output_tokens * OUTPUT_USD_PER_MTOK / 1_000_000.0)
+\end{py}
+
+The character-based estimator is wrong in the third decimal place and right
+enough to compare a before against an after, which is what it is for. Your
+provider reports exact counts; use those in production and the estimator when you
+need a number before you have spent the money.
+
+\begin{measurebox}{Meridian's per-iteration cost}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+\thead{Iteration} & \thead{Input} & \thead{Output} & \thead{Cost} \\
+\midrule
+0 & 1{,}252 & 12 & \$0.003936 \\
+1 & 1{,}318 & 19 & \$0.004239 \\
+2 & 1{,}400 & 8  & \$0.004320 \\
+\midrule
+\textbf{Total} & \textbf{3{,}970} & \textbf{39} & \textbf{\$0.012495} \\
+\bottomrule
+\end{tabular}
+\end{measurebox}
+
+Input climbs, output does not, and iteration 2 is the most expensive despite
+doing the least. That is the economics of agent loops in one table.
+
+\subsection{Catalogue cost as a first-class metric}
+
+\begin{py}
+def catalogue_tokens(self) -> int:
+    return sum(
+        estimate_tokens(f"{t.get('name','')}{t.get('description','')}"
+                        f"{t.get('inputSchema','')}{t.get('outputSchema','')}")
+        for t in self.catalogue())
+\end{py}
+
+Put this on a dashboard. It changes whenever anybody adds a tool to any connected
+server, it is charged on every turn of every task, and nobody notices it climbing
+until it is 12,000 and the model has started guessing.
+
+\section{Evals as regression tests}
+
+The four numbers to track per release:
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXl@{}}
+\toprule
+\thead{Number} & \thead{Regression means} & \thead{Gate} \\
+\midrule
+Task success rate       & Something broke behaviourally & no drop $>$ 3 points \\
+Iterations per task     & The model needs more turns for the same work & no rise $>$ 10\,\% \\
+Tokens per task         & Context or catalogue grew & no rise $>$ 10\,\% \\
+Cost per task           & All of the above, monetised & no rise $>$ 10\,\% \\
+\bottomrule
+\end{tabularx}
+\caption{Gate on movement against the last release, not on absolutes. Absolute
+thresholds get deleted the first time somebody needs to ship.}
+\label{tab:eval-gates}
+\end{table}
+
+Catching \emph{capability drift} is the real prize here. The model provider ships
+a new version. Your tests pass, because they use a stub. Your evals show
+iterations per task moved from 3.0 to 3.4, which is a 13\,\% cost increase nobody
+would have seen otherwise.
+
+\section{A dashboard worth having}
+
+\begin{plain}
+MERIDIAN                                    last 24h
+
+  TASKS
+  completed                     14,204        +2.1%
+  p50 wall clock                 1,412 ms     +0.3%
+  p95 wall clock                 3,890 ms     +8.2%   <-- look here
+  iterations per task (mean)       3.14        +0.1%
+  cost per task                  $0.0131      +4.8%
+
+  PROTOCOL
+  round trips per task             3.21        +6.9%   <-- and here
+  mrtr rounds per task             0.19       +58.0%   <-- and here
+  cache hit rate                   94.1%       -2.1pt
+
+  SERVERS                     calls    p95      errors
+  risk                       28,401   14 ms      0.02%
+  compliance                  9,120   31 ms      0.11%
+  fraud                      27,880    8 ms      0.00%
+  marketdata                 31,004    3 ms      0.00%
+\end{plain}
+
+Read the arrows together and the story writes itself. MRTR rounds up 58\,\%,
+round trips up 6.9\,\%, p95 up 8.2\,\%, cost up 4.8\,\%. Somebody deployed a
+server that started asking for something it used to infer, and everything
+downstream is a consequence.
+
+That diagnosis takes ten seconds with these numbers and a week without them.
+
+\section{Alerting}
+
+Four alerts. Chapter~\ref{ch:operations} adds the operational ones; these are the
+protocol ones.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXX@{}}
+\toprule
+\thead{Alert} & \thead{Condition} & \thead{Usually means} \\
+\midrule
+Iteration inflation & Iterations per task up $>$ 20\,\% & Tool or prompt change \\
+Catalogue bloat     & Catalogue tokens up $>$ 25\,\% & Somebody added tools \\
+Cache collapse      & Hit rate down $>$ 15 points & TTLs changed, or ordering went unstable \\
+MRTR surge          & MRTR rounds per task doubled & A server started asking \\
+\bottomrule
+\end{tabularx}
+\caption{All four are ratios against a baseline, because absolute thresholds are
+wrong for every deployment except the one that set them.}
+\label{tab:alerts}
+\end{table}
+
+\section{The harness}
+
+Meridian's measurement rig, and the shape is worth copying whatever you build.
+
+\begin{py}
+def time_it(fn, *, n: int = 200, warmup: int = 20, label: str = "") -> Timing:
+    for _ in range(warmup):
+        fn()
+    timing = Timing(label)
+    for _ in range(n):
+        started = time.perf_counter()
+        fn()
+        timing.add((time.perf_counter() - started) * 1000.0)
+    return timing
+\end{py}
+
+Warmup matters more than people expect. The first calls pay import costs, JIT
+warmup, connection setup, and cold caches, and including them turns a
+distribution into a bimodal mess.
+
+Eight scenarios, each answering one question:
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+\thead{Scenario} & \thead{Question} \\
+\midrule
+\texttt{transport}     & What does each transport cost, minus execution? \\
+\texttt{coldstart}     & Spawn per call, or warm pool? \\
+\texttt{catalogue}     & What does catalogue bloat cost per turn? \\
+\texttt{cache}         & What is honouring \texttt{ttlMs} worth? \\
+\texttt{fanout}        & What does parallelism buy, at what latency? \\
+\texttt{mrtr}          & What does one elicitation really cost? \\
+\texttt{loop}          & Where does a whole task's time go? \\
+\texttt{serialisation} & How much of a request is envelope? \\
+\bottomrule
+\end{tabularx}
+\caption{Each scenario exists to answer a question somebody actually asked.
+Benchmarks without a question attached become numbers nobody acts on.}
+\label{tab:bench-scenarios}
+\end{table}
+
+\begin{sh}
+make bench                                   # everything, print a table
+python3 -m meridian.bench.run cache fanout   # named scenarios
+python3 -m meridian.bench.run --json out.json
+\end{sh}
+
+\subsection{Two things a harness must be honest about}
+
+\textbf{State what is simulated.} Meridian's model latency is drawn from a stated
+distribution and its docstring says so in the first paragraph. A harness that
+quietly models something is generating fiction with error bars.
+
+\textbf{State the machine.} Absolute numbers do not transfer. Ratios do.
+
+\begin{py}
+def machine() -> dict:
+    return {
+        "python": platform.python_version(),
+        "platform": platform.platform(),
+        "machine": platform.machine(),
+        "processor": platform.processor() or platform.machine(),
+    }
+\end{py}
+
+\section{What to remember}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item Nine metrics. If you take three: iterations per task, cost per task, cache
+hit rate.
+\item Decompose every iteration into model, transport, execution, and consent.
+Every millisecond belongs to one band.
+\item Subtract an in-process control to isolate transport from execution.
+\item \texttt{traceparent} in \texttt{\_meta} is one line and gives you real
+distributed traces.
+\item Make iterations spans, not just tool calls, or your trace has a hole where
+96\,\% of the time went.
+\item Report percentiles. Means hide the users who are suffering.
+\item Split cache misses from staleness. They have opposite fixes.
+\item Track catalogue tokens on a dashboard. It grows silently.
+\item Gate evals on movement against the last release, not on absolute
+thresholds.
+\item Warm up before timing, state what is simulated, and state the machine.
+\end{itemize}
+
+Next: spending the measurements.

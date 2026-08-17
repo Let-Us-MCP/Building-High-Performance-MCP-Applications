@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C. Performance Checklist &middot; Building Awesome MCP Apps</title>
+<meta name="description" content="C. Performance Checklist. What every AI application developer should know about the Model Context Protocol">
+<meta property="og:title" content="C. Performance Checklist">
+<meta property="og:description" content="C. Performance Checklist. What every AI application developer should know about the Model Context Protocol">
+<style>
+:root{
+  --ink:#15181D; --muted:#5B6472; --rule:#D8DDE4; --wash:#F5F6F8;
+  --paper:#FFFFFF; --accent:#0F5C8C; --accent-soft:#E7F0F6;
+  --warm:#B4531A; --warm-soft:#FBF0E7; --good:#2C6E49; --good-soft:#E9F2EC;
+  --danger:#9B2226; --danger-soft:#FAECEC;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#E7EAEE; --muted:#98A2B0; --rule:#2C333D; --wash:#171B21;
+    --paper:#0F1216; --accent:#63AEDC; --accent-soft:#14232E;
+    --warm:#E08B4F; --warm-soft:#2A1D13; --good:#6FBF8E; --good-soft:#13221A;
+    --danger:#E4796F; --danger-soft:#291516;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--serif);font-size:18px;line-height:1.62;
+  -webkit-text-size-adjust:100%}
+.layout{display:grid;grid-template-columns:288px minmax(0,1fr);
+  max-width:1280px;margin:0 auto;gap:0}
+nav.toc{position:sticky;top:0;height:100vh;overflow-y:auto;padding:26px 20px 60px;
+  border-right:1px solid var(--rule);font-family:var(--sans);font-size:14px}
+nav.toc .brand{display:block;font-weight:700;font-size:16px;color:var(--ink);
+  text-decoration:none;line-height:1.3;margin-bottom:4px}
+nav.toc .tagline{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.45}
+nav.toc .part{margin:18px 0 6px;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);font-weight:700}
+nav.toc a{display:block;padding:4px 8px;margin-left:-8px;border-radius:5px;
+  color:var(--muted);text-decoration:none}
+nav.toc a:hover{background:var(--wash);color:var(--ink)}
+nav.toc a.current{background:var(--accent-soft);color:var(--accent);font-weight:600}
+main{padding:44px 52px 120px;min-width:0;max-width:78ch}
+h1,h2,h3,h4{font-family:var(--sans);line-height:1.25;color:var(--ink)}
+h1{font-size:2.05em;margin:0 0 .55em;letter-spacing:-.015em}
+h2{font-size:1.42em;margin:2em 0 .5em;padding-top:.35em}
+h3{font-size:1.14em;margin:1.7em 0 .4em}
+h4{font-size:1em;margin:1.4em 0 .3em;color:var(--muted)}
+p{margin:0 0 1.05em}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.855em;background:var(--wash);
+  padding:.12em .36em;border-radius:4px;word-break:break-word}
+pre{background:var(--wash);border-left:3px solid var(--rule);
+  border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+  font-size:13.5px;line-height:1.5;margin:1.3em 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+pre.json,pre.http{background:var(--accent-soft);border-left-color:var(--accent)}
+aside.box{border-left:3px solid var(--rule);background:var(--wash);
+  padding:14px 18px;margin:1.5em 0;border-radius:0 6px 6px 0;font-size:.955em}
+aside.box .box-title{font-family:var(--sans);font-weight:700;font-size:12px;
+  letter-spacing:.07em;text-transform:uppercase;margin:0 0 .55em}
+aside.box.legacy{border-left-color:var(--warm);background:var(--warm-soft)}
+aside.box.legacy .box-title{color:var(--warm)}
+aside.box.measured{border-left-color:var(--good);background:var(--good-soft)}
+aside.box.measured .box-title{color:var(--good)}
+aside.box.threat{border-left-color:var(--danger);background:var(--danger-soft)}
+aside.box.threat .box-title{color:var(--danger)}
+aside.box.note .box-title{color:var(--muted)}
+aside.keyidea{border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:14px 18px;margin:1.6em 0;border-radius:0 6px 6px 0;
+  font-family:var(--sans);font-style:italic;font-size:.97em}
+aside.keyidea p:last-child,aside.box p:last-child{margin-bottom:0}
+aside.keyidea pre,aside.keyidea code,aside.keyidea table{font-style:normal}
+aside.epigraph{border:0;margin:0 0 2em;padding:0 0 0 clamp(0px,7%,52px);
+  color:var(--muted);font-size:.97em}
+aside.epigraph p{margin:0 0 .3em}
+main figure{margin:2em 0;text-align:center}
+main figure img{max-width:100%;height:auto;border-radius:6px}
+@media (prefers-color-scheme: dark){
+  main figure img{background:#fff;padding:10px;border-radius:8px}
+}
+figcaption{font-family:var(--sans);font-size:13.5px;color:var(--muted);
+  margin-top:.7em;text-align:left;line-height:1.5}
+.table-wrap{overflow-x:auto;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:14.5px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+thead th{border-bottom:2px solid var(--rule);font-weight:700}
+caption{caption-side:bottom;font-size:13.5px;color:var(--muted);
+  text-align:left;padding-top:.7em;line-height:1.5}
+ul,ol{padding-left:1.35em;margin:0 0 1.05em}
+li{margin-bottom:.32em}
+dl{margin:0 0 1.05em}
+dt{font-weight:700;font-family:var(--sans);font-size:.95em;margin-top:.75em}
+dd{margin:.15em 0 0 1.35em}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
+.pager{display:flex;justify-content:space-between;gap:16px;margin-top:4em;
+  padding-top:1.5em;border-top:1px solid var(--rule);font-family:var(--sans);
+  font-size:14px}
+.pager a{text-decoration:none;max-width:46%}
+.pager .dir{display:block;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted)}
+.masthead{border-bottom:1px solid var(--rule);padding-bottom:1.8em;margin-bottom:2.2em}
+.masthead .kicker{font-family:var(--sans);font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);font-weight:700}
+.lede{font-size:1.12em;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:14px;margin:1.8em 0}
+.card{border:1px solid var(--rule);border-radius:9px;padding:15px 17px;
+  font-family:var(--sans);font-size:14px}
+.card h3{margin:0 0 .35em;font-size:15px}
+.card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+.menu-btn{display:none}
+@media (max-width:940px){
+  body{font-size:17px}
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:0;
+    border-bottom:1px solid var(--rule);max-height:none}
+  nav.toc.collapsed .toc-body{display:none}
+  main{padding:28px 20px 90px}
+  .menu-btn{display:inline-block;font-family:var(--sans);font-size:13px;
+    background:var(--wash);border:1px solid var(--rule);color:var(--ink);
+    border-radius:6px;padding:6px 11px;cursor:pointer;margin-bottom:10px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc"><button class="menu-btn" type="button">Contents</button>
+<div class="toc-body">
+<a class="brand" href="index.html">Building Awesome MCP Apps</a>
+<p class="tagline">What every AI application developer should know about the Model Context Protocol</p>
+<a href="preface.html">Preface</a>
+<a href="how-to-read.html">How to read this book</a>
+<div class="part">Part I. Protocol Fundamentals</div>
+<a href="ch01.html">A Primer on Latency, Tokens, and Context</a>
+<a href="ch02.html">The MCP Architectural Model</a>
+<a href="ch03.html">Building Blocks of the Transport</a>
+<a href="ch04.html">Authorization on the Wire</a>
+<div class="part">Part II. The Primitives</div>
+<a href="ch05.html">Tools: The Execution Layer</a>
+<a href="ch06.html">Resources: The Context Layer</a>
+<a href="ch07.html">Prompts: Workflow Blueprints</a>
+<a href="ch08.html">Multi Round-Trip Requests</a>
+<a href="ch09.html">Extensions and Tasks</a>
+<a href="ch10.html">MCP Apps: Interactive Interfaces</a>
+<div class="part">Part III. Building MCP Applications</div>
+<a href="ch11.html">Building Servers</a>
+<a href="ch12.html">Building Hosts and Clients</a>
+<a href="ch13.html">The Agent Loop, State, and Memory</a>
+<a href="ch14.html">Multi-Agent Topologies</a>
+<div class="part">Part IV. Performance Engineering</div>
+<a href="ch15.html">Testing and Debugging</a>
+<a href="ch16.html">Measuring MCP Applications</a>
+<a href="ch17.html">Optimizing for Latency, Tokens, and Cost</a>
+<a href="ch18.html">Deployment and Operations</a>
+<div class="part">Part V. Security and Trust</div>
+<a href="ch19.html">Threat Modeling Agentic Applications</a>
+<a href="ch20.html">Access Control, Audit, and MCP in the Enterprise</a>
+<div class="part">Back matter</div>
+<a href="epilogue.html">Epilogue: The Evolving Protocol</a>
+<div class="part">Appendices</div>
+<a href="appendix-a.html">A. Method and Message Reference</a>
+<a href="appendix-b.html">B. Transport Decision Matrix</a>
+<a href="appendix-c.html" class="current">C. Performance Checklist</a>
+<a href="appendix-d.html">D. Security Hardening Checklist</a>
+<a href="appendix-e.html">E. The Meridian Companion Repository</a>
+<a href="about.html">About the author</a>
+</div></nav>
+<main>
+<section id="ch:perf-checklist" class="level1">
+<h1>Performance Checklist</h1>
+<p>Chapter <a href="ch17.html#ch:optimizing">17</a> in one page. Work down it in order; the ordering is by return per unit effort, measured on Meridian and stable across the systems I have looked at.</p>
+<p>Every item cites where the reasoning lives.</p>
+<section id="first-measure" class="level2">
+<h2>First: measure</h2>
+<ul>
+<li><p><strong>Count loop iterations per task.</strong> Not tool calls. Iterations, because each is a full model turn. (<a href="ch16.html#ch:measuring">Chapter 16</a>)</p></li>
+<li><p><strong>Decompose one iteration</strong> into model, transport, server execution, and consent. Every millisecond belongs to one band. (<a href="ch16.html#ch:measuring">Chapter 16</a>)</p></li>
+<li><p><strong>Measure catalogue tokens per turn.</strong> Serialise <code>tools/list</code>, divide characters by four. (<a href="ch05.html#ch:tools">Chapter 5</a>)</p></li>
+<li><p><strong>Check your cache hit rate.</strong> If you are not honouring <code>ttlMs</code>, it is zero. (<a href="ch06.html#ch:resources">Chapter 6</a>)</p></li>
+<li><p><strong>Subtract an in-process control</strong> to separate transport from execution. (<a href="ch16.html#ch:measuring">Chapter 16</a>)</p></li>
+</ul>
+</section>
+<section id="then-cut-round-trips" class="level2">
+<h2>Then: cut round trips</h2>
+<p>The largest returns, always.</p>
+<ul>
+<li><p><strong>Add batch variants</strong> of any tool the model calls in a loop. Forty accounts becomes one call. (<a href="ch05.html#ch:tools">Chapter 5</a>)</p></li>
+<li><p><strong>Let the model batch independent calls</strong> into one turn. Worth roughly thirteen times more than fan-out. (<a href="ch17.html#ch:optimizing">Chapter 17</a>)</p></li>
+<li><p><strong>Fan out what it batched.</strong> 2.8<span class="math inline">×</span> on three calls, better as latency rises. (<a href="ch05.html#ch:tools">Chapter 5</a>)</p></li>
+<li><p><strong>Front-load MRTR inputs</strong> into tool schemas. An elicitation is roughly 375 ms. (<a href="ch08.html#ch:mrtr">Chapter 8</a>)</p></li>
+<li><p><strong>Ask for everything at once</strong> when you must elicit. One interim result, not three. (<a href="ch08.html#ch:mrtr">Chapter 8</a>)</p></li>
+<li><p><strong>Collapse read-then-combine chains</strong> into one tool. If your traces show a fixed sequence, ship it as a tool. (<a href="ch05.html#ch:tools">Chapter 5</a>)</p></li>
+</ul>
+</section>
+<section id="then-cache" class="level2">
+<h2>Then: cache</h2>
+<ul>
+<li><p><strong>Honour <code>ttlMs</code>.</strong> 164 setup requests became 8 across 20 tasks. Do this first of everything in this section. (<a href="ch17.html#ch:optimizing">Chapter 17</a>)</p></li>
+<li><p><strong>Check freshness on access</strong>, never poll on the TTL. Polling is a self-inflicted thundering herd. (<a href="ch06.html#ch:resources">Chapter 6</a>)</p></li>
+<li><p><strong>Jitter TTLs</strong> per client so caches do not expire together. (<a href="ch18.html#ch:operations">Chapter 18</a>)</p></li>
+<li><p><strong>Set <code>cacheScope: public</code></strong> where it is genuinely true, so gateways can share. Never on anything personalised. (<a href="ch06.html#ch:resources">Chapter 6</a>)</p></li>
+<li><p><strong>Fold the auth context into every cache key</strong>, public or private. (<a href="ch20.html#ch:access-control">Chapter 20</a>)</p></li>
+<li><p><strong>Invalidate on <code>listChanged</code></strong>, so long TTLs are safe. (<a href="ch06.html#ch:resources">Chapter 6</a>)</p></li>
+<li><p><strong>Return tools in a deterministic order</strong>, or you silently lose the provider’s prompt cache. (<a href="ch05.html#ch:tools">Chapter 5</a>)</p></li>
+<li><p><strong>Keep stable content first</strong> in prompts, variable content last. (<a href="ch07.html#ch:prompts">Chapter 7</a>)</p></li>
+<li><p><strong>Never cache MRTR retries</strong> or interim results. (<a href="ch06.html#ch:resources">Chapter 6</a>)</p></li>
+</ul>
+</section>
+<section id="then-spend-tokens-deliberately" class="level2">
+<h2>Then: spend tokens deliberately</h2>
+<ul>
+<li><p><strong>Delete tools nobody calls.</strong> Check telemetry; 90 days of no calls is pure cost. (<a href="ch05.html#ch:tools">Chapter 5</a>)</p></li>
+<li><p><strong>Replace REST mirrors with task-shaped tools.</strong> 5,617 tokens became 1,246. (<a href="ch05.html#ch:tools">Chapter 5</a>)</p></li>
+<li><p><strong>Compress descriptions.</strong> Lead with the outcome, never mention your transport. (<a href="ch05.html#ch:tools">Chapter 5</a>)</p></li>
+<li><p><strong>Set a catalogue token budget in the host</strong> and put it on a dashboard. (<a href="ch12.html#ch:building-hosts">Chapter 12</a>)</p></li>
+<li><p><strong>Add output schemas</strong> to remove parse-retry loops. Use <code>enum</code> generously. (<a href="ch05.html#ch:tools">Chapter 5</a>)</p></li>
+<li><p><strong>Bound tool results</strong> before they enter context. (<a href="ch13.html#ch:agent-loop">Chapter 13</a>)</p></li>
+<li><p><strong>Prefer <code>structuredContent</code></strong> over the prose mirror when summarising. (<a href="ch13.html#ch:agent-loop">Chapter 13</a>)</p></li>
+<li><p><strong>Return resource links</strong> instead of embedding large documents. (<a href="ch06.html#ch:resources">Chapter 6</a>)</p></li>
+</ul>
+</section>
+<section id="then-stream" class="level2">
+<h2>Then: stream</h2>
+<ul>
+<li><p><strong>Stream model tokens.</strong> TTFT is 340 ms of a 440 ms turn. (<a href="ch13.html#ch:agent-loop">Chapter 13</a>)</p></li>
+<li><p><strong>Forward progress notifications.</strong> Free UX from any server that emits them. (<a href="ch09.html#ch:tasks">Chapter 9</a>)</p></li>
+<li><p><strong>Show tool calls as they happen.</strong> (<a href="ch13.html#ch:agent-loop">Chapter 13</a>)</p></li>
+<li><p><strong>Show partial results</strong> rather than waiting for the final synthesis. (<a href="ch17.html#ch:optimizing">Chapter 17</a>)</p></li>
+<li><p><strong>Send <code>X-Accel-Buffering: no</code></strong>, or a proxy un-streams everything you just streamed. (<a href="ch03.html#ch:transport">Chapter 3</a>)</p></li>
+</ul>
+</section>
+<section id="then-transport" class="level2">
+<h2>Then: transport</h2>
+<p>Smallest returns, listed last on purpose.</p>
+<ul>
+<li><p><strong>Reuse connections.</strong> Saves two round trips per call over TLS. (<a href="ch17.html#ch:optimizing">Chapter 17</a>)</p></li>
+<li><p><strong>Warm pools for stdio.</strong> Cold start is roughly 750 warm calls. (<a href="ch03.html#ch:transport">Chapter 3</a>)</p></li>
+<li><p><strong>Route on <code>Mcp-Method</code> and <code>Mcp-Name</code></strong> at the gateway, without parsing bodies. (<a href="ch03.html#ch:transport">Chapter 3</a>)</p></li>
+<li><p><strong>Tune task polling</strong> to <code>pollIntervalMs</code>, with backoff and jitter. (<a href="ch09.html#ch:tasks">Chapter 9</a>)</p></li>
+</ul>
+</section>
+<section id="finally-route-models" class="level2">
+<h2>Finally: route models</h2>
+<ul>
+<li><p><strong>Small models for glue turns</strong>: tool selection, result extraction, summarisation. (<a href="ch13.html#ch:agent-loop">Chapter 13</a>)</p></li>
+<li><p><strong>Large models for planning, judgement, and synthesis.</strong> (<a href="ch13.html#ch:agent-loop">Chapter 13</a>)</p></li>
+<li><p><strong>Verify the frontier with evals</strong>, not intuition. (<a href="ch16.html#ch:measuring">Chapter 16</a>)</p></li>
+<li><p><strong>Remember a cheap wrong answer costs a full recovery cycle.</strong> (<a href="ch17.html#ch:optimizing">Chapter 17</a>)</p></li>
+</ul>
+</section>
+<section id="guardrails-which-are-not-optional" class="level2">
+<h2>Guardrails, which are not optional</h2>
+<ul>
+<li><p>Step budget. (<a href="ch13.html#ch:agent-loop">Chapter 13</a>)</p></li>
+<li><p>Token budget. (<a href="ch13.html#ch:agent-loop">Chapter 13</a>)</p></li>
+<li><p>Cost budget. (<a href="ch13.html#ch:agent-loop">Chapter 13</a>)</p></li>
+<li><p>Depth limit and decrementing budgets, if you delegate. (<a href="ch14.html#ch:multi-agent">Chapter 14</a>)</p></li>
+<li><p>Circuit breakers on flaky dependencies. (<a href="ch14.html#ch:multi-agent">Chapter 14</a>)</p></li>
+</ul>
+</section>
+<section id="do-not-bother" class="level2">
+<h2>Do not bother</h2>
+<p>Measured, and not worth your time.</p>
+<table id="tab:dont-bother">
+<caption>From Chapter <a href="ch17.html#ch:optimizing">17</a>. Publishing what did not work is how you stop the next person repeating it.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Tempting</strong></td>
+<td style="text-align: left;"><strong>Why not</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Shrinking the <code>_meta</code> envelope</td>
+<td style="text-align: left;">197 bytes on a request whose unit of work is hundreds of milliseconds</td>
+</tr>
+<tr>
+<td style="text-align: left;">Rewriting the server in a faster language</td>
+<td style="text-align: left;">Server execution is 3.8 % of the task</td>
+</tr>
+<tr>
+<td style="text-align: left;">Optimising JSON parsing</td>
+<td style="text-align: left;">Same reason</td>
+</tr>
+<tr>
+<td style="text-align: left;">Trimming the catalogue for latency</td>
+<td style="text-align: left;">It saves tokens and zero milliseconds. Different budget</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="the-meridian-result" class="level2">
+<h2>The Meridian result</h2>
+<table id="tab:perf-summary">
+<caption>Four changes. No new hardware. Reproduce with <code>make bench</code>.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: right;"><strong>Before</strong></td>
+<td style="text-align: right;"><strong>After</strong></td>
+<td style="text-align: right;"><strong>Change</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Loop iterations</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">-50 %</td>
+</tr>
+<tr>
+<td style="text-align: left;">Wall clock</td>
+<td style="text-align: right;">1<span>,</span>753 ms</td>
+<td style="text-align: right;">1<span>,</span>014 ms</td>
+<td style="text-align: right;">-42.2 %</td>
+</tr>
+<tr>
+<td style="text-align: left;">Tokens per task</td>
+<td style="text-align: right;">22<span>,</span>846</td>
+<td style="text-align: right;">2<span>,</span>692</td>
+<td style="text-align: right;">-88.2 %</td>
+</tr>
+<tr>
+<td style="text-align: left;">Cost per task</td>
+<td style="text-align: right;">$0.0690</td>
+<td style="text-align: right;">$0.0086</td>
+<td style="text-align: right;">-87.6 %</td>
+</tr>
+<tr>
+<td style="text-align: left;">Setup requests, 20 tasks</td>
+<td style="text-align: right;">164</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">-95.1 %</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<div class="pager">
+<a href="appendix-b.html"><span class="dir">Previous</span>B. Transport Decision Matrix</a>
+<a href="appendix-d.html" style="text-align:right"><span class="dir">Next</span>D. Security Hardening Checklist</a>
+</div>
+</main>
+</div>
+<script>
+(function(){
+  var nav = document.querySelector('nav.toc');
+  var btn = document.querySelector('.menu-btn');
+  if(btn && nav){
+    if(window.innerWidth <= 940) nav.classList.add('collapsed');
+    btn.addEventListener('click', function(){ nav.classList.toggle('collapsed'); });
+  }
+  // Wrap tables so wide ones scroll rather than overflowing the page.
+  document.querySelectorAll('main table').forEach(function(t){
+    if(t.parentElement.classList.contains('table-wrap')) return;
+    var w = document.createElement('div');
+    w.className = 'table-wrap';
+    t.parentNode.insertBefore(w, t);
+    w.appendChild(t);
+  });
+})();
+</script>
+</body>
+</html>

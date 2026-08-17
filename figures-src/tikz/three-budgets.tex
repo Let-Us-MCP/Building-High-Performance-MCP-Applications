@@ -1,0 +1,32 @@
+% Chapter 1. The three budgets, and the fact that they trade against each other.
+\documentclass[tikz,border=6pt]{standalone}
+\input{_style}
+\begin{document}
+\begin{tikzpicture}[x=1cm, y=1cm]
+
+  \def\R{2.55}
+
+  % --- the three budgets, as a triangle of tradeoffs ---------------------
+  \node[boxa, minimum width=34mm, align=center] (lat) at (0,3.1)
+    {\textbf{LATENCY}\\[1pt]\scriptsize time to first token\\\scriptsize tokens/sec\\\scriptsize round trips};
+
+  \node[boxg, minimum width=34mm, align=center] (ctx) at (-4.1,-1.5)
+    {\textbf{CONTEXT}\\[1pt]\scriptsize the token window\\\scriptsize as bandwidth\\\scriptsize and as memory};
+
+  \node[boxw, minimum width=34mm, align=center] (cost) at (4.1,-1.5)
+    {\textbf{COST}\\[1pt]\scriptsize \$ per task\\\scriptsize input + output tokens\\\scriptsize model tier};
+
+  % --- the tradeoff edges ------------------------------------------------
+  \draw[<->, draw=muted, line width=1pt] (lat) -- node[lbl, fill=white, inner sep=2pt,
+        align=center, pos=0.5] {summarise to fit,\\pay a model turn} (ctx);
+  \draw[<->, draw=muted, line width=1pt] (lat) -- node[lbl, fill=white, inner sep=2pt,
+        align=center, pos=0.5] {smaller model,\\faster and worse} (cost);
+  \draw[<->, draw=muted, line width=1pt] (ctx) -- node[lbl, fill=white, inner sep=2pt,
+        align=center, pos=0.5] {every token in context is billed, every turn} (cost);
+
+  % --- the centre --------------------------------------------------------
+  \node[align=center, font=\sffamily\small\itshape, text=muted] at (0,0.15)
+    {spend one,\\you spend the others};
+
+\end{tikzpicture}
+\end{document}

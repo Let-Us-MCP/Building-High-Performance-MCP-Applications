@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Preface &middot; Building Awesome MCP Apps</title>
+<meta name="description" content="Preface. What every AI application developer should know about the Model Context Protocol">
+<meta property="og:title" content="Preface">
+<meta property="og:description" content="Preface. What every AI application developer should know about the Model Context Protocol">
+<style>
+:root{
+  --ink:#15181D; --muted:#5B6472; --rule:#D8DDE4; --wash:#F5F6F8;
+  --paper:#FFFFFF; --accent:#0F5C8C; --accent-soft:#E7F0F6;
+  --warm:#B4531A; --warm-soft:#FBF0E7; --good:#2C6E49; --good-soft:#E9F2EC;
+  --danger:#9B2226; --danger-soft:#FAECEC;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#E7EAEE; --muted:#98A2B0; --rule:#2C333D; --wash:#171B21;
+    --paper:#0F1216; --accent:#63AEDC; --accent-soft:#14232E;
+    --warm:#E08B4F; --warm-soft:#2A1D13; --good:#6FBF8E; --good-soft:#13221A;
+    --danger:#E4796F; --danger-soft:#291516;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--serif);font-size:18px;line-height:1.62;
+  -webkit-text-size-adjust:100%}
+.layout{display:grid;grid-template-columns:288px minmax(0,1fr);
+  max-width:1280px;margin:0 auto;gap:0}
+nav.toc{position:sticky;top:0;height:100vh;overflow-y:auto;padding:26px 20px 60px;
+  border-right:1px solid var(--rule);font-family:var(--sans);font-size:14px}
+nav.toc .brand{display:block;font-weight:700;font-size:16px;color:var(--ink);
+  text-decoration:none;line-height:1.3;margin-bottom:4px}
+nav.toc .tagline{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.45}
+nav.toc .part{margin:18px 0 6px;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);font-weight:700}
+nav.toc a{display:block;padding:4px 8px;margin-left:-8px;border-radius:5px;
+  color:var(--muted);text-decoration:none}
+nav.toc a:hover{background:var(--wash);color:var(--ink)}
+nav.toc a.current{background:var(--accent-soft);color:var(--accent);font-weight:600}
+main{padding:44px 52px 120px;min-width:0;max-width:78ch}
+h1,h2,h3,h4{font-family:var(--sans);line-height:1.25;color:var(--ink)}
+h1{font-size:2.05em;margin:0 0 .55em;letter-spacing:-.015em}
+h2{font-size:1.42em;margin:2em 0 .5em;padding-top:.35em}
+h3{font-size:1.14em;margin:1.7em 0 .4em}
+h4{font-size:1em;margin:1.4em 0 .3em;color:var(--muted)}
+p{margin:0 0 1.05em}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.855em;background:var(--wash);
+  padding:.12em .36em;border-radius:4px;word-break:break-word}
+pre{background:var(--wash);border-left:3px solid var(--rule);
+  border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+  font-size:13.5px;line-height:1.5;margin:1.3em 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+pre.json,pre.http{background:var(--accent-soft);border-left-color:var(--accent)}
+aside.box{border-left:3px solid var(--rule);background:var(--wash);
+  padding:14px 18px;margin:1.5em 0;border-radius:0 6px 6px 0;font-size:.955em}
+aside.box .box-title{font-family:var(--sans);font-weight:700;font-size:12px;
+  letter-spacing:.07em;text-transform:uppercase;margin:0 0 .55em}
+aside.box.legacy{border-left-color:var(--warm);background:var(--warm-soft)}
+aside.box.legacy .box-title{color:var(--warm)}
+aside.box.measured{border-left-color:var(--good);background:var(--good-soft)}
+aside.box.measured .box-title{color:var(--good)}
+aside.box.threat{border-left-color:var(--danger);background:var(--danger-soft)}
+aside.box.threat .box-title{color:var(--danger)}
+aside.box.note .box-title{color:var(--muted)}
+aside.keyidea{border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:14px 18px;margin:1.6em 0;border-radius:0 6px 6px 0;
+  font-family:var(--sans);font-style:italic;font-size:.97em}
+aside.keyidea p:last-child,aside.box p:last-child{margin-bottom:0}
+aside.keyidea pre,aside.keyidea code,aside.keyidea table{font-style:normal}
+aside.epigraph{border:0;margin:0 0 2em;padding:0 0 0 clamp(0px,7%,52px);
+  color:var(--muted);font-size:.97em}
+aside.epigraph p{margin:0 0 .3em}
+main figure{margin:2em 0;text-align:center}
+main figure img{max-width:100%;height:auto;border-radius:6px}
+@media (prefers-color-scheme: dark){
+  main figure img{background:#fff;padding:10px;border-radius:8px}
+}
+figcaption{font-family:var(--sans);font-size:13.5px;color:var(--muted);
+  margin-top:.7em;text-align:left;line-height:1.5}
+.table-wrap{overflow-x:auto;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:14.5px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+thead th{border-bottom:2px solid var(--rule);font-weight:700}
+caption{caption-side:bottom;font-size:13.5px;color:var(--muted);
+  text-align:left;padding-top:.7em;line-height:1.5}
+ul,ol{padding-left:1.35em;margin:0 0 1.05em}
+li{margin-bottom:.32em}
+dl{margin:0 0 1.05em}
+dt{font-weight:700;font-family:var(--sans);font-size:.95em;margin-top:.75em}
+dd{margin:.15em 0 0 1.35em}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
+.pager{display:flex;justify-content:space-between;gap:16px;margin-top:4em;
+  padding-top:1.5em;border-top:1px solid var(--rule);font-family:var(--sans);
+  font-size:14px}
+.pager a{text-decoration:none;max-width:46%}
+.pager .dir{display:block;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted)}
+.masthead{border-bottom:1px solid var(--rule);padding-bottom:1.8em;margin-bottom:2.2em}
+.masthead .kicker{font-family:var(--sans);font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);font-weight:700}
+.lede{font-size:1.12em;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:14px;margin:1.8em 0}
+.card{border:1px solid var(--rule);border-radius:9px;padding:15px 17px;
+  font-family:var(--sans);font-size:14px}
+.card h3{margin:0 0 .35em;font-size:15px}
+.card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+.menu-btn{display:none}
+@media (max-width:940px){
+  body{font-size:17px}
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:0;
+    border-bottom:1px solid var(--rule);max-height:none}
+  nav.toc.collapsed .toc-body{display:none}
+  main{padding:28px 20px 90px}
+  .menu-btn{display:inline-block;font-family:var(--sans);font-size:13px;
+    background:var(--wash);border:1px solid var(--rule);color:var(--ink);
+    border-radius:6px;padding:6px 11px;cursor:pointer;margin-bottom:10px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc"><button class="menu-btn" type="button">Contents</button>
+<div class="toc-body">
+<a class="brand" href="index.html">Building Awesome MCP Apps</a>
+<p class="tagline">What every AI application developer should know about the Model Context Protocol</p>
+<a href="preface.html" class="current">Preface</a>
+<a href="how-to-read.html">How to read this book</a>
+<div class="part">Part I. Protocol Fundamentals</div>
+<a href="ch01.html">A Primer on Latency, Tokens, and Context</a>
+<a href="ch02.html">The MCP Architectural Model</a>
+<a href="ch03.html">Building Blocks of the Transport</a>
+<a href="ch04.html">Authorization on the Wire</a>
+<div class="part">Part II. The Primitives</div>
+<a href="ch05.html">Tools: The Execution Layer</a>
+<a href="ch06.html">Resources: The Context Layer</a>
+<a href="ch07.html">Prompts: Workflow Blueprints</a>
+<a href="ch08.html">Multi Round-Trip Requests</a>
+<a href="ch09.html">Extensions and Tasks</a>
+<a href="ch10.html">MCP Apps: Interactive Interfaces</a>
+<div class="part">Part III. Building MCP Applications</div>
+<a href="ch11.html">Building Servers</a>
+<a href="ch12.html">Building Hosts and Clients</a>
+<a href="ch13.html">The Agent Loop, State, and Memory</a>
+<a href="ch14.html">Multi-Agent Topologies</a>
+<div class="part">Part IV. Performance Engineering</div>
+<a href="ch15.html">Testing and Debugging</a>
+<a href="ch16.html">Measuring MCP Applications</a>
+<a href="ch17.html">Optimizing for Latency, Tokens, and Cost</a>
+<a href="ch18.html">Deployment and Operations</a>
+<div class="part">Part V. Security and Trust</div>
+<a href="ch19.html">Threat Modeling Agentic Applications</a>
+<a href="ch20.html">Access Control, Audit, and MCP in the Enterprise</a>
+<div class="part">Back matter</div>
+<a href="epilogue.html">Epilogue: The Evolving Protocol</a>
+<div class="part">Appendices</div>
+<a href="appendix-a.html">A. Method and Message Reference</a>
+<a href="appendix-b.html">B. Transport Decision Matrix</a>
+<a href="appendix-c.html">C. Performance Checklist</a>
+<a href="appendix-d.html">D. Security Hardening Checklist</a>
+<a href="appendix-e.html">E. The Meridian Companion Repository</a>
+<a href="about.html">About the author</a>
+</div></nav>
+<main>
+<section id="preface" class="level1 unnumbered">
+<h1 class="unnumbered">Preface</h1>
+<p>Here is the moment this book was born.</p>
+<p>I was watching a demo. Somebody had wired an AI assistant into four internal systems, and it worked. Actual work got done, live, in front of people who had been promised this for two years. The room was delighted. Then somebody in the back asked how long it took, and the presenter said, cheerfully, “about forty seconds,” and the room stayed delighted, and I sat there thinking: forty seconds? For that? The four systems it called were all sub-hundred-millisecond services. I had seen their dashboards. Ninety-nine percent of that forty seconds went somewhere, and nobody in the room, including the person who built it, could tell you where.</p>
+<p>That is the state of the art. We have built a genuinely new kind of software, and we are shipping it with roughly the diagnostic sophistication of a 1996 CGI script. We know it works. We do not know why it is slow, what it costs, or which of the eleven things we could change would matter. We guess. Then we rewrite the server in a faster language and save three milliseconds off a forty second task, and we feel good about it, because at least rewriting things in faster languages is a problem we know how to have.</p>
+<figure id="fig:preface-roundtrips">
+<img src="figures/xkcd-roundtrips.svg" />
+<figcaption>The optimisation everybody does, and the one that works. Chapter <a href="ch01.html#ch:primer">1</a> explains why the gap is this large, and Chapter <a href="ch17.html#ch:optimizing">17</a> spends thirty pages exploiting it.</figcaption>
+</figure>
+<section id="what-this-book-is" class="level2 unnumbered">
+<h2 class="unnumbered">What this book is</h2>
+<p>This is a protocol book that is secretly a performance book. Or possibly a performance book that is secretly a protocol book. The two turn out to be the same subject, and that is the whole thesis.</p>
+<p>The model here is Ilya Grigorik’s <em>High Performance Browser Networking</em>, which did something I have never stopped admiring. It taught web developers TCP. Not trivia about TCP. Actual TCP: slow start, congestion windows, the three-way handshake, why your first byte arrives when it arrives. And it justified every page of that by cashing it out into things you could do on Monday morning. Nobody had to be persuaded that the protocol layer mattered, because every chapter ended with a measurement that only made sense if you understood the layer underneath.</p>
+<p>I want to do that for the Model Context Protocol. Not because MCP is beautiful, though parts of it are, but because you cannot build a good agentic application without knowing what the protocol does on the wire. The abstractions leak immediately and constantly. A tool description is not free; you pay for it on every single request, forever. An extra round trip is not a small cost; it is usually the largest single item on the bill. A cache hint you ignored is a hundred milliseconds you spent for nothing. None of this is visible from inside a framework, and all of it is obvious once you have watched the bytes.</p>
+<p>So: three parts physics, three parts protocol mechanics, and a lot of numbers.</p>
+</section>
+<section id="who-it-is-for" class="level2 unnumbered">
+<h2 class="unnumbered">Who it is for</h2>
+<p>You have shipped something. Maybe it is a chat assistant with tools bolted on, maybe it is an autonomous pipeline that runs at three in the morning, maybe it is a server that other people’s agents call. It works, mostly. You have a nagging sense that you are holding it wrong.</p>
+<p>You do not need to know MCP already. Chapter <a href="ch02.html#ch:architecture">2</a> builds it up from nothing. You do need to be comfortable reading code, thinking about latency, and being told that a thing you are currently doing is expensive.</p>
+<p>If you are looking for a tutorial that gets you to a working server in ten minutes, this is not it, and the official documentation does that job well. This book is for the part afterwards, when it works and you need it to be <em>good</em>.</p>
+</section>
+<section id="the-version-problem-and-what-i-did-about-it" class="level2 unnumbered">
+<h2 class="unnumbered">The version problem, and what I did about it</h2>
+<p>Every book about a young protocol has the same terrifying paragraph in the preface, where the author admits the thing might change and asks for your patience. Here is mine, except I think the situation is better than usual, and for a specific reason.</p>
+<p>This book is pinned to revision <code>2026-07-28</code>. That revision is the largest change since MCP launched. It deleted the initialization handshake. It deleted protocol-level sessions. It deleted the standalone SSE endpoint, stream resumability, and server-initiated requests. It deprecated Sampling, Roots, and Logging. If you learned MCP in 2025, a meaningful fraction of what you know is now wrong, and I will point out exactly which fraction as we go.</p>
+<p>But the same revision also adopted a formal feature lifecycle: Active, Deprecated, Removed, with a minimum twelve-month window between the middle one and the last one. That is the first version of MCP that comes with a promise about how it will break. It is not a promise that it will not break. It is better than that. It is a promise that it will break <em>slowly and in public</em>, which is the only kind of promise a protocol can honestly make and the only kind that lets you plan.</p>
+<p>So the deprecated features are in this book, boxed and labelled, because you have to maintain systems that use them. They are never presented as something to adopt. When you see one of these:</p>
+<aside class="box legacy"><p class="box-title">Legacy: Sampling</p>
+<p>The 2025 design let a server ask the client to run a completion on its behalf. It is Deprecated as of <code>2026-07-28</code> and eligible for removal no earlier than 2027-07-28. Chapter <a href="ch08.html#ch:mrtr">8</a> covers what it was for, why it lost, and what to do with the servers that still speak it.</p>
+</aside>
+<p>you are reading about the past, on purpose, so you can recognise it in the wild.</p>
+</section>
+<section id="meridian-and-why-the-numbers-are-real" class="level2 unnumbered">
+<h2 class="unnumbered">Meridian, and why the numbers are real</h2>
+<p>Technical books have a bad habit. They say things like “this reduces latency significantly” and then move on, and you are left with a claim you cannot check and a number you cannot use.</p>
+<p>I did not want to write that book, so this one comes with a program.</p>
+<p>Meridian is a financial analytics assistant: four MCP servers, one host, an agent loop, a load-test harness, and a measurement rig. It ships in the repository. It has no third-party dependencies, which means it also happens to be a complete implementation of <code>2026-07-28</code> in about two thousand lines of Python, and every listing in this book is lifted from it. When Chapter <a href="ch05.html#ch:tools">5</a> claims a bloated tool catalogue costs you 4,371 extra tokens on every model turn, that number came out of <code>meridian/bench/results.json</code>, and you can regenerate it with <code>make bench</code> and watch it change when you edit the catalogue.</p>
+<p>Two honest caveats, stated here and repeated wherever they matter.</p>
+<p>First, model inference is simulated. A book cannot ship a reproducible large language model, so Meridian uses a stub with a stated latency distribution. Everything downstream of inference (serialisation, transport, server execution, caching, round-trip counts) is measured for real.</p>
+<p>Second, the transport numbers are loopback numbers. Localhost has no physics worth speaking of. That is deliberate: it isolates protocol overhead so you can see it, and then Chapter <a href="ch16.html#ch:measuring">16</a> shows you how to add your own network back in. A book that mixed the two would be measuring my office wi-fi and calling it your architecture.</p>
+<aside class="box measured"><p class="box-title">Measured: What a box like this means</p>
+<p>Numbers in boxes like this one came from a real run of the harness on the machine described in Chapter <a href="ch01.html#ch:primer">1</a>. If a number is modelled rather than measured, the box says so explicitly.</p>
+</aside>
+</section>
+<section id="a-note-on-how-this-is-written" class="level2 unnumbered">
+<h2 class="unnumbered">A note on how this is written</h2>
+<p>Long. Opinionated. Occasionally funny, when the joke earns its place.</p>
+<p>I have tried very hard to avoid the register that technical writing drifts into when nobody is watching, the one where every paragraph restates the previous paragraph in slightly different words and nothing is ever asserted plainly. If I think something is a bad idea, I say it is a bad idea and then show you the measurement. If I am guessing, I say I am guessing.</p>
+<p>Each chapter opens with a line of film dialogue. This is not decoration. It is a compression trick: the right quote does about a paragraph of work in eleven words, and it tells you what the chapter is actually arguing before the argument starts.</p>
+<p>Also, there is not a single em dash in this book. This started as a constraint somebody imposed on me and became a genuine discipline. Em dashes let you staple two thoughts together without deciding how they relate. Take them away and you have to pick: is this a list, a consequence, an aside, or two sentences? Usually it was two sentences. The prose got better. Make of that what you will.</p>
+</section>
+<section id="thank-you" class="level2 unnumbered">
+<h2 class="unnumbered">Thank you</h2>
+<p>To the MCP maintainers and the SEP authors, whose design discussions are public and unusually candid, and who deprecated three of their own features in one release rather than defend them. That is rarer than it should be.</p>
+<p>To everybody who has shipped an agent that was mysteriously slow and then let me look at the traces.</p>
+<p><em>Krimler</em><br />
+<em>July 2026</em></p>
+</section>
+</section>
+<div class="pager">
+<span></span>
+<a href="how-to-read.html" style="text-align:right"><span class="dir">Next</span>How to read this book</a>
+</div>
+</main>
+</div>
+<script>
+(function(){
+  var nav = document.querySelector('nav.toc');
+  var btn = document.querySelector('.menu-btn');
+  if(btn && nav){
+    if(window.innerWidth <= 940) nav.classList.add('collapsed');
+    btn.addEventListener('click', function(){ nav.classList.toggle('collapsed'); });
+  }
+  // Wrap tables so wide ones scroll rather than overflowing the page.
+  document.querySelectorAll('main table').forEach(function(t){
+    if(t.parentElement.classList.contains('table-wrap')) return;
+    var w = document.createElement('div');
+    w.className = 'table-wrap';
+    t.parentNode.insertBefore(w, t);
+    w.appendChild(t);
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "meridian-risk": {
+      "command": "python3",
+      "args": ["-m", "meridian.serve", "risk"],
+      "env": {"PYTHONPATH": "."}
+    },
+    "meridian-fraud": {
+      "command": "python3",
+      "args": ["-m", "meridian.serve", "fraud"],
+      "env": {"PYTHONPATH": "."}
+    },
+    "meridian-marketdata": {
+      "command": "python3",
+      "args": ["-m", "meridian.serve", "marketdata"],
+      "env": {"PYTHONPATH": "."}
+    }
+  }
+}

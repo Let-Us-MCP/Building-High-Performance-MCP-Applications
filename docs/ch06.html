@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resources: The Context Layer &middot; Building Awesome MCP Apps</title>
+<meta name="description" content="Resources: The Context Layer. What every AI application developer should know about the Model Context Protocol">
+<meta property="og:title" content="Resources: The Context Layer">
+<meta property="og:description" content="Resources: The Context Layer. What every AI application developer should know about the Model Context Protocol">
+<style>
+:root{
+  --ink:#15181D; --muted:#5B6472; --rule:#D8DDE4; --wash:#F5F6F8;
+  --paper:#FFFFFF; --accent:#0F5C8C; --accent-soft:#E7F0F6;
+  --warm:#B4531A; --warm-soft:#FBF0E7; --good:#2C6E49; --good-soft:#E9F2EC;
+  --danger:#9B2226; --danger-soft:#FAECEC;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#E7EAEE; --muted:#98A2B0; --rule:#2C333D; --wash:#171B21;
+    --paper:#0F1216; --accent:#63AEDC; --accent-soft:#14232E;
+    --warm:#E08B4F; --warm-soft:#2A1D13; --good:#6FBF8E; --good-soft:#13221A;
+    --danger:#E4796F; --danger-soft:#291516;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--serif);font-size:18px;line-height:1.62;
+  -webkit-text-size-adjust:100%}
+.layout{display:grid;grid-template-columns:288px minmax(0,1fr);
+  max-width:1280px;margin:0 auto;gap:0}
+nav.toc{position:sticky;top:0;height:100vh;overflow-y:auto;padding:26px 20px 60px;
+  border-right:1px solid var(--rule);font-family:var(--sans);font-size:14px}
+nav.toc .brand{display:block;font-weight:700;font-size:16px;color:var(--ink);
+  text-decoration:none;line-height:1.3;margin-bottom:4px}
+nav.toc .tagline{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.45}
+nav.toc .part{margin:18px 0 6px;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);font-weight:700}
+nav.toc a{display:block;padding:4px 8px;margin-left:-8px;border-radius:5px;
+  color:var(--muted);text-decoration:none}
+nav.toc a:hover{background:var(--wash);color:var(--ink)}
+nav.toc a.current{background:var(--accent-soft);color:var(--accent);font-weight:600}
+main{padding:44px 52px 120px;min-width:0;max-width:78ch}
+h1,h2,h3,h4{font-family:var(--sans);line-height:1.25;color:var(--ink)}
+h1{font-size:2.05em;margin:0 0 .55em;letter-spacing:-.015em}
+h2{font-size:1.42em;margin:2em 0 .5em;padding-top:.35em}
+h3{font-size:1.14em;margin:1.7em 0 .4em}
+h4{font-size:1em;margin:1.4em 0 .3em;color:var(--muted)}
+p{margin:0 0 1.05em}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.855em;background:var(--wash);
+  padding:.12em .36em;border-radius:4px;word-break:break-word}
+pre{background:var(--wash);border-left:3px solid var(--rule);
+  border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+  font-size:13.5px;line-height:1.5;margin:1.3em 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+pre.json,pre.http{background:var(--accent-soft);border-left-color:var(--accent)}
+aside.box{border-left:3px solid var(--rule);background:var(--wash);
+  padding:14px 18px;margin:1.5em 0;border-radius:0 6px 6px 0;font-size:.955em}
+aside.box .box-title{font-family:var(--sans);font-weight:700;font-size:12px;
+  letter-spacing:.07em;text-transform:uppercase;margin:0 0 .55em}
+aside.box.legacy{border-left-color:var(--warm);background:var(--warm-soft)}
+aside.box.legacy .box-title{color:var(--warm)}
+aside.box.measured{border-left-color:var(--good);background:var(--good-soft)}
+aside.box.measured .box-title{color:var(--good)}
+aside.box.threat{border-left-color:var(--danger);background:var(--danger-soft)}
+aside.box.threat .box-title{color:var(--danger)}
+aside.box.note .box-title{color:var(--muted)}
+aside.keyidea{border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:14px 18px;margin:1.6em 0;border-radius:0 6px 6px 0;
+  font-family:var(--sans);font-style:italic;font-size:.97em}
+aside.keyidea p:last-child,aside.box p:last-child{margin-bottom:0}
+aside.keyidea pre,aside.keyidea code,aside.keyidea table{font-style:normal}
+aside.epigraph{border:0;margin:0 0 2em;padding:0 0 0 clamp(0px,7%,52px);
+  color:var(--muted);font-size:.97em}
+aside.epigraph p{margin:0 0 .3em}
+main figure{margin:2em 0;text-align:center}
+main figure img{max-width:100%;height:auto;border-radius:6px}
+@media (prefers-color-scheme: dark){
+  main figure img{background:#fff;padding:10px;border-radius:8px}
+}
+figcaption{font-family:var(--sans);font-size:13.5px;color:var(--muted);
+  margin-top:.7em;text-align:left;line-height:1.5}
+.table-wrap{overflow-x:auto;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:14.5px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+thead th{border-bottom:2px solid var(--rule);font-weight:700}
+caption{caption-side:bottom;font-size:13.5px;color:var(--muted);
+  text-align:left;padding-top:.7em;line-height:1.5}
+ul,ol{padding-left:1.35em;margin:0 0 1.05em}
+li{margin-bottom:.32em}
+dl{margin:0 0 1.05em}
+dt{font-weight:700;font-family:var(--sans);font-size:.95em;margin-top:.75em}
+dd{margin:.15em 0 0 1.35em}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
+.pager{display:flex;justify-content:space-between;gap:16px;margin-top:4em;
+  padding-top:1.5em;border-top:1px solid var(--rule);font-family:var(--sans);
+  font-size:14px}
+.pager a{text-decoration:none;max-width:46%}
+.pager .dir{display:block;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted)}
+.masthead{border-bottom:1px solid var(--rule);padding-bottom:1.8em;margin-bottom:2.2em}
+.masthead .kicker{font-family:var(--sans);font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);font-weight:700}
+.lede{font-size:1.12em;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:14px;margin:1.8em 0}
+.card{border:1px solid var(--rule);border-radius:9px;padding:15px 17px;
+  font-family:var(--sans);font-size:14px}
+.card h3{margin:0 0 .35em;font-size:15px}
+.card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+.menu-btn{display:none}
+@media (max-width:940px){
+  body{font-size:17px}
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:0;
+    border-bottom:1px solid var(--rule);max-height:none}
+  nav.toc.collapsed .toc-body{display:none}
+  main{padding:28px 20px 90px}
+  .menu-btn{display:inline-block;font-family:var(--sans);font-size:13px;
+    background:var(--wash);border:1px solid var(--rule);color:var(--ink);
+    border-radius:6px;padding:6px 11px;cursor:pointer;margin-bottom:10px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc"><button class="menu-btn" type="button">Contents</button>
+<div class="toc-body">
+<a class="brand" href="index.html">Building Awesome MCP Apps</a>
+<p class="tagline">What every AI application developer should know about the Model Context Protocol</p>
+<a href="preface.html">Preface</a>
+<a href="how-to-read.html">How to read this book</a>
+<div class="part">Part I. Protocol Fundamentals</div>
+<a href="ch01.html">A Primer on Latency, Tokens, and Context</a>
+<a href="ch02.html">The MCP Architectural Model</a>
+<a href="ch03.html">Building Blocks of the Transport</a>
+<a href="ch04.html">Authorization on the Wire</a>
+<div class="part">Part II. The Primitives</div>
+<a href="ch05.html">Tools: The Execution Layer</a>
+<a href="ch06.html" class="current">Resources: The Context Layer</a>
+<a href="ch07.html">Prompts: Workflow Blueprints</a>
+<a href="ch08.html">Multi Round-Trip Requests</a>
+<a href="ch09.html">Extensions and Tasks</a>
+<a href="ch10.html">MCP Apps: Interactive Interfaces</a>
+<div class="part">Part III. Building MCP Applications</div>
+<a href="ch11.html">Building Servers</a>
+<a href="ch12.html">Building Hosts and Clients</a>
+<a href="ch13.html">The Agent Loop, State, and Memory</a>
+<a href="ch14.html">Multi-Agent Topologies</a>
+<div class="part">Part IV. Performance Engineering</div>
+<a href="ch15.html">Testing and Debugging</a>
+<a href="ch16.html">Measuring MCP Applications</a>
+<a href="ch17.html">Optimizing for Latency, Tokens, and Cost</a>
+<a href="ch18.html">Deployment and Operations</a>
+<div class="part">Part V. Security and Trust</div>
+<a href="ch19.html">Threat Modeling Agentic Applications</a>
+<a href="ch20.html">Access Control, Audit, and MCP in the Enterprise</a>
+<div class="part">Back matter</div>
+<a href="epilogue.html">Epilogue: The Evolving Protocol</a>
+<div class="part">Appendices</div>
+<a href="appendix-a.html">A. Method and Message Reference</a>
+<a href="appendix-b.html">B. Transport Decision Matrix</a>
+<a href="appendix-c.html">C. Performance Checklist</a>
+<a href="appendix-d.html">D. Security Hardening Checklist</a>
+<a href="appendix-e.html">E. The Meridian Companion Repository</a>
+<a href="about.html">About the author</a>
+</div></nav>
+<main>
+<section id="ch:resources" class="level1">
+<h1>Resources: The Context Layer</h1>
+<aside class="epigraph">
+<p><em>“Roads? Where we’re going, we don’t need roads.”</em></p>
+<p>Doc Brown, <em>Back to the Future</em> (1985)</p>
+</aside>
+<p>Doc is wrong, of course. They need roads constantly for the rest of the trilogy. But the line captures a real feeling, which is the moment you realise the constraint you had been designing around is not actually the constraint.</p>
+<p>With resources, the constraint people design around is “how do I get data to the model”. The actual constraint is “how do I get data to the model <em>without</em> spending the context budget on data it will not read”. Those are different problems, and confusing them is how you end up with a 200,000-token context window and no room to think in.</p>
+<section id="what-a-resource-is-and-what-it-is-not" class="level2">
+<h2>What a resource is, and what it is not</h2>
+<p>A resource is addressable, readable context, identified by a URI.</p>
+<p>The distinction from tools is about control, and it is worth being precise because the specification is:</p>
+<table id="tab:tools-vs-resources">
+<caption>Model-controlled versus application-driven. The row that matters is the first one.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"><strong>Tools</strong></td>
+<td style="text-align: left;"><strong>Resources</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Controlled by</td>
+<td style="text-align: left;">The model</td>
+<td style="text-align: left;">The application</td>
+</tr>
+<tr>
+<td style="text-align: left;">Invoked when</td>
+<td style="text-align: left;">The model decides</td>
+<td style="text-align: left;">The host decides</td>
+</tr>
+<tr>
+<td style="text-align: left;">Side effects</td>
+<td style="text-align: left;">Expected</td>
+<td style="text-align: left;">None</td>
+</tr>
+<tr>
+<td style="text-align: left;">Question</td>
+<td style="text-align: left;">“Do something”</td>
+<td style="text-align: left;">“Give me something to read”</td>
+</tr>
+</tbody>
+</table>
+<p>That first row is why resources exist at all. A user picking three documents from a file tree is doing something a model should not be doing on their behalf, and a host that wants to attach the current file to the conversation should not have to persuade a language model to call a tool.</p>
+<aside class="box note"><p class="box-title">When something could be either</p>
+<p>It happens constantly. “Fetch the account summary” is defensible as either.</p>
+<p>The test I use: <em>who should decide when this happens?</em> If the answer is “the user, from a picker”, it is a resource. If the answer is “the model, while planning”, it is a tool. If the answer is genuinely both, ship both; they can share an implementation, and Meridian’s account summary is reachable as a resource and as part of <code>assess_account_risk</code>.</p>
+</aside>
+</section>
+<section id="mechanics" class="level2">
+<h2>Mechanics</h2>
+<p>Four methods, and they should look familiar by now.</p>
+<pre class="json" data-language="json"><code>resources/list             -&gt; the concrete resources available
+resources/templates/list   -&gt; parameterised families of resources
+resources/read             -&gt; the contents of one URI
+subscriptions/listen       -&gt; tell me when these change</code></pre>
+<p>A read looks like this:</p>
+<pre class="json" data-language="json"><code>{
+  &quot;jsonrpc&quot;: &quot;2.0&quot;,
+  &quot;id&quot;: 2,
+  &quot;result&quot;: {
+    &quot;resultType&quot;: &quot;complete&quot;,
+    &quot;contents&quot;: [
+      {
+        &quot;uri&quot;: &quot;meridian://accounts/ACC-1042/summary&quot;,
+        &quot;mimeType&quot;: &quot;application/json&quot;,
+        &quot;text&quot;: &quot;{\&quot;accountId\&quot;:\&quot;ACC-1042\&quot;,\&quot;tier\&quot;:\&quot;B\&quot;,...}&quot;
+      }
+    ],
+    &quot;ttlMs&quot;: 900000,
+    &quot;cacheScope&quot;: &quot;private&quot;
+  }
+}</code></pre>
+<p>Two rules worth internalising.</p>
+<p><strong>A read may return several contents.</strong> Reading a directory resource can legitimately return every file in it. Useful, and a good way to accidentally put four megabytes into a context window.</p>
+<p><strong>An empty <code>contents</code> array is forbidden for a nonexistent resource.</strong> It is ambiguous: does the resource exist and have no content, or not exist? Return <code>-32602</code> instead.</p>
+<aside class="box legacy"><p class="box-title">Legacy: The error code changed</p>
+<p>Resource-not-found was <code>-32002</code> through <code>2025-11-25</code>. It is <code>-32602</code> (Invalid params) now, aligning with plain JSON-RPC.</p>
+<p>The asymmetry from Chapter <a href="ch03.html#ch:transport">3</a> applies here specifically: read the old code, write only the new one.</p>
+</aside>
+<section id="templates" class="level3">
+<h3>Templates</h3>
+<p>Enumerating 240 accounts as concrete resources would be silly. A template describes the family instead, using RFC 6570 URI templates:</p>
+<pre class="python" data-language="python"><code>@server.template(
+    &quot;meridian://accounts/{account_id}/summary&quot;,
+    &quot;Account summary&quot;,
+    description=&quot;Static profile for one account. Cheap, stable, private.&quot;,
+    mime_type=&quot;application/json&quot;,
+    ttl_ms=900_000,
+    cache_scope=&quot;private&quot;,
+)
+def account_summary(ctx: RequestContext, uri: str, params: dict):
+    account = ACCOUNTS.get(params[&quot;account_id&quot;])
+    if account is None:
+        raise ResourceNotFound(uri)
+    return json.dumps(account.to_json(), separators=(&quot;,&quot;, &quot;:&quot;))</code></pre>
+<p>Level 1 templates (a variable inside a path segment) cover essentially every real case. Meridian compiles them to a regex once, at registration:</p>
+<pre class="python" data-language="python"><code>def __post_init__(self) -&gt; None:
+    # RFC 6570 level 1 is all the book needs: {var} inside a path.
+    pattern = re.escape(self.uri_template)
+    pattern = re.sub(r&quot;\\\{(\w+)\\\}&quot;, r&quot;(?P&lt;\1&gt;[^/]+)&quot;, pattern)
+    self._regex = re.compile(&quot;^&quot; + pattern + &quot;$&quot;)</code></pre>
+</section>
+</section>
+<section id="designing-uris-for-machines-and-humans" class="level2">
+<h2>Designing URIs for machines and humans</h2>
+<p>URIs are an interface, and unlike most interfaces this one is read by three audiences: your code, the model, and a human staring at an audit log at midnight. Design accordingly.</p>
+<p><strong>Hierarchical and guessable.</strong> <code>meridian://accounts/ACC-1042/summary</code> tells you what it is without documentation. <code>meridian://r/4a7f2b</code> does not.</p>
+<p><strong>Stable.</strong> A resource URI ends up in conversation history, in caches, in audit logs, and in the model’s working memory. Changing the scheme is a breaking change even though nothing in the protocol says so.</p>
+<p><strong>Scoped, so you cannot express a cross-tenant reference.</strong></p>
+<aside class="box threat"><p class="box-title">Threat: URIs that can name other people’s data</p>
+<p><code>meridian://accounts/{id}/summary</code> is fine only if the server checks authorization on every read. If it does not, the URI space <em>is</em> the attack: a model that has seen one account id can construct another, and the identifiers are sequential.</p>
+<p>Two mitigations, and use both. Authorize every read against the caller. And prefer identifiers that are not enumerable, so a leaked one does not imply the neighbours.</p>
+</aside>
+<p><strong>Pagination is a requirement, not a nicety.</strong> Meridian’s market-data server has 40 benchmark resources and a page size of 25, which forces the pagination path to be exercised rather than theoretical:</p>
+<pre class="python" data-language="python"><code>def test_marketdata_paginates_its_resource_list(self):
+    client = Client(InProcessTransport(marketdata.build_server()))
+    first = client.call(&quot;resources/list&quot;)
+    self.assertIn(&quot;nextCursor&quot;, first)
+    everything = client.list_resources()
+    self.assertGreater(len(everything), 25)</code></pre>
+<p>Cursors are opaque. Meridian uses an offset because its catalogue is small and stable, and says so in the code, because an offset over a mutable table skips and duplicates rows when the underlying set shifts between pages. If your list comes from a database, encode a sort key instead.</p>
+</section>
+<section id="the-2026-caching-model" class="level2">
+<h2>The 2026 caching model</h2>
+<p>Here is the part of the chapter that will pay for the book.</p>
+<p>Six operations carry caching hints: <code>server/discover</code>, <code>tools/list</code>, <code>prompts/list</code>, <code>resources/list</code>, <code>resources/templates/list</code>, and <code>resources/read</code>. Two fields:</p>
+<dl>
+<dt><code>ttlMs</code></dt>
+<dd>
+<p>How long the client may consider this fresh. Semantically identical to HTTP’s <code>max-age</code>.</p>
+</dd>
+<dt><code>cacheScope</code></dt>
+<dd>
+<p><code>"public"</code> or <code>"private"</code>. Who may hold the cached copy.</p>
+</dd>
+</dl>
+<p>It is HTTP caching, and that is a compliment. HTTP caching is a design that has survived thirty years of adversarial contact with reality.</p>
+<section id="ttl-is-a-freshness-hint-not-a-polling-interval" class="level3">
+<h3>TTL is a freshness hint, not a polling interval</h3>
+<p>The most common mistake, and it is a self-inflicted denial of service.</p>
+<aside class="keyidea">
+<p>Check freshness when you need the data. Do not wake up every <code>ttlMs</code> to refetch data nobody asked for. At scale, a fleet of clients polling on a shared TTL is a synchronised thundering herd that you built yourself, on purpose, out of enthusiasm.</p>
+</aside>
+<p>The correct loop is: need the data, check freshness, refetch only if stale.</p>
+<pre class="python" data-language="python"><code>def get(self, server, method, params, auth_context=&quot;anon&quot;):
+    if method not in CACHEABLE_METHODS:
+        self.stats.uncacheable += 1
+        return None
+    # A retry carrying MRTR fields is a different question with the same name.
+    if &quot;inputResponses&quot; in params or &quot;requestState&quot; in params:
+        self.stats.uncacheable += 1
+        return None
+
+    key = cache_key(server, method, params, auth_context)
+    now = self._clock()
+    with self._lock:
+        entry = self._entries.get(key)
+        if entry is None:
+            self.stats.misses += 1
+            return None
+        if not entry.fresh_at(now):
+            self.stats.stale += 1
+            del self._entries[key]
+            return None
+        self.stats.hits += 1
+        return entry.value</code></pre>
+<p>Note the second check. Results produced by an MRTR retry are never cacheable, because they depend on <code>inputResponses</code>, which is not part of the cache key. Caching one would serve one user’s answer to another user’s question.</p>
+<p>Three edge cases the specification pins down, and Meridian tests all three:</p>
+<ul>
+<li><p><code>ttlMs: 0</code> means immediately stale. Do not store it.</p></li>
+<li><p><code>ttlMs</code> absent means assume 0. This should only happen with older servers.</p></li>
+<li><p>Negative <code>ttlMs</code> is ignored, treated as 0.</p></li>
+</ul>
+</section>
+<section id="cachescope-is-an-access-control-decision" class="level3">
+<h3><code>cacheScope</code> is an access-control decision</h3>
+<figure id="fig:cache-scope">
+<img src="figures/cache-scope.svg" />
+<figcaption>The two scopes, and what each permits. The box at the bottom is the part that turns a performance field into a security field.</figcaption>
+</figure>
+<p><code>public</code> means the response contains nothing user-specific, so any client, gateway, or proxy may store it and serve it to anybody.</p>
+<p><code>private</code> means it may be reused only within the same authorization context. Different token, different cache.</p>
+<p>The trap is stated plainly in the specification and is worth repeating: <strong>a <code>public</code> response may be shared even when it came from an authenticated endpoint</strong>. Authentication does not make a response private. Marking it <code>private</code> does.</p>
+<p>So mislabelling a personalised response as <code>public</code> does not merely leak it. It instructs a shared gateway to serve one user’s data to another and report a cache hit while doing so.</p>
+<p>Meridian takes the conservative line and keys <em>every</em> entry by principal, public or not:</p>
+<pre class="python" data-language="python"><code>def cache_key(server, method, params, auth_context):
+    &quot;&quot;&quot;Method plus the params that affect the answer, plus who is asking.
+
+    `auth_context` is folded in unconditionally rather than only for `private`
+    entries. Doing it the other way round means a single mislabelled response
+    leaks across users, and the cost of being wrong is far higher than the cost
+    of a few duplicate entries.
+    &quot;&quot;&quot;</code></pre>
+<p>That is a deliberate trade. It gives up gateway-level sharing of public resources in exchange for making a mislabelling bug harmless. For a financial application that is obviously right. For a public documentation server it may not be, and you should make the choice consciously rather than inherit mine.</p>
+</section>
+<section id="what-it-is-worth" class="level3">
+<h3>What it is worth</h3>
+<figure id="fig:cache-effect">
+<img src="figures/cache-effect.svg" />
+<figcaption>600 resource reads over 40 URIs with realistic repetition. The left bar is what your server sees; the right column is what the client experiences.</figcaption>
+</figure>
+<aside class="box measured"><p class="box-title">Measured: Honouring <code>ttlMs</code> on a realistic read pattern</p>
+<div class="tabular">
+<p><span>@lrr@</span></p>
+<p><strong></strong> &amp; <strong>Ignoring TTL</strong> &amp; <strong>Honouring TTL</strong><br />
+Reads issued by the application &amp; 600 &amp; 600<br />
+Requests reaching the server &amp; 600 &amp; 23<br />
+Wall clock &amp; 12.4 ms &amp; 1.8 ms<br />
+Cache hit rate &amp; 0 % &amp; 96.2 %<br />
+&amp; 6.82<span class="math inline">×</span><br />
+</p>
+</div>
+<p>In-process transport, so this measures the caching logic rather than the network. Over a real network the ratio is far larger, because the 577 avoided requests each avoid a round trip.</p>
+</aside>
+<p>Read the middle row again. 577 of 600 requests never happened. On loopback that saves 10 milliseconds. Across a 68 ms cross-region hop it saves 39 seconds.</p>
+</section>
+<section id="invalidation" class="level3">
+<h3>Invalidation</h3>
+<p>TTL and change notifications are complementary, and the specification is explicit that a server may provide either or both.</p>
+<ul>
+<li><p>TTL alone: the client refetches when stale. Simple, and it may serve stale data for up to <code>ttlMs</code>.</p></li>
+<li><p>TTL plus <code>listChanged</code>: the notification invalidates immediately, and the TTL stops needless refetching in between.</p></li>
+</ul>
+<pre class="python" data-language="python"><code>def on_notification(self, msg: dict) -&gt; None:
+    &quot;&quot;&quot;Turn a change notification into a cache invalidation.
+
+    This is the whole reason `listChanged` and `ttlMs` coexist. The TTL
+    stops you refetching while nothing has changed; the notification stops
+    you serving stale data the moment something has.
+    &quot;&quot;&quot;
+    method = msg.get(&quot;method&quot;, &quot;&quot;)
+    if method == &quot;notifications/tools/list_changed&quot;:
+        self.cache.invalidate_method(self.label, &quot;tools/list&quot;)
+    elif method == &quot;notifications/resources/updated&quot;:
+        uri = (msg.get(&quot;params&quot;) or {}).get(&quot;uri&quot;)
+        if uri:
+            self.cache.invalidate_uri(self.label, uri)</code></pre>
+<p>Subscribing is a <code>subscriptions/listen</code> request with a filter:</p>
+<pre class="json" data-language="json"><code>{
+  &quot;jsonrpc&quot;: &quot;2.0&quot;,
+  &quot;id&quot;: 4,
+  &quot;method&quot;: &quot;subscriptions/listen&quot;,
+  &quot;params&quot;: {
+    &quot;notifications&quot;: {
+      &quot;resourcesListChanged&quot;: true,
+      &quot;resourceSubscriptions&quot;: [&quot;meridian://accounts/ACC-1042/summary&quot;]
+    }
+  }
+}</code></pre>
+<p>Two rules govern that stream, and they exist because stdio multiplexes everything onto one pipe:</p>
+<p><strong>The server sends only what was requested.</strong> Not “everything it might like”. A subscriber who asked for tool changes never sees resource updates.</p>
+<p><strong>The acknowledgement comes first and carries the subscription id.</strong> Everything afterwards is tagged with it, so a client with two open subscriptions can demultiplex.</p>
+<pre class="python" data-language="python"><code>def test_acknowledged_first_then_only_requested_types(self):
+    ...
+    first = received[0]
+    self.assertEqual(first[&quot;method&quot;],
+                     &quot;notifications/subscriptions/acknowledged&quot;)
+    self.assertEqual(
+        first[&quot;params&quot;][&quot;_meta&quot;][&quot;io.modelcontextprotocol/subscriptionId&quot;], 42)
+
+    # A prompts change was never requested, so it must not be delivered.
+    server.notify_list_changed(&quot;prompts&quot;)
+    server.notify_list_changed(&quot;tools&quot;)
+    ...
+    self.assertIn(&quot;notifications/tools/list_changed&quot;, methods)
+    self.assertNotIn(&quot;notifications/prompts/list_changed&quot;, methods)</code></pre>
+<p>The acknowledgement also reports the subset the server actually agreed to honour, which is how a client learns that the server does not support resource subscriptions rather than waiting forever for updates that are never coming.</p>
+<aside class="box legacy"><p class="box-title">Legacy: <code>resources/subscribe</code> and the GET stream</p>
+<p>Through <code>2025-11-25</code>, subscribing was a <code>resources/subscribe</code> RPC and notifications arrived on a standalone SSE stream opened with HTTP GET.</p>
+<p>Both are gone, and for the same reason: they were per-connection state, which is the thing this revision deleted. <code>subscriptions/listen</code> replaces them with an ordinary request whose response happens to stay open.</p>
+<p>On stdio, if the connection drops and is re-established, the client must re-send <code>subscriptions/listen</code>. The server holds no subscription state across reconnections.</p>
+</aside>
+</section>
+</section>
+<section id="who-chooses-what-goes-into-context" class="level2">
+<h2>Who chooses what goes into context</h2>
+<p>Three strategies, three cost profiles, and most applications need all three.</p>
+<table id="tab:context-strategies">
+<caption>Three ways context gets filled. The third one is where the waste accumulates, because nobody has to decide anything for it to happen.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Strategy</strong></td>
+<td style="text-align: left;"><strong>How it works</strong></td>
+<td style="text-align: left;"><strong>Token cost</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">User-driven</td>
+<td style="text-align: left;">A picker, a file tree, an @-mention</td>
+<td style="text-align: left;">Exactly what was chosen. Predictable, and usually right</td>
+</tr>
+<tr>
+<td style="text-align: left;">Model-driven</td>
+<td style="text-align: left;">Resource links in tool results; the model asks for what it wants</td>
+<td style="text-align: left;">One extra round trip per fetch, but only fetches what it needs</td>
+</tr>
+<tr>
+<td style="text-align: left;">Host policy</td>
+<td style="text-align: left;">Always attach the current file, the system prompt, the last N turns</td>
+<td style="text-align: left;">Constant per turn, and the easiest to let grow silently</td>
+</tr>
+</tbody>
+</table>
+<p>The model-driven route is worth a note. A tool can return a <em>link</em> rather than the content:</p>
+<pre class="json" data-language="json"><code>{
+  &quot;type&quot;: &quot;resource_link&quot;,
+  &quot;uri&quot;: &quot;meridian://filings/FIL-2000&quot;,
+  &quot;name&quot;: &quot;FIL-2000&quot;,
+  &quot;description&quot;: &quot;10-K, fiscal 2025, 284 pages&quot;,
+  &quot;mimeType&quot;: &quot;application/json&quot;
+}</code></pre>
+<p>The model sees that a 284-page filing exists and decides whether it wants it. That is one extra round trip if it does, and zero tokens if it does not, which is usually the better trade for large documents. Chapter <a href="ch13.html#ch:agent-loop">13</a> covers when to embed instead.</p>
+</section>
+<section id="anti-patterns" class="level2">
+<h2>Anti-patterns</h2>
+<p>Five, in rough order of how often I encounter them.</p>
+<p><strong>Dumping a database as resources.</strong> One resource per row, ten thousand rows. The list response alone exhausts the context window. If your resource list is longer than a person would scroll, it should be a template plus a search tool.</p>
+<p><strong>Ignoring pagination.</strong> Both directions. Servers that return everything, and clients that read page one and stop. Meridian’s client walks to the end and caches each page under its own cursor.</p>
+<p><strong>Cross-tenant URIs.</strong> Covered above. Authorize on every read.</p>
+<p><strong><code>cacheScope: public</code> on anything personalised.</strong> Covered above, and it is a data breach rather than a performance bug.</p>
+<p><strong>Returning enormous blobs with no size hint.</strong> The <code>size</code> field exists. Populate it. A host that knows a resource is 4 MB before reading it can decide not to, and a host that finds out afterwards has already spent the budget.</p>
+</section>
+<section id="meridians-resources" class="level2">
+<h2>Meridian’s resources</h2>
+<table id="tab:meridian-resources">
+<caption>Every TTL is a claim about how fast the underlying data changes, and every scope is a claim about who may see it.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Resource</strong></td>
+<td style="text-align: left;"><strong>What</strong></td>
+<td style="text-align: right;"><strong>TTL</strong></td>
+<td style="text-align: left;"><strong>Scope</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>accounts/{id}/summary</code></td>
+<td style="text-align: left;">Account profile</td>
+<td style="text-align: right;">15 min</td>
+<td style="text-align: left;">private</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>filings/{id}</code></td>
+<td style="text-align: left;">Public regulatory filing</td>
+<td style="text-align: right;">24 h</td>
+<td style="text-align: left;">public</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>risk/model-card</code></td>
+<td style="text-align: left;">How the score works</td>
+<td style="text-align: right;">7 d</td>
+<td style="text-align: left;">public</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>transactions/{id}</code></td>
+<td style="text-align: left;">One transaction</td>
+<td style="text-align: right;">30 s</td>
+<td style="text-align: left;">private</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>market/curve</code></td>
+<td style="text-align: left;">Reference rates</td>
+<td style="text-align: right;">1 h</td>
+<td style="text-align: left;">public</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>market/benchmark/{...}</code></td>
+<td style="text-align: left;">40 sector benchmarks</td>
+<td style="text-align: right;">2 h</td>
+<td style="text-align: left;">public</td>
+</tr>
+</tbody>
+</table>
+<p>The spread of TTLs is the interesting part, and each one is an argument:</p>
+<p><code>transactions</code> gets 30 seconds because a transaction under active review changes state and stale data would mislead a compliance officer.</p>
+<p><code>filings</code> gets 24 hours and <code>public</code> because a filed 10-K is immutable and identical for everybody. This is the row where a shared gateway cache does real work.</p>
+<p><code>model-card</code> gets 7 days because it changes when the model is retrained, which is quarterly.</p>
+<aside class="keyidea">
+<p>A TTL is not a performance knob you tune until the graph looks nice. It is a statement about how quickly the underlying data changes, and the right value comes from the domain rather than from the dashboard.</p>
+</aside>
+</section>
+<section id="what-to-remember" class="level2">
+<h2>What to remember</h2>
+<ul>
+<li><p>Resources are application-driven; tools are model-controlled. The question is who decides when it happens.</p></li>
+<li><p>Templates over enumeration. Pagination is required, and cursors are opaque.</p></li>
+<li><p>Six operations carry <code>ttlMs</code> and <code>cacheScope</code>.</p></li>
+<li><p>TTL is a freshness hint. Never poll on it.</p></li>
+<li><p>MRTR retries and interim results are never cacheable.</p></li>
+<li><p><code>cacheScope: public</code> may be shared across users even from an authenticated endpoint. It is an access-control decision.</p></li>
+<li><p>Honouring TTL avoided 577 of 600 requests on a realistic read pattern, a 96.2 % hit rate.</p></li>
+<li><p>Notifications invalidate; TTL prevents needless refetching between them. The server sends only the types the client asked for.</p></li>
+<li><p>Authorize every read. Populate <code>size</code>. Do not dump your database.</p></li>
+</ul>
+<p>Next: prompts, the primitive everybody skips, and the one that quietly standardises a workflow across three teams.</p>
+</section>
+</section>
+<div class="pager">
+<a href="ch05.html"><span class="dir">Previous</span>Tools: The Execution Layer</a>
+<a href="ch07.html" style="text-align:right"><span class="dir">Next</span>Prompts: Workflow Blueprints</a>
+</div>
+</main>
+</div>
+<script>
+(function(){
+  var nav = document.querySelector('nav.toc');
+  var btn = document.querySelector('.menu-btn');
+  if(btn && nav){
+    if(window.innerWidth <= 940) nav.classList.add('collapsed');
+    btn.addEventListener('click', function(){ nav.classList.toggle('collapsed'); });
+  }
+  // Wrap tables so wide ones scroll rather than overflowing the page.
+  document.querySelectorAll('main table').forEach(function(t){
+    if(t.parentElement.classList.contains('table-wrap')) return;
+    var w = document.createElement('div');
+    w.className = 'table-wrap';
+    t.parentNode.insertBefore(w, t);
+    w.appendChild(t);
+  });
+})();
+</script>
+</body>
+</html>

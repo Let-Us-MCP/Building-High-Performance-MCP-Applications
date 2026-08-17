@@ -1,0 +1,48 @@
+% Chapter 9. Task states, and which ones you can leave.
+\documentclass[tikz,border=6pt]{standalone}
+\input{_style}
+\begin{document}
+\begin{tikzpicture}[x=1cm, y=1cm, node distance=1cm]
+
+  \node[boxa, minimum width=24mm] (working) at (0,0) {\texttt{working}};
+  \node[boxw, minimum width=30mm, align=center] (input) at (0,2.6)
+    {\texttt{input\_required}\\[-1pt]\scriptsize needs a human};
+
+  \node[boxg, minimum width=24mm] (done)   at (5.4,1.5) {\texttt{completed}};
+  \node[boxd, minimum width=24mm] (failed) at (5.4,0.0) {\texttt{failed}};
+  \node[box,  minimum width=24mm] (cancel) at (5.4,-1.5) {\texttt{cancelled}};
+
+  % Two arrows between the same pair of nodes, kept apart by anchoring to
+  % opposite corners so their labels cannot collide.
+  \draw[flow] (working.north west) -- (input.south west)
+    node[tag, midway, left, align=right, xshift=-4pt]
+    {\texttt{tasks/get}\\surfaces\\the question};
+  \draw[flow] (input.south east) -- (working.north east)
+    node[tag, midway, right, align=left, xshift=4pt]
+    {\texttt{tasks/update}\\with\\inputResponses};
+
+  \draw[flow] (working) -- (done);
+  \draw[flow] (working) -- (failed);
+  \draw[flow] (working) -- node[tag, below, sloped] {tasks/cancel} (cancel);
+
+  % terminal bracket
+  \draw[draw=rule, line width=1pt, densely dashed, rounded corners=3pt]
+    (3.9,-2.3) rectangle (6.9,2.3);
+  \node[note, anchor=south, text=muted] at (5.4,2.35) {terminal};
+
+  \node[note, anchor=west, align=left, text=muted] at (7.2,0.0)
+    {once here the state\\never changes again};
+
+  \node[note, anchor=north west, align=left, text=danger] at (-2.6,-2.9)
+    {\textbf{The two traps.}
+     \texttt{input\_required} is \emph{not} terminal, so a poller that stops on
+     ``not working'' hangs forever.\\
+     And cancellation is cooperative: the server acknowledges the intent, but
+     the task may still reach \texttt{completed}.};
+
+  \node[note, anchor=north west, align=left, text=accent] at (-2.6,-4.5)
+    {Poll at the server's \texttt{pollIntervalMs}. Ignoring it turns one long
+     request into four hundred short ones.};
+
+\end{tikzpicture}
+\end{document}

@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Agent Loop, State, and Memory &middot; Building Awesome MCP Apps</title>
+<meta name="description" content="The Agent Loop, State, and Memory. What every AI application developer should know about the Model Context Protocol">
+<meta property="og:title" content="The Agent Loop, State, and Memory">
+<meta property="og:description" content="The Agent Loop, State, and Memory. What every AI application developer should know about the Model Context Protocol">
+<style>
+:root{
+  --ink:#15181D; --muted:#5B6472; --rule:#D8DDE4; --wash:#F5F6F8;
+  --paper:#FFFFFF; --accent:#0F5C8C; --accent-soft:#E7F0F6;
+  --warm:#B4531A; --warm-soft:#FBF0E7; --good:#2C6E49; --good-soft:#E9F2EC;
+  --danger:#9B2226; --danger-soft:#FAECEC;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#E7EAEE; --muted:#98A2B0; --rule:#2C333D; --wash:#171B21;
+    --paper:#0F1216; --accent:#63AEDC; --accent-soft:#14232E;
+    --warm:#E08B4F; --warm-soft:#2A1D13; --good:#6FBF8E; --good-soft:#13221A;
+    --danger:#E4796F; --danger-soft:#291516;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--serif);font-size:18px;line-height:1.62;
+  -webkit-text-size-adjust:100%}
+.layout{display:grid;grid-template-columns:288px minmax(0,1fr);
+  max-width:1280px;margin:0 auto;gap:0}
+nav.toc{position:sticky;top:0;height:100vh;overflow-y:auto;padding:26px 20px 60px;
+  border-right:1px solid var(--rule);font-family:var(--sans);font-size:14px}
+nav.toc .brand{display:block;font-weight:700;font-size:16px;color:var(--ink);
+  text-decoration:none;line-height:1.3;margin-bottom:4px}
+nav.toc .tagline{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.45}
+nav.toc .part{margin:18px 0 6px;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);font-weight:700}
+nav.toc a{display:block;padding:4px 8px;margin-left:-8px;border-radius:5px;
+  color:var(--muted);text-decoration:none}
+nav.toc a:hover{background:var(--wash);color:var(--ink)}
+nav.toc a.current{background:var(--accent-soft);color:var(--accent);font-weight:600}
+main{padding:44px 52px 120px;min-width:0;max-width:78ch}
+h1,h2,h3,h4{font-family:var(--sans);line-height:1.25;color:var(--ink)}
+h1{font-size:2.05em;margin:0 0 .55em;letter-spacing:-.015em}
+h2{font-size:1.42em;margin:2em 0 .5em;padding-top:.35em}
+h3{font-size:1.14em;margin:1.7em 0 .4em}
+h4{font-size:1em;margin:1.4em 0 .3em;color:var(--muted)}
+p{margin:0 0 1.05em}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.855em;background:var(--wash);
+  padding:.12em .36em;border-radius:4px;word-break:break-word}
+pre{background:var(--wash);border-left:3px solid var(--rule);
+  border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+  font-size:13.5px;line-height:1.5;margin:1.3em 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+pre.json,pre.http{background:var(--accent-soft);border-left-color:var(--accent)}
+aside.box{border-left:3px solid var(--rule);background:var(--wash);
+  padding:14px 18px;margin:1.5em 0;border-radius:0 6px 6px 0;font-size:.955em}
+aside.box .box-title{font-family:var(--sans);font-weight:700;font-size:12px;
+  letter-spacing:.07em;text-transform:uppercase;margin:0 0 .55em}
+aside.box.legacy{border-left-color:var(--warm);background:var(--warm-soft)}
+aside.box.legacy .box-title{color:var(--warm)}
+aside.box.measured{border-left-color:var(--good);background:var(--good-soft)}
+aside.box.measured .box-title{color:var(--good)}
+aside.box.threat{border-left-color:var(--danger);background:var(--danger-soft)}
+aside.box.threat .box-title{color:var(--danger)}
+aside.box.note .box-title{color:var(--muted)}
+aside.keyidea{border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:14px 18px;margin:1.6em 0;border-radius:0 6px 6px 0;
+  font-family:var(--sans);font-style:italic;font-size:.97em}
+aside.keyidea p:last-child,aside.box p:last-child{margin-bottom:0}
+aside.keyidea pre,aside.keyidea code,aside.keyidea table{font-style:normal}
+aside.epigraph{border:0;margin:0 0 2em;padding:0 0 0 clamp(0px,7%,52px);
+  color:var(--muted);font-size:.97em}
+aside.epigraph p{margin:0 0 .3em}
+main figure{margin:2em 0;text-align:center}
+main figure img{max-width:100%;height:auto;border-radius:6px}
+@media (prefers-color-scheme: dark){
+  main figure img{background:#fff;padding:10px;border-radius:8px}
+}
+figcaption{font-family:var(--sans);font-size:13.5px;color:var(--muted);
+  margin-top:.7em;text-align:left;line-height:1.5}
+.table-wrap{overflow-x:auto;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:14.5px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+thead th{border-bottom:2px solid var(--rule);font-weight:700}
+caption{caption-side:bottom;font-size:13.5px;color:var(--muted);
+  text-align:left;padding-top:.7em;line-height:1.5}
+ul,ol{padding-left:1.35em;margin:0 0 1.05em}
+li{margin-bottom:.32em}
+dl{margin:0 0 1.05em}
+dt{font-weight:700;font-family:var(--sans);font-size:.95em;margin-top:.75em}
+dd{margin:.15em 0 0 1.35em}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
+.pager{display:flex;justify-content:space-between;gap:16px;margin-top:4em;
+  padding-top:1.5em;border-top:1px solid var(--rule);font-family:var(--sans);
+  font-size:14px}
+.pager a{text-decoration:none;max-width:46%}
+.pager .dir{display:block;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted)}
+.masthead{border-bottom:1px solid var(--rule);padding-bottom:1.8em;margin-bottom:2.2em}
+.masthead .kicker{font-family:var(--sans);font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);font-weight:700}
+.lede{font-size:1.12em;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:14px;margin:1.8em 0}
+.card{border:1px solid var(--rule);border-radius:9px;padding:15px 17px;
+  font-family:var(--sans);font-size:14px}
+.card h3{margin:0 0 .35em;font-size:15px}
+.card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+.menu-btn{display:none}
+@media (max-width:940px){
+  body{font-size:17px}
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:0;
+    border-bottom:1px solid var(--rule);max-height:none}
+  nav.toc.collapsed .toc-body{display:none}
+  main{padding:28px 20px 90px}
+  .menu-btn{display:inline-block;font-family:var(--sans);font-size:13px;
+    background:var(--wash);border:1px solid var(--rule);color:var(--ink);
+    border-radius:6px;padding:6px 11px;cursor:pointer;margin-bottom:10px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc"><button class="menu-btn" type="button">Contents</button>
+<div class="toc-body">
+<a class="brand" href="index.html">Building Awesome MCP Apps</a>
+<p class="tagline">What every AI application developer should know about the Model Context Protocol</p>
+<a href="preface.html">Preface</a>
+<a href="how-to-read.html">How to read this book</a>
+<div class="part">Part I. Protocol Fundamentals</div>
+<a href="ch01.html">A Primer on Latency, Tokens, and Context</a>
+<a href="ch02.html">The MCP Architectural Model</a>
+<a href="ch03.html">Building Blocks of the Transport</a>
+<a href="ch04.html">Authorization on the Wire</a>
+<div class="part">Part II. The Primitives</div>
+<a href="ch05.html">Tools: The Execution Layer</a>
+<a href="ch06.html">Resources: The Context Layer</a>
+<a href="ch07.html">Prompts: Workflow Blueprints</a>
+<a href="ch08.html">Multi Round-Trip Requests</a>
+<a href="ch09.html">Extensions and Tasks</a>
+<a href="ch10.html">MCP Apps: Interactive Interfaces</a>
+<div class="part">Part III. Building MCP Applications</div>
+<a href="ch11.html">Building Servers</a>
+<a href="ch12.html">Building Hosts and Clients</a>
+<a href="ch13.html" class="current">The Agent Loop, State, and Memory</a>
+<a href="ch14.html">Multi-Agent Topologies</a>
+<div class="part">Part IV. Performance Engineering</div>
+<a href="ch15.html">Testing and Debugging</a>
+<a href="ch16.html">Measuring MCP Applications</a>
+<a href="ch17.html">Optimizing for Latency, Tokens, and Cost</a>
+<a href="ch18.html">Deployment and Operations</a>
+<div class="part">Part V. Security and Trust</div>
+<a href="ch19.html">Threat Modeling Agentic Applications</a>
+<a href="ch20.html">Access Control, Audit, and MCP in the Enterprise</a>
+<div class="part">Back matter</div>
+<a href="epilogue.html">Epilogue: The Evolving Protocol</a>
+<div class="part">Appendices</div>
+<a href="appendix-a.html">A. Method and Message Reference</a>
+<a href="appendix-b.html">B. Transport Decision Matrix</a>
+<a href="appendix-c.html">C. Performance Checklist</a>
+<a href="appendix-d.html">D. Security Hardening Checklist</a>
+<a href="appendix-e.html">E. The Meridian Companion Repository</a>
+<a href="about.html">About the author</a>
+</div></nav>
+<main>
+<section id="ch:agent-loop" class="level1">
+<h1>The Agent Loop, State, and Memory</h1>
+<aside class="epigraph">
+<p><em>“What we do in life echoes in eternity.”</em></p>
+<p>Maximus, <em>Gladiator</em> (2000)</p>
+</aside>
+<p>Or, in the agentic case, it echoes in the context window, which is worse, because eternity is free and the context window is billed per token on every subsequent turn.</p>
+<p>This chapter is about the loop: how it terminates, where state lives now that the protocol holds none, and how to stop the context filling with the corpses of completed steps.</p>
+<section id="the-loop-instrumented" class="level2">
+<h2>The loop, instrumented</h2>
+<p>Four bands per iteration, and if you cannot attribute a millisecond to one of them you cannot optimise it.</p>
+<pre class="python" data-language="python"><code>@dataclass
+class Iteration:
+    &quot;&quot;&quot;One trip round the loop, with the milliseconds attributed.&quot;&quot;&quot;
+    index: int
+    model_ms: float = 0.0
+    transport_ms: float = 0.0
+    consent_ms: float = 0.0
+    tool_calls: int = 0
+    parallel: bool = False
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cost_usd: float = 0.0</code></pre>
+<p>The loop itself:</p>
+<pre class="python" data-language="python"><code>for step in range(self.max_steps):
+    iteration = Iteration(index=step)
+
+    # --- think
+    turn = self.model.think(&quot;\n&quot;.join(context), catalogue)
+    iteration.model_ms = turn.latency_ms
+    iteration.input_tokens = turn.input_tokens
+    iteration.output_tokens = turn.output_tokens
+    iteration.cost_usd = turn.cost_usd
+
+    if not turn.tool_calls:
+        result.answer = turn.text
+        result.stopped_because = &quot;completed&quot;
+        break
+
+    # --- act
+    iteration.parallel = self.parallel_fanout and len(turn.tool_calls) &gt; 1
+    started = time.perf_counter()
+    if iteration.parallel:
+        results = self.host.call_tools_parallel(turn.tool_calls)
+    else:
+        results = [self.host.call_tool(c[&quot;name&quot;], c.get(&quot;arguments&quot;))
+                   for c in turn.tool_calls]
+    iteration.transport_ms = (time.perf_counter() - started) * 1000.0
+
+    # --- observe
+    for call, payload in zip(turn.tool_calls, results):
+        context.append(f&quot;[{call[&#39;name&#39;]}] {_summarise(payload)}&quot;)</code></pre>
+<p>Think, act, observe. The whole thing.</p>
+</section>
+<section id="termination" class="level2">
+<h2>Termination</h2>
+<p>An agent loop that cannot stop is not an agent, it is an outage with a personality. There are four ways out and a production loop needs all four.</p>
+<table id="tab:termination">
+<caption>Four exits. The last three are guardrails, and the third and fourth are the ones people leave unset.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Condition</strong></td>
+<td style="text-align: left;"><strong>Means</strong></td>
+<td style="text-align: left;"><strong>Meridian default</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">No tool calls</td>
+<td style="text-align: left;">The model is finished. The one you hope for</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">Step budget</td>
+<td style="text-align: left;">Looping without progress</td>
+<td style="text-align: left;">8</td>
+</tr>
+<tr>
+<td style="text-align: left;">Token budget</td>
+<td style="text-align: left;">Context filling with tool output</td>
+<td style="text-align: left;">task-dependent</td>
+</tr>
+<tr>
+<td style="text-align: left;">Cost budget</td>
+<td style="text-align: left;">Somebody wired this to cron and went on holiday</td>
+<td style="text-align: left;">task-dependent</td>
+</tr>
+</tbody>
+</table>
+<pre class="python" data-language="python"><code>if self.token_budget is not None and result.total_tokens &gt; self.token_budget:
+    result.stopped_because = &quot;token budget exhausted&quot;
+    result.answer = &quot;Stopped: the context budget for this task ran out.&quot;
+    break
+if self.cost_budget_usd is not None and result.cost_usd &gt; self.cost_budget_usd:
+    result.stopped_because = &quot;cost budget exhausted&quot;
+    result.answer = &quot;Stopped: the dollar budget for this task ran out.&quot;
+    break</code></pre>
+<p>Note that a budget stop still produces an <em>answer</em>. Not an exception, not a blank. The user asked a question and deserves to be told why they are not getting one.</p>
+<pre class="python" data-language="python"><code>def test_step_budget_stops_a_runaway(self):
+    looping = [[{&quot;name&quot;: &quot;fraud.screen_account&quot;,
+                 &quot;arguments&quot;: {&quot;accountId&quot;: &quot;ACC-1000&quot;}}]] * 50
+    model = StubModel(plan=looping, simulate_latency=False)
+    result = AgentLoop(host, model, max_steps=4).run(&quot;loop forever&quot;)
+    self.assertEqual(result.stopped_because, &quot;step budget exhausted&quot;)
+    self.assertEqual(len(result.iterations), 4)</code></pre>
+<aside class="keyidea">
+<p>Set all four. The model cannot be trusted to stop, and the server cannot see enough to make it. Termination is the host’s job, and an unset budget is not a default, it is infinity.</p>
+</aside>
+<section id="choosing-the-numbers" class="level3">
+<h3>Choosing the numbers</h3>
+<p>Not arbitrary, and derivable from Chapter <a href="ch01.html#ch:primer">1</a>.</p>
+<p><strong>Step budget</strong>: look at your traces, take the 95th percentile of iterations for successful tasks, and add two. Meridian’s tasks finish in three, so eight is generous.</p>
+<p><strong>Token budget</strong>: your context window, minus a reserve for the final answer, minus your catalogue cost times your step budget. If that arithmetic comes out negative, your catalogue is too big and Chapter <a href="ch05.html#ch:tools">5</a> is where you should be.</p>
+<p><strong>Cost budget</strong>: what one task is worth. A $0.012 task with a $0.50 budget has forty times the headroom it needs and still stops before anything alarming happens.</p>
+</section>
+</section>
+<section id="where-state-lives-now" class="level2">
+<h2>Where state lives now</h2>
+<p>The protocol holds none. So state lives in exactly three places, and knowing which is which prevents most of the confusion.</p>
+<table id="tab:state-homes">
+<caption>Three homes. Nothing lives in the connection, because the connection is no longer a thing that means anything.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Kind</strong></td>
+<td style="text-align: left;"><strong>Where</strong></td>
+<td style="text-align: left;"><strong>Lifetime</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Conversation</td>
+<td style="text-align: left;">Host memory</td>
+<td style="text-align: left;">The conversation</td>
+</tr>
+<tr>
+<td style="text-align: left;">Cross-call server state</td>
+<td style="text-align: left;">A handle passed as a tool argument</td>
+<td style="text-align: left;">Server’s retention policy</td>
+</tr>
+<tr>
+<td style="text-align: left;">Durable domain state</td>
+<td style="text-align: left;">A database, exposed as resources or tools</td>
+<td style="text-align: left;">Forever</td>
+</tr>
+</tbody>
+</table>
+<p>The middle row is the one that changed. Before 2026, a server could keep a per-session dictionary. Now it mints a handle and the model carries it.</p>
+<p>The interesting consequence: <strong>the model is now part of your state machine</strong>. It has to remember to pass <code>basket_id</code> to the next call. Which means the handle needs to be visible in a tool result the model actually reads, and the tool description needs to say what to do with it.</p>
+<pre class="python" data-language="python"><code># The model is responsible for carrying `basket_id` forward; the server
+# stores the cart contents under that key and looks them up on each call.</code></pre>
+<p>If that makes you slightly nervous, good. It should. It is why Chapter <a href="ch11.html#ch:building-servers">11</a> insists on a clear expiry error: when the model loses the handle, and it will, the failure has to be self-explanatory enough for it to recover.</p>
+</section>
+<section id="context-management" class="level2">
+<h2>Context management</h2>
+<p>Now the hard part.</p>
+<p>Every tool result enters the context and stays there. Ten calls returning 2 KB each is 20 KB of JSON, re-processed on every subsequent turn, most of it irrelevant by the time you get to turn eight.</p>
+<section id="truncate-at-minimum" class="level3">
+<h3>Truncate, at minimum</h3>
+<p>Meridian’s approach is blunt and bounded, which beats unbounded:</p>
+<pre class="python" data-language="python"><code>def _summarise(payload: dict, limit: int = 600) -&gt; str:
+    &quot;&quot;&quot;Put the tool result into the context without putting *all* of it there.
+
+    Structured content is preferred over the text mirror, because it is smaller
+    and the model does not have to parse prose to find a number. Truncation is
+    blunt, and Chapter 13 replaces it with something better, but blunt and
+    bounded beats unbounded.
+    &quot;&quot;&quot;
+    if payload.get(&quot;structuredContent&quot;) is not None:
+        text = json.dumps(payload[&quot;structuredContent&quot;], separators=(&quot;,&quot;, &quot;:&quot;))
+    else:
+        text = &quot; &quot;.join(block.get(&quot;text&quot;, &quot;&quot;)
+                        for block in payload.get(&quot;content&quot;, [])
+                        if block.get(&quot;type&quot;) == &quot;text&quot;)
+    if payload.get(&quot;isError&quot;):
+        text = &quot;ERROR: &quot; + text
+    return text if len(text) &lt;= limit else text[:limit] + &quot;...[truncated]&quot;</code></pre>
+<p>Preferring <code>structuredContent</code> is worth more than it looks. It is smaller than the prose mirror and the model does not have to parse English to find a number.</p>
+</section>
+<section id="better-strategies-roughly-in-order-of-effort" class="level3">
+<h3>Better strategies, roughly in order of effort</h3>
+<p><strong>Summarise old turns.</strong> After N iterations, replace the oldest tool results with a one-line summary. Costs a model call. Best when tasks are long and early results stop mattering.</p>
+<p><strong>Retrieval-augmented re-injection.</strong> Keep full results outside the context, in a store, and re-inject only what the current step needs. More machinery, and the right answer when results are large and reuse is unpredictable.</p>
+<p><strong>Sliding window.</strong> Keep the last N results, drop the rest. Cheap. Wrong whenever step nine needs step one, which is more often than you would like.</p>
+<p><strong>Resource links instead of content.</strong> Chapter <a href="ch06.html#ch:resources">6</a> covered this: return a link, let the model fetch only if it needs to. Zero tokens for results nobody reads.</p>
+<aside class="box note"><p class="box-title">Measure against task success, not against token count</p>
+<p>Every one of these makes token count go down. That is not the goal. The goal is tasks that still succeed.</p>
+<p>An aggressive sliding window can cut context by 60 % and quietly drop your success rate by 15 %, and you will only find out from the eval suite in Chapter <a href="ch16.html#ch:measuring">16</a>. Never tune context strategy without one.</p>
+</aside>
+</section>
+</section>
+<section id="cache-staleness-in-a-long-running-agent" class="level2">
+<h2>Cache staleness in a long-running agent</h2>
+<p>A subtle failure mode that only shows up in autonomous systems.</p>
+<p>An agent runs for twenty minutes. It cached <code>tools/list</code> at minute zero with a five-minute TTL. At minute six the cache is stale, and the agent is mid-task.</p>
+<p>The freshness check handles it, but only if you actually check on access rather than on a timer. And there is a second-order problem: what if the catalogue <em>changed</em> in a way that invalidates the plan the model already made?</p>
+<p>Three defences, in increasing order of paranoia:</p>
+<p><strong>Subscribe.</strong> A <code>listChanged</code> notification invalidates immediately, so the window is milliseconds instead of minutes.</p>
+<p><strong>Treat unexpected errors as invalidation signals.</strong> A <code>-32602</code> saying “unknown tool” on a tool you know exists means your catalogue is stale. Refetch and retry once, rather than reporting failure. The specification explicitly permits refetching before TTL expiry when you have reason to believe the data changed.</p>
+<p><strong>Re-plan on catalogue change.</strong> If the tools available to a task change mid-task, the plan may no longer be valid. Expensive, and worth it for long autonomous runs.</p>
+</section>
+<section id="cost-guardrails" class="level2">
+<h2>Cost guardrails</h2>
+<pre class="python" data-language="python"><code>@property
+def cost_usd(self) -&gt; float:
+    return sum(i.cost_usd for i in self.iterations)</code></pre>
+<p>Per iteration, from tokens and price:</p>
+<pre class="python" data-language="python"><code>def estimate_cost_usd(input_tokens: int, output_tokens: int) -&gt; float:
+    return (input_tokens * INPUT_USD_PER_MTOK / 1_000_000.0
+            + output_tokens * OUTPUT_USD_PER_MTOK / 1_000_000.0)</code></pre>
+<aside class="box measured"><p class="box-title">Measured: Where Meridian’s $0.0125 goes</p>
+<table>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Iteration</strong></td>
+<td style="text-align: right;"><strong>Input</strong></td>
+<td style="text-align: right;"><strong>Output</strong></td>
+<td style="text-align: right;"><strong>Cost</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">1</td>
+<td style="text-align: right;">1<span>,</span>252</td>
+<td style="text-align: right;">12</td>
+<td style="text-align: right;">$0.003936</td>
+</tr>
+<tr>
+<td style="text-align: left;">2</td>
+<td style="text-align: right;">1<span>,</span>318</td>
+<td style="text-align: right;">19</td>
+<td style="text-align: right;">$0.004239</td>
+</tr>
+<tr>
+<td style="text-align: left;">3</td>
+<td style="text-align: right;">1<span>,</span>400</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">$0.004320</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Total</strong></td>
+<td style="text-align: right;"><strong>3<span>,</span>970</strong></td>
+<td style="text-align: right;"><strong>39</strong></td>
+<td style="text-align: right;"><strong>$0.012495</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Note the input column climbing while the output column does not. That is the context filling with tool results, and it is why iteration three costs more than iteration one despite doing less.</p>
+</aside>
+<p>That table is the whole economics of agent loops in six numbers. Input grows monotonically because everything accumulates. Output stays tiny because the model emits a tool call, not an essay. So <strong>your cost is dominated by re-reading what you already read</strong>, and the lever is context management rather than prompting.</p>
+<section id="model-routing" class="level3">
+<h3>Model routing</h3>
+<p>Not every step needs your best model.</p>
+<table id="tab:model-routing">
+<caption>Route by what the step actually requires. Glue steps are the majority of turns in a long task, and they are the cheapest to move.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Step</strong></td>
+<td style="text-align: left;"><strong>Needs</strong></td>
+<td style="text-align: left;"><strong>Model</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Planning the task</td>
+<td style="text-align: left;">Real reasoning</td>
+<td style="text-align: left;">Large</td>
+</tr>
+<tr>
+<td style="text-align: left;">Picking one of three tools</td>
+<td style="text-align: left;">Classification</td>
+<td style="text-align: left;">Small</td>
+</tr>
+<tr>
+<td style="text-align: left;">Formatting a result</td>
+<td style="text-align: left;">Transcription</td>
+<td style="text-align: left;">Small</td>
+</tr>
+<tr>
+<td style="text-align: left;">Deciding whether to stop</td>
+<td style="text-align: left;">Judgement</td>
+<td style="text-align: left;">Large</td>
+</tr>
+<tr>
+<td style="text-align: left;">Summarising for context</td>
+<td style="text-align: left;">Compression</td>
+<td style="text-align: left;">Small</td>
+</tr>
+</tbody>
+</table>
+<p>The measurement that matters is the quality/cost frontier, and the honest way to find it is to run your eval suite at each mix rather than to reason about it. It is common to move the majority of turns to a small model and lose nothing measurable, and it is also common to lose a lot, and which one you are in is not predictable from first principles.</p>
+</section>
+</section>
+<section id="memory-across-sessions" class="level2">
+<h2>Memory across sessions</h2>
+<p>The protocol is stateless. Your application probably should not be.</p>
+<p>Meridian’s risk agent keeps 30 days of interaction history for an account, and none of it lives in MCP. It lives in a database, exposed as a resource:</p>
+<pre class="text" data-language="text"><code>meridian://accounts/{account_id}/history</code></pre>
+<p>Which is the whole trick. <strong>Persistence is a domain concern, not a protocol concern.</strong> The protocol moved to statelessness precisely so it would stop having an opinion about your storage.</p>
+<p>Three layers, and it is worth being explicit about which is which:</p>
+<dl>
+<dt>Conversation memory</dt>
+<dd>
+<p>This task. Lives in the host, dies with the conversation.</p>
+</dd>
+<dt>Session memory</dt>
+<dd>
+<p>This user, recently. Lives in the host’s own store. Survives a page refresh.</p>
+</dd>
+<dt>Domain memory</dt>
+<dd>
+<p>Facts about the world. Lives in your database, reachable as resources and tools. Survives everything, and is the only layer another system can also read.</p>
+</dd>
+</dl>
+<p>The mistake is putting domain memory in conversation memory, where it is expensive, ephemeral, and invisible to every other consumer.</p>
+</section>
+<section id="streaming-because-perceived-latency-is-the-latency" class="level2">
+<h2>Streaming, because perceived latency is the latency</h2>
+<p>The Meridian baseline is 1,366 ms, 96 % of it model inference. You cannot make that faster. You can make it <em>feel</em> faster, and that is not a trick, it is the actual user experience.</p>
+<ul>
+<li><p><strong>Stream the model’s tokens</strong> as they arrive. Time to first token becomes the number the user feels, and it is a third of the total.</p></li>
+<li><p><strong>Show tool calls as they happen.</strong> “Checking fraud signals...” tells the user the system is working and, incidentally, gives them a chance to notice it is doing something wrong.</p></li>
+<li><p><strong>Forward progress notifications.</strong> A server emitting <code>notifications/progress</code> is offering you free UX. Take it.</p></li>
+<li><p><strong>Stream partial results.</strong> If iteration one produced a usable answer, show it while iteration two refines.</p></li>
+</ul>
+<pre class="python" data-language="python"><code>if total &gt; 20 and i % 10 == 0:
+    ctx.progress(i, total, f&quot;scored {i} of {total}&quot;)</code></pre>
+<p>Note the guard again. Progress on a three-item loop is noise on the wire and flicker in the UI.</p>
+</section>
+<section id="putting-it-together" class="level2">
+<h2>Putting it together</h2>
+<pre class="python" data-language="python"><code>def test_loop_terminates_and_attributes_time(self):
+    host = wire_host()
+    model = StubModel(plan=[
+        [{&quot;name&quot;: &quot;risk.assess_account_risk&quot;,
+          &quot;arguments&quot;: {&quot;accountId&quot;: &quot;ACC-1002&quot;}}],
+        [{&quot;name&quot;: &quot;fraud.screen_account&quot;,
+          &quot;arguments&quot;: {&quot;accountId&quot;: &quot;ACC-1002&quot;}}],
+        [],
+    ], simulate_latency=False)
+    result = AgentLoop(host, model).run(&quot;Assess ACC-1002 for credit and fraud.&quot;)
+
+    self.assertEqual(result.stopped_because, &quot;completed&quot;)
+    self.assertEqual(len(result.iterations), 3)
+    self.assertEqual(result.round_trips, 2)
+    self.assertGreater(result.model_ms, 0)
+    self.assertGreater(result.total_tokens, 0)</code></pre>
+<p>Three iterations for two tool calls. The third exists solely so the model can read the second result and decide it is done, and that third turn costs a full TTFT and 1,400 input tokens.</p>
+<aside class="keyidea">
+<p>The last iteration of every loop is pure overhead: a model turn that produces no tool call and exists only to say “I am finished”. It is the price of letting the model decide when to stop, and it is usually worth paying. But it means a two-call task costs three turns, and that is the arithmetic to use when estimating.</p>
+</aside>
+</section>
+<section id="what-to-remember" class="level2">
+<h2>What to remember</h2>
+<ul>
+<li><p>Think, act, observe. Attribute every millisecond to one of four bands.</p></li>
+<li><p>Four termination conditions, all four set to a number. Budget stops still produce an answer.</p></li>
+<li><p>State lives in host memory, in server handles passed as arguments, or in your database. Never in the connection.</p></li>
+<li><p>The model is now part of your state machine, so handles must be visible and expiry errors must be self-explanatory.</p></li>
+<li><p>Context management is the dominant cost lever, because input grows every turn while output does not.</p></li>
+<li><p>Tune context strategy against task success, never against token count alone.</p></li>
+<li><p>Treat an unexpected “unknown tool” as a cache invalidation signal.</p></li>
+<li><p>Route glue steps to a small model, and verify the frontier with evals rather than intuition.</p></li>
+<li><p>Persistence is a domain concern. Expose it as resources.</p></li>
+<li><p>Stream everything. Perceived latency is the latency.</p></li>
+</ul>
+<p>Next: what happens when the thing calling your tools is itself an agent.</p>
+</section>
+</section>
+<div class="pager">
+<a href="ch12.html"><span class="dir">Previous</span>Building Hosts and Clients</a>
+<a href="ch14.html" style="text-align:right"><span class="dir">Next</span>Multi-Agent Topologies</a>
+</div>
+</main>
+</div>
+<script>
+(function(){
+  var nav = document.querySelector('nav.toc');
+  var btn = document.querySelector('.menu-btn');
+  if(btn && nav){
+    if(window.innerWidth <= 940) nav.classList.add('collapsed');
+    btn.addEventListener('click', function(){ nav.classList.toggle('collapsed'); });
+  }
+  // Wrap tables so wide ones scroll rather than overflowing the page.
+  document.querySelectorAll('main table').forEach(function(t){
+    if(t.parentElement.classList.contains('table-wrap')) return;
+    var w = document.createElement('div');
+    w.className = 'table-wrap';
+    t.parentNode.insertBefore(w, t);
+    w.appendChild(t);
+  });
+})();
+</script>
+</body>
+</html>

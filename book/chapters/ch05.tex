@@ -1,0 +1,557 @@
+\chapter{Tools: The Execution Layer}
+\label{ch:tools}
+
+\epigraph{``You're gonna need a bigger boat.''}{Chief Brody, \emph{Jaws} (1975)}
+
+Brody says it after seeing the thing he has been theorising about, at actual
+scale, for the first time. Everybody has this moment with tool catalogues. You
+design six tools, they work beautifully, you ship. Eighteen months later there
+are forty-one, three of them do nearly the same thing, and the model has started
+picking the wrong one about a fifth of the time and nobody can say when that
+started.
+
+This chapter is about not getting there. Tools are the primitive that does the
+work, and they are the primitive where design mistakes compound fastest, because
+their cost is charged on every request forever.
+
+\section{Mechanics first}
+
+Two methods. That is the entire surface.
+
+\subsection{\texttt{tools/list}}
+
+\begin{wire}
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "resultType": "complete",
+    "tools": [
+      {
+        "name": "assess_account_risk",
+        "title": "Assess account risk",
+        "description": "Score one commercial account for credit risk...",
+        "inputSchema": { "type": "object", "properties": { ... } },
+        "outputSchema": { "type": "object", "properties": { ... } },
+        "annotations": { "readOnlyHint": true, "idempotentHint": true }
+      }
+    ],
+    "nextCursor": "50",
+    "ttlMs": 300000,
+    "cacheScope": "public"
+  }
+}
+\end{wire}
+
+Three fields at the bottom that did not exist in 2025 and matter a great deal.
+\texttt{nextCursor} means catalogues paginate. \texttt{ttlMs} and
+\texttt{cacheScope} mean the client can stop asking. Chapter~\ref{ch:resources}
+covers the caching model; here the relevant fact is that a well-behaved client
+fetches your catalogue once per TTL rather than once per task.
+
+There is also a requirement that reads like a footnote and is not:
+
+\keyidea{Return tools in a deterministic order. The same order, every time, when
+the underlying set has not changed. Unstable ordering silently destroys the
+provider's prompt cache, and nothing in your telemetry will tell you.}
+
+That last part is what makes it nasty. Prompt caching keys on a stable prefix.
+If your catalogue serialises in a different order on each request, the prefix
+changes, every cache lookup misses, and you pay full price for prompt processing
+on every turn. Your server looks fine. Your latency is quietly 30\,\% worse.
+Meridian sorts by name and asserts it:
+
+\begin{py}
+def test_tools_list_order_is_stable(self):
+    """Unstable ordering silently destroys the provider's prompt cache."""
+    server = tiny_server()
+    for i in range(6):
+        server.add_tool(_noop_tool(f"tool_{i}"))
+    orders = [
+        [t["name"] for t in server.handle(
+            request("tools/list", req_id=i))["result"]["tools"]]
+        for i in range(5)
+    ]
+    self.assertEqual(len(set(map(tuple, orders))), 1)
+\end{py}
+
+If you build your catalogue by iterating a Python dictionary, a Go map, or a
+database query with no \texttt{ORDER BY}, you are one refactor away from this
+bug. Sort explicitly.
+
+\subsection{\texttt{tools/call}}
+
+\begin{wire}
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/call",
+  "params": {
+    "name": "assess_account_risk",
+    "arguments": { "accountId": "ACC-1042", "exposureUsd": 250000 }
+  }
+}
+\end{wire}
+
+And back:
+
+\begin{wire}
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "resultType": "complete",
+    "content": [{ "type": "text", "text": "{\"score\":55.4,...}" }],
+    "structuredContent": { "accountId": "ACC-1042", "score": 55.4,
+                           "band": "elevated", "drivers": [...] },
+    "isError": false
+  }
+}
+\end{wire}
+
+Note that the result carries the same data twice. That is deliberate and
+recommended: \texttt{structuredContent} for anything that will parse it,
+\texttt{content} for backwards compatibility and for models that do better with
+text. Chapter~\ref{ch:apps} shows the third consumer, an MCP App, which reads
+\texttt{structuredContent} and never puts it in the model's context at all.
+
+\section{Designing tools a model can actually use}
+
+Now the part that matters more than the mechanics.
+
+\subsection{Stop mirroring your REST API}
+
+The single most common failure. You have an API. It has endpoints. Wrapping each
+endpoint as a tool is mechanical, fast, and completable in an afternoon, which is
+exactly why so many people do it.
+
+Meridian shipped this way. You can still run it:
+
+\begin{sh}
+python3 -m meridian.serve risk --fat
+\end{sh}
+
+It exposes \texttt{get\_account} and \texttt{list\_account}, then
+\texttt{create\_exposure}, then \texttt{update\_covenant}, then
+\texttt{delete\_collateral}, and two dozen more in the same shape. Every one is
+a faithful wrapper around a REST endpoint. Every one works.
+
+Here is what it costs.
+
+\bookfig[0.98]{catalogue-cost}{The same server, two catalogues. Left: what the
+catalogue costs. Right: what it costs by turn eight, which is the number that
+should change your mind.}{catalogue-cost}
+
+\begin{measurebox}{REST mirror versus task-shaped tools}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\thead{} & \thead{REST mirror} & \thead{Task-shaped} \\
+\midrule
+Tools in catalogue          & 38    & 10 \\
+Tokens per model turn       & 5{,}617 & 1{,}246 \\
+Extra tokens per turn       & +4{,}371 & \\
+Extra tokens per task       & +8{,}738 & \\
+Wasted input cost per 1,000 tasks & \$26.21 & \\
+\bottomrule
+\end{tabular}
+
+\vspace{6pt}
+\footnotesize
+Meridian, four servers, measured by \texttt{make bench}. The task-shaped
+catalogue does strictly more useful work.
+\end{measurebox}
+
+Twenty-six dollars per thousand tasks, for nothing. And that is only the money.
+The real damage is upstream: the model now chooses among 38 similar options
+instead of 10 distinct ones, and selection accuracy falls, and a wrong choice
+costs a whole extra loop iteration to detect and recover from.
+
+Why does the REST shape fail? Because REST is organised around \emph{resources
+and verbs}, and a planner reasons in \emph{tasks and outcomes}. To answer ``is
+this account risky'', a model given a REST mirror must plan: get the account,
+list its exposures, list its covenants, fetch the rating, then combine. Five
+round trips, five model turns, five chances to go wrong.
+
+Given a task-shaped tool it calls \texttt{assess\_account\_risk} once.
+
+\keyidea{Design tools for the plan, not for the database. The right question is
+not ``what are my entities'', it is ``what does the user want done, and what is
+the smallest number of calls that does it.''}
+
+\subsection{The three rewrites that fix most catalogues}
+
+\textbf{Collapse read-then-combine chains.} Any sequence the model performs
+identically every time is a tool you have not written yet. If your traces show
+\texttt{get\_x} always followed by \texttt{get\_y} then \texttt{compute\_z},
+ship \texttt{compute\_z\_for\_x}.
+
+\textbf{Add a batch variant of anything called in a loop.} Meridian has
+\texttt{assess\_account\_risk} for one account and
+\texttt{rank\_portfolio\_risk} for many. Without the second, a portfolio review
+of forty accounts is forty round trips and forty model turns. With it, one.
+The description points at it explicitly, because the model reads descriptions:
+
+\begin{py}
+@server.tool(
+    "rank_portfolio_risk",
+    "Rank a set of accounts by risk score in one call. Prefer this over "
+    "calling assess_account_risk repeatedly.",
+    ...
+)
+\end{py}
+
+\textbf{Delete tools nobody calls.} You have telemetry. Any tool with no calls
+in ninety days is costing you tokens on every request in exchange for nothing.
+Delete it. If somebody objects, the objection is usually about the endpoint
+existing, not about the tool existing, and those are different things.
+
+\subsection{Descriptions are prompt engineering}
+
+The description is not documentation. It is the only thing the model sees when
+deciding, and it is charged per turn. So it should be short and it should
+contain the information that distinguishes this tool from its neighbours.
+
+Bad:
+
+\begin{plain}
+Get a account record via the core banking API. Wraps GET /v2/accounts.
+Accepts an optional id, an optional body, and standard pagination
+parameters. Returns the raw account representation as stored by the
+system of record, including audit fields, soft-delete markers, and
+denormalised references to related entities.
+\end{plain}
+
+Fifty-one tokens describing the transport and the storage layer, neither of
+which is a fact the model can act on.
+
+Good:
+
+\begin{plain}
+Score one commercial account for credit risk. Returns a 1-99 score, a
+band, and the weighted factors behind it.
+\end{plain}
+
+Twenty-three tokens, all of them about what the model gets back.
+
+Three rules that survive contact with reality:
+
+\begin{enumerate}[leftmargin=1.6em, itemsep=3pt]
+\item \textbf{Lead with the outcome}, not the mechanism. The model is choosing
+between outcomes.
+\item \textbf{Name the discriminator} when tools are adjacent. ``Prefer this
+over calling X repeatedly'' is worth its tokens.
+\item \textbf{Do not document your transport.} The model cannot use
+``wraps GET /v2/accounts'' and you pay for it forever.
+\end{enumerate}
+
+\section{Schemas}
+
+JSON Schema 2020-12 by default, and \texttt{2026-07-28} loosened the restriction
+so you can use the full dialect. That freedom comes with two obligations.
+
+\subsection{The \texttt{\$ref} rule, which is a security rule}
+
+\begin{dangerbox}{Never dereference a remote \texttt{\$ref}}
+JSON Schema permits \texttt{\$ref} to an absolute URI. A validator that fetches
+it is a server-side request forgery primitive: a hostile tool definition points
+\texttt{\$ref} at \texttt{http://169.254.169.254/} and your validator obligingly
+retrieves cloud instance credentials.
+
+The specification makes this a MUST NOT by default. An opt-in mode may exist,
+but it must be off by default, and it should enforce a host allowlist, reject
+loopback and private addresses, apply timeouts and size limits, and log every
+URI it touched.
+\end{dangerbox}
+
+\begin{py}
+if "$ref" in schema and str(schema["$ref"]).startswith(("http://", "https://")):
+    raise errors.InvalidParams(f"{where}: remote $ref is not dereferenced")
+\end{py}
+
+A schema that fails to validate because of an unresolved external \texttt{\$ref}
+must be \emph{rejected}, not silently treated as permissive. Failing open here
+means an attacker can disable your validation by pointing at a URL you will not
+fetch.
+
+\subsection{The composition rule, which is a denial-of-service rule}
+
+\texttt{anyOf}, \texttt{oneOf}, \texttt{allOf}, \texttt{if}/\texttt{then}, and
+\texttt{\$defs} are expressive and expensive. Nested deeply enough, validation
+cost explodes combinatorially, and a hostile schema becomes a CPU bomb against
+whoever validates it.
+
+So bound it: a maximum depth, a cap on subschemas, or a per-validation time
+budget. Meridian caps depth at twelve, which no honest tool schema approaches:
+
+\begin{py}
+if depth > 12:
+    raise errors.InvalidParams(f"{where}: schema nesting exceeds the depth limit")
+\end{py}
+
+\subsection{Output schemas earn their keep}
+
+Optional, and you should use them anyway.
+
+Without one, a model receives text and has to parse it. Sometimes it parses
+wrong, which costs a retry, which costs a model turn. With one, the client
+validates \texttt{structuredContent} before it ever reaches the model, and a
+malformed response is caught at the boundary instead of confusing the planner
+two turns later.
+
+\begin{py}
+output_schema={
+    "type": "object",
+    "properties": {
+        "accountId": {"type": "string"},
+        "score": {"type": "number"},
+        "band": {"type": "string",
+                 "enum": ["low", "moderate", "elevated", "high"]},
+        "drivers": {"type": "array", "items": {...}},
+    },
+    "required": ["accountId", "score", "band", "drivers"],
+}
+\end{py}
+
+That \texttt{enum} on \texttt{band} is doing real work. It tells the model the
+complete set of possible answers, which means it will not invent
+\texttt{"very high"} and it will not write branching logic for a fifth case that
+cannot occur.
+
+\subsection{Annotations, and why they are untrusted}
+
+\begin{py}
+annotations={"readOnlyHint": True, "idempotentHint": True}
+\end{py}
+
+Useful hints. A host can auto-approve read-only tools and prompt for the rest,
+which is exactly what Meridian's default consent policy does.
+
+But the specification is blunt: clients must treat annotations as untrusted
+unless the server is trusted. A compromised server marking
+\texttt{delete\_everything} as \texttt{readOnlyHint: true} would sail through a
+host that believes annotations.
+
+\begin{py}
+def check(self, qualified_name: str, tool: dict, arguments: dict) -> str:
+    if qualified_name in self.denylist:
+        decision = ConsentDecision.DENY
+    elif self.auto_allow_read_only and \
+            (tool.get("annotations") or {}).get("readOnlyHint"):
+        decision = ConsentDecision.ALLOW
+    ...
+\end{py}
+
+Meridian does auto-allow on \texttt{readOnlyHint}, and that is a defensible
+default \emph{for servers you trust}. Chapter~\ref{ch:threats} shows what
+happens when you extend the same courtesy to a server you should not.
+
+\section{Errors: the distinction that decides whether a model recovers}
+
+This is the most consequential paragraph in the chapter, so here it is plainly.
+
+There are two error mechanisms, they are not interchangeable, and mislabelling
+one as the other either burns tokens or kills tasks.
+
+\textbf{Protocol errors} are JSON-RPC errors. They mean the request was
+structurally wrong: unknown tool, malformed parameters, server on fire. Models
+are unlikely to recover from these, because the problem is not in the arguments,
+it is in the shape.
+
+\begin{wire}
+{ "jsonrpc": "2.0", "id": 3,
+  "error": { "code": -32602, "message": "Unknown tool: invalid_tool_name" } }
+\end{wire}
+
+\textbf{Tool execution errors} are \emph{successful} results with
+\texttt{isError: true}. They mean the call was well-formed and the work failed
+for a reason the model can understand and act on.
+
+\begin{wire}
+{ "jsonrpc": "2.0", "id": 4,
+  "result": {
+    "resultType": "complete",
+    "content": [{ "type": "text",
+      "text": "Invalid departure date: must be in the future. Today is 2026-08-08." }],
+    "isError": true } }
+\end{wire}
+
+Read that message. It says what was wrong, and it gives the model what it needs
+to fix it. That is the whole design goal.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}XllX@{}}
+\toprule
+\thead{Situation} & \thead{Mechanism} & \thead{Code} & \thead{Because} \\
+\midrule
+Unknown tool name          & Protocol & \texttt{-32602} & The catalogue is wrong, not the arguments \\
+Missing required argument  & Protocol & \texttt{-32602} & Schema violation; caught before your code runs \\
+Account id does not exist  & Tool     & \texttt{isError} & The model can try a different id \\
+Date in the past           & Tool     & \texttt{isError} & The model can pick another date \\
+Downstream API timed out   & Tool     & \texttt{isError} & The model can retry or route around \\
+Insufficient permissions   & Tool     & \texttt{isError} & The model can explain, or take another path \\
+Server crashed             & Protocol & \texttt{-32603} & Nothing the model does will help \\
+\bottomrule
+\end{tabularx}
+\caption{Which mechanism, and why. The rule of thumb: if a smart colleague
+could act on the message, it is a tool execution error.}
+\label{tab:error-choice}
+\end{table}
+
+Meridian's version, and note how much work the message does:
+
+\begin{py}
+account = ACCOUNTS.get(account_id)
+if account is None:
+    # A tool execution error, not a protocol error. The model can read
+    # this, notice it used a stale id, and try a different one.
+    return tool_error(
+        f"No account {account_id}. Account ids look like ACC-1000 "
+        f"through ACC-{1000 + len(ACCOUNTS) - 1}."
+    )
+\end{py}
+
+It states the failure and the valid range. A model reading that fixes its next
+call. A model reading ``Error: not found'' does not, and asks the user, and now
+a recoverable situation has become a conversation.
+
+\begin{py}
+def test_bad_business_input_is_a_tool_execution_error(self):
+    resp = build_server().handle(request(
+        "tools/call",
+        {"name": "assess_account_risk", "arguments": {"accountId": "ACC-9999"}}))
+    self.assertNotIn("error", resp)
+    self.assertTrue(resp["result"]["isError"])
+    # And it must be actionable, not just "invalid".
+    self.assertIn("ACC-1000", resp["result"]["content"][0]["text"])
+\end{py}
+
+\section{The interception loop}
+
+Between the model's intent and the server's execution sits the host, and the
+places it can intervene are the places your security lives.
+
+\bookfig[0.98]{interception-loop}{Every dotted line is a hook, and every hook is
+a place to say no. A host that forwards intents untouched has not implemented
+MCP.}{interception-loop}
+
+Four outbound hooks and one inbound one:
+
+\begin{description}[leftmargin=1.4em, style=nextline, itemsep=3pt]
+\item[Schema validation] Reject malformed arguments before they reach a server.
+Cheap, and it turns a class of server bug into a client-side error.
+\item[Consent] Show the user the arguments, not just the tool name. ``Call
+\texttt{send\_email}?'' is not consent. ``Send email to \texttt{whom}, saying
+\texttt{what}?'' is.
+\item[Audit] Who, what, when, with which arguments, and what came back. Designed
+for a regulator, not for your debugger. Chapter~\ref{ch:access-control} covers
+what that means concretely.
+\item[Authorization] Scope checks and row-level policy, on the server side,
+where the data is.
+\item[Result validation] The return path. Validate against
+\texttt{outputSchema}, then treat the content as data. Never as instructions.
+\end{description}
+
+That last one is the one people skip, and it is the one Chapter~\ref{ch:threats}
+is about.
+
+\section{Parallel fan-out}
+
+When a model emits three tool calls in one turn, it is telling you those three
+are independent. Honour that.
+
+\begin{py}
+def call_tools_parallel(self, calls: list[dict]) -> list[dict]:
+    """Fan out independent calls.
+
+    The model asked for these together, which is its way of saying none of
+    them depends on the others. Running them in sequence throws that
+    information away and pays the sum of the latencies instead of the max.
+    """
+    if len(calls) <= 1:
+        return [self.call_tool(c["name"], c.get("arguments")) for c in calls]
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(calls)) as pool:
+        futures = [pool.submit(self.call_tool, c["name"], c.get("arguments"))
+                   for c in calls]
+        ...
+\end{py}
+
+Chapter~\ref{ch:primer} measured this: a consistent 2.8$\times$ on three calls,
+holding steady as per-call latency rises from 2\,ms to 40\,ms. The ceiling is
+3$\times$, and the gap is thread scheduling plus the slowest of the three
+servers.
+
+Two things the host must get right for this to work at all.
+
+\textbf{Preserve ordering.} Results must come back in the order the calls were
+issued, whatever order they complete in. Meridian iterates futures in submission
+order rather than as-completed, for exactly this reason.
+
+\textbf{Never fail the batch on one failure.} One tool erroring should produce
+one error result, not an exception that discards the other two successful calls
+you already paid for.
+
+\begin{notebox}{You cannot fan out what the model serialised}
+If your tool design forces \texttt{get\_x} then \texttt{get\_y} then
+\texttt{combine}, the model \emph{cannot} parallelise, because each step depends
+on the last. Parallel fan-out is available only to catalogues whose tools are
+independent, which is another way of saying tool design and latency are the same
+problem.
+\end{notebox}
+
+\section{Meridian's catalogue, and why it is ten tools}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}llX@{}}
+\toprule
+\thead{Server} & \thead{Tool} & \thead{Why it exists} \\
+\midrule
+risk & \texttt{assess\_account\_risk} & The single-account question, one call \\
+risk & \texttt{rank\_portfolio\_risk} & So a 40-account review is 1 trip, not 40 \\
+risk & \texttt{underwrite\_loan}      & Long-running, returns a task (\chapref{tasks}) \\
+compliance & \texttt{review\_transaction} & Needs a named officer (\chapref{mrtr}) \\
+compliance & \texttt{search\_guidance}   & Reference text. Untrusted (\chapref{threats}) \\
+compliance & \texttt{export\_audit\_log} & For the regulator, not the debugger \\
+fraud & \texttt{screen\_account}   & Fast, read-only, safe to run in parallel \\
+fraud & \texttt{explain\_signal}   & So the model can explain rather than guess \\
+marketdata & \texttt{get\_reference\_curve} & Public, cacheable, called constantly \\
+marketdata & \texttt{price\_facility}      & The combine step, done server-side \\
+\bottomrule
+\end{tabularx}
+\caption{Ten tools across four servers. Each is a task somebody wants done, and
+none is an entity with CRUD hung off it.}
+\label{tab:meridian-tools}
+\end{table}
+
+The \texttt{price\_facility} row deserves a note, because it is the pattern
+generalised. Pricing needs a risk score, a tenor, and a sector spread. You
+\emph{could} expose \texttt{get\_curve}, \texttt{get\_sector\_spread}, and
+\texttt{get\_credit\_spread} and let the model do arithmetic. Three round trips,
+three model turns, and a model doing floating-point maths in its head.
+
+Instead the server does the combining and returns the answer. One call. And the
+arithmetic is done by a computer, which is generally better at it.
+
+\section{What to remember}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item Two methods total. The design work is all in what you put in them.
+\item Deterministic ordering, or you silently lose the provider's prompt cache.
+\item Task-shaped, not REST-shaped. Meridian's REST mirror cost 4,371 extra
+tokens per turn and \$26 per thousand tasks in pure waste.
+\item Descriptions lead with the outcome, name the discriminator, and never
+mention your transport.
+\item Never dereference remote \texttt{\$ref}s. Bound schema depth.
+\item Output schemas eliminate parse-retry loops. Use \texttt{enum} generously.
+\item Protocol errors are for malformed requests. Tool execution errors are for
+things the model can fix, and the message should tell it how.
+\item Fan out what the model batched, keep the ordering, and do not let one
+failure discard the batch.
+\end{itemize}
+
+Next: resources, which is where the caching model lives and where the token
+budget is most often wasted.

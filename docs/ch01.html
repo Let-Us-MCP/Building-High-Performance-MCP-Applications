@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A Primer on Latency, Tokens, and Context &middot; Building Awesome MCP Apps</title>
+<meta name="description" content="A Primer on Latency, Tokens, and Context. What every AI application developer should know about the Model Context Protocol">
+<meta property="og:title" content="A Primer on Latency, Tokens, and Context">
+<meta property="og:description" content="A Primer on Latency, Tokens, and Context. What every AI application developer should know about the Model Context Protocol">
+<style>
+:root{
+  --ink:#15181D; --muted:#5B6472; --rule:#D8DDE4; --wash:#F5F6F8;
+  --paper:#FFFFFF; --accent:#0F5C8C; --accent-soft:#E7F0F6;
+  --warm:#B4531A; --warm-soft:#FBF0E7; --good:#2C6E49; --good-soft:#E9F2EC;
+  --danger:#9B2226; --danger-soft:#FAECEC;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#E7EAEE; --muted:#98A2B0; --rule:#2C333D; --wash:#171B21;
+    --paper:#0F1216; --accent:#63AEDC; --accent-soft:#14232E;
+    --warm:#E08B4F; --warm-soft:#2A1D13; --good:#6FBF8E; --good-soft:#13221A;
+    --danger:#E4796F; --danger-soft:#291516;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--serif);font-size:18px;line-height:1.62;
+  -webkit-text-size-adjust:100%}
+.layout{display:grid;grid-template-columns:288px minmax(0,1fr);
+  max-width:1280px;margin:0 auto;gap:0}
+nav.toc{position:sticky;top:0;height:100vh;overflow-y:auto;padding:26px 20px 60px;
+  border-right:1px solid var(--rule);font-family:var(--sans);font-size:14px}
+nav.toc .brand{display:block;font-weight:700;font-size:16px;color:var(--ink);
+  text-decoration:none;line-height:1.3;margin-bottom:4px}
+nav.toc .tagline{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.45}
+nav.toc .part{margin:18px 0 6px;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);font-weight:700}
+nav.toc a{display:block;padding:4px 8px;margin-left:-8px;border-radius:5px;
+  color:var(--muted);text-decoration:none}
+nav.toc a:hover{background:var(--wash);color:var(--ink)}
+nav.toc a.current{background:var(--accent-soft);color:var(--accent);font-weight:600}
+main{padding:44px 52px 120px;min-width:0;max-width:78ch}
+h1,h2,h3,h4{font-family:var(--sans);line-height:1.25;color:var(--ink)}
+h1{font-size:2.05em;margin:0 0 .55em;letter-spacing:-.015em}
+h2{font-size:1.42em;margin:2em 0 .5em;padding-top:.35em}
+h3{font-size:1.14em;margin:1.7em 0 .4em}
+h4{font-size:1em;margin:1.4em 0 .3em;color:var(--muted)}
+p{margin:0 0 1.05em}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.855em;background:var(--wash);
+  padding:.12em .36em;border-radius:4px;word-break:break-word}
+pre{background:var(--wash);border-left:3px solid var(--rule);
+  border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+  font-size:13.5px;line-height:1.5;margin:1.3em 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+pre.json,pre.http{background:var(--accent-soft);border-left-color:var(--accent)}
+aside.box{border-left:3px solid var(--rule);background:var(--wash);
+  padding:14px 18px;margin:1.5em 0;border-radius:0 6px 6px 0;font-size:.955em}
+aside.box .box-title{font-family:var(--sans);font-weight:700;font-size:12px;
+  letter-spacing:.07em;text-transform:uppercase;margin:0 0 .55em}
+aside.box.legacy{border-left-color:var(--warm);background:var(--warm-soft)}
+aside.box.legacy .box-title{color:var(--warm)}
+aside.box.measured{border-left-color:var(--good);background:var(--good-soft)}
+aside.box.measured .box-title{color:var(--good)}
+aside.box.threat{border-left-color:var(--danger);background:var(--danger-soft)}
+aside.box.threat .box-title{color:var(--danger)}
+aside.box.note .box-title{color:var(--muted)}
+aside.keyidea{border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:14px 18px;margin:1.6em 0;border-radius:0 6px 6px 0;
+  font-family:var(--sans);font-style:italic;font-size:.97em}
+aside.keyidea p:last-child,aside.box p:last-child{margin-bottom:0}
+aside.keyidea pre,aside.keyidea code,aside.keyidea table{font-style:normal}
+aside.epigraph{border:0;margin:0 0 2em;padding:0 0 0 clamp(0px,7%,52px);
+  color:var(--muted);font-size:.97em}
+aside.epigraph p{margin:0 0 .3em}
+main figure{margin:2em 0;text-align:center}
+main figure img{max-width:100%;height:auto;border-radius:6px}
+@media (prefers-color-scheme: dark){
+  main figure img{background:#fff;padding:10px;border-radius:8px}
+}
+figcaption{font-family:var(--sans);font-size:13.5px;color:var(--muted);
+  margin-top:.7em;text-align:left;line-height:1.5}
+.table-wrap{overflow-x:auto;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:14.5px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+thead th{border-bottom:2px solid var(--rule);font-weight:700}
+caption{caption-side:bottom;font-size:13.5px;color:var(--muted);
+  text-align:left;padding-top:.7em;line-height:1.5}
+ul,ol{padding-left:1.35em;margin:0 0 1.05em}
+li{margin-bottom:.32em}
+dl{margin:0 0 1.05em}
+dt{font-weight:700;font-family:var(--sans);font-size:.95em;margin-top:.75em}
+dd{margin:.15em 0 0 1.35em}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
+.pager{display:flex;justify-content:space-between;gap:16px;margin-top:4em;
+  padding-top:1.5em;border-top:1px solid var(--rule);font-family:var(--sans);
+  font-size:14px}
+.pager a{text-decoration:none;max-width:46%}
+.pager .dir{display:block;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted)}
+.masthead{border-bottom:1px solid var(--rule);padding-bottom:1.8em;margin-bottom:2.2em}
+.masthead .kicker{font-family:var(--sans);font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);font-weight:700}
+.lede{font-size:1.12em;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:14px;margin:1.8em 0}
+.card{border:1px solid var(--rule);border-radius:9px;padding:15px 17px;
+  font-family:var(--sans);font-size:14px}
+.card h3{margin:0 0 .35em;font-size:15px}
+.card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+.menu-btn{display:none}
+@media (max-width:940px){
+  body{font-size:17px}
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:0;
+    border-bottom:1px solid var(--rule);max-height:none}
+  nav.toc.collapsed .toc-body{display:none}
+  main{padding:28px 20px 90px}
+  .menu-btn{display:inline-block;font-family:var(--sans);font-size:13px;
+    background:var(--wash);border:1px solid var(--rule);color:var(--ink);
+    border-radius:6px;padding:6px 11px;cursor:pointer;margin-bottom:10px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc"><button class="menu-btn" type="button">Contents</button>
+<div class="toc-body">
+<a class="brand" href="index.html">Building Awesome MCP Apps</a>
+<p class="tagline">What every AI application developer should know about the Model Context Protocol</p>
+<a href="preface.html">Preface</a>
+<a href="how-to-read.html">How to read this book</a>
+<div class="part">Part I. Protocol Fundamentals</div>
+<a href="ch01.html" class="current">A Primer on Latency, Tokens, and Context</a>
+<a href="ch02.html">The MCP Architectural Model</a>
+<a href="ch03.html">Building Blocks of the Transport</a>
+<a href="ch04.html">Authorization on the Wire</a>
+<div class="part">Part II. The Primitives</div>
+<a href="ch05.html">Tools: The Execution Layer</a>
+<a href="ch06.html">Resources: The Context Layer</a>
+<a href="ch07.html">Prompts: Workflow Blueprints</a>
+<a href="ch08.html">Multi Round-Trip Requests</a>
+<a href="ch09.html">Extensions and Tasks</a>
+<a href="ch10.html">MCP Apps: Interactive Interfaces</a>
+<div class="part">Part III. Building MCP Applications</div>
+<a href="ch11.html">Building Servers</a>
+<a href="ch12.html">Building Hosts and Clients</a>
+<a href="ch13.html">The Agent Loop, State, and Memory</a>
+<a href="ch14.html">Multi-Agent Topologies</a>
+<div class="part">Part IV. Performance Engineering</div>
+<a href="ch15.html">Testing and Debugging</a>
+<a href="ch16.html">Measuring MCP Applications</a>
+<a href="ch17.html">Optimizing for Latency, Tokens, and Cost</a>
+<a href="ch18.html">Deployment and Operations</a>
+<div class="part">Part V. Security and Trust</div>
+<a href="ch19.html">Threat Modeling Agentic Applications</a>
+<a href="ch20.html">Access Control, Audit, and MCP in the Enterprise</a>
+<div class="part">Back matter</div>
+<a href="epilogue.html">Epilogue: The Evolving Protocol</a>
+<div class="part">Appendices</div>
+<a href="appendix-a.html">A. Method and Message Reference</a>
+<a href="appendix-b.html">B. Transport Decision Matrix</a>
+<a href="appendix-c.html">C. Performance Checklist</a>
+<a href="appendix-d.html">D. Security Hardening Checklist</a>
+<a href="appendix-e.html">E. The Meridian Companion Repository</a>
+<a href="about.html">About the author</a>
+</div></nav>
+<main>
+<section id="ch:primer" class="level1">
+<h1>A Primer on Latency, Tokens, and Context</h1>
+<aside class="epigraph">
+<p><em>“I feel the need. The need for speed.”</em></p>
+<p>Maverick and Goose, <em>Top Gun</em> (1986)</p>
+</aside>
+<p>Everybody quotes that line. Almost nobody remembers what happens next, which is that the two of them proceed to fly recklessly, get chewed out, and eventually lose an aircraft. The need for speed is not a strategy. It is an appetite. What turns it into engineering is knowing which knob actually moves the aircraft.</p>
+<p>So before we look at a single byte of the Model Context Protocol, we are going to spend a chapter on the physics. Not because physics is fun, though it is. Because every design decision in the rest of this book is a trade against one of exactly three budgets. Miss that, and you will spend three weeks optimising the wrong thing. I have done this. I have watched a very good team spend a sprint moving a server from Python to Go, ship it, measure it, and discover they had improved end-to-end task latency by approximately one half of one percent.</p>
+<p>They were not stupid. They were optimising the only layer they could see.</p>
+<section id="sec:three-budgets" class="level2">
+<h2>The three budgets</h2>
+<p>Every agentic application spends three things. Not two. Not four. These three, and they are coupled, so you cannot economise on one without paying in another.</p>
+<figure id="fig:three-budgets">
+<img src="figures/three-budgets.svg" />
+<figcaption>The three budgets, and the fact that they trade against each other. Almost every optimisation in this book is a move along one of these edges. The trick is knowing which direction you are moving.</figcaption>
+</figure>
+<section id="latency" class="level3">
+<h3>Latency</h3>
+<p>Wall clock, from the user pressing enter to the user having an answer. It decomposes into pieces you must learn to name separately, because they behave completely differently:</p>
+<dl>
+<dt>Time to first token (TTFT)</dt>
+<dd>
+<p>How long the model thinks before it emits anything. Dominated by prompt processing, so it grows with how much context you sent. This is the number your users feel as “is it broken?”</p>
+</dd>
+<dt>Tokens per second</dt>
+<dd>
+<p>The generation rate once it starts. Roughly constant for a given model, and roughly outside your control.</p>
+</dd>
+<dt>Round-trip time of one loop iteration</dt>
+<dd>
+<p>Model turn, plus tool call, plus the model reading the result. This is the unit that actually matters, and it is the one nobody measures.</p>
+</dd>
+</dl>
+<p>The third one is the whole ballgame. A single agent task is not one model call. It is a loop, and every trip round that loop pays for a full model turn.</p>
+</section>
+<section id="context" class="level3">
+<h3>Context</h3>
+<p>The token window is your bandwidth. It is also your memory, which is an unusual and slightly horrible property: the same finite resource stores the conversation, the tool catalogue, the system prompt, and every result you have retrieved so far. Fill it with junk and there is no room for the task.</p>
+<p>Worse, it is not a one-time cost. Anything sitting in context is re-sent and re-processed on every single turn. A tool description you added in March is being paid for, right now, on a request that will never call it.</p>
+<figure id="fig:xkcd-context">
+<img src="figures/xkcd-context.svg" />
+<figcaption>The context window of a working agent, in approximate proportion. The green sliver is the part anybody would defend in a code review.</figcaption>
+</figure>
+</section>
+<section id="cost" class="level3">
+<h3>Cost</h3>
+<p>Dollars per task, and it deserves to be a first-class metric rather than something finance discovers in the quarterly. It is nearly a linear function of context: input tokens times input price, plus output tokens times output price, summed over every turn in the loop.</p>
+<p>Which means context bloat is not merely a memory problem. It is a recurring bill, and it scales with your traffic, which is exactly the direction you were hoping your traffic would scale.</p>
+<aside class="keyidea">
+<p>Latency, context, and cost are one resource wearing three hats. Every optimisation in this book is a trade among them, and most of the good ones attack all three at once because they remove work rather than moving it.</p>
+</aside>
+</section>
+</section>
+<section id="sec:anatomy" class="level2">
+<h2>Anatomy of one loop iteration</h2>
+<p>Here is where the time goes. This is the diagram the rest of the book keeps returning to, so it is worth staring at for a minute.</p>
+<figure id="fig:loop-anatomy">
+<img src="figures/loop-anatomy.svg" />
+<figcaption>One iteration of an agent loop, drawn to scale. The model bands are simulated from a stated distribution; the server band is measured. Note the proportion, and note which band this book can actually help you with.</figcaption>
+</figure>
+<p>Read it left to right:</p>
+<ol>
+<li><p><strong>The host assembles context.</strong> Conversation history, system prompt, and the merged tool catalogue from every connected server. Cheap in time. Ruinously expensive in tokens, which we will get to.</p></li>
+<li><p><strong>The model thinks.</strong> Time to first token, then generation. It emits a tool-call intent: a name and some arguments.</p></li>
+<li><p><strong>The host serialises and sends.</strong> JSON-RPC, over stdio or HTTP. Microseconds of CPU, plus whatever the network costs.</p></li>
+<li><p><strong>The server executes.</strong> Your actual business logic. The part you own, the part you profile, and usually the smallest slice on the chart.</p></li>
+<li><p><strong>The result comes back and re-enters context.</strong> And now the model has to read it, which means the whole prompt gets processed again.</p></li>
+<li><p><strong>The model thinks again.</strong> Another full turn. This is step 2 again, and it costs what step 2 cost.</p></li>
+</ol>
+<p>Steps 5 and 6 are the expensive ones and they are the ones people forget, because they do not look like work. Nothing is executing. But a tool result entering context means the next model turn processes a longer prompt, and you pay another TTFT, and you are billed for every token again.</p>
+<section id="what-the-proportions-actually-are" class="level3">
+<h3>What the proportions actually are</h3>
+<p>Enough theory. Meridian, the reference application that ships with this book, runs a three-step task against four MCP servers: score an account for credit risk, screen it for fraud, and price a facility against the reference curve. Here is where its wall clock goes.</p>
+<aside class="box measured"><p class="box-title">Measured: Meridian baseline, one task, three iterations</p>
+<table>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Band</strong></td>
+<td style="text-align: right;"><strong>Milliseconds</strong></td>
+<td style="text-align: right;"><strong>Share</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Model inference (3 turns)</td>
+<td style="text-align: right;">1<span>,</span>312.5</td>
+<td style="text-align: right;">96.1 %</td>
+</tr>
+<tr>
+<td style="text-align: left;">Transport + server execution</td>
+<td style="text-align: right;">53.9</td>
+<td style="text-align: right;">3.9 %</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Total wall clock</strong></td>
+<td style="text-align: right;"><strong>1<span>,</span>366.4</strong></td>
+<td style="text-align: right;"></td>
+</tr>
+</tbody>
+</table>
+<p>3 model turns, 3 tool calls, 4 servers, 4<span>,</span>009 tokens, $0.0125 per task. Model timings simulated from the distribution in <a href="#sec:simulated">§1.6.2</a>; transport and execution measured on the machine in <a href="#sec:machine">§1.6</a>. Regenerate with <code>make bench</code>.</p>
+</aside>
+<figure id="fig:loop-breakdown">
+<img src="figures/loop-breakdown.svg" />
+<figcaption>The same numbers, to scale. If you have been optimising the green sliver, this chart is either very good news or very bad news depending on how long you have been at it.</figcaption>
+</figure>
+<p>Now, before you conclude that the protocol does not matter and close the book: that green sliver is not the point. The point is the <em>number of blue bands</em>. There are three of them because the loop ran three times.</p>
+<aside class="keyidea">
+<p>You do not make an agent fast by making the tool call fast. You make it fast by needing fewer tool calls, and by making each one carry more.</p>
+</aside>
+<p>That reframing is the reason this book exists. Every technique in Chapter <a href="ch17.html#ch:optimizing">17</a> is ultimately a way of deleting a blue band, or of stopping one from getting wider.</p>
+</section>
+</section>
+<section id="sec:round-trips" class="level2">
+<h2>Round trips are the enemy</h2>
+<p>If you take one idea from this chapter, take this one.</p>
+<p>An extra round trip is not an extra 20 milliseconds of network time. It is an extra <em>model turn</em>, because the model has to look at what came back and decide what to do next. On the Meridian baseline that is roughly 440 milliseconds, plus another 1,300 tokens of input, plus the cost of those tokens, every time.</p>
+<p>Watch what that does to an MRTR interaction. Multi round-trip requests are how a 2026-era server asks the client a question mid-call, and Chapter <a href="ch08.html#ch:mrtr">8</a> covers the mechanism properly. For now, only the price tag matters.</p>
+<aside class="box measured"><p class="box-title">Measured: The cost of one elicitation</p>
+<table>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong></strong></td>
+<td style="text-align: right;"><strong>Requests</strong></td>
+<td style="text-align: right;"><strong>Latency</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Tool call, no elicitation</td>
+<td style="text-align: right;">1.0</td>
+<td style="text-align: right;">34.0 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;">Tool call with elicitation</td>
+<td style="text-align: right;">2.0</td>
+<td style="text-align: right;">68.5 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;">Transport delta</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;">+34.5 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;">Plus one model turn to read the form</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;">+340 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>True delta</strong></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"><strong>+375 ms</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Measured at 12 ms simulated per-call latency. The transport cost of the extra round trip is real but small; the model turn it forces is ten times larger.</p>
+</aside>
+<p>The transport delta is 34 milliseconds and looks harmless. The honest number is 375, because a round trip drags a model turn along behind it. This is why Chapter <a href="ch08.html#ch:mrtr">8</a> spends so much energy on collecting inputs up front, and why “just add a confirmation prompt” is a more expensive suggestion than it sounds in a design review.</p>
+<p>The same arithmetic runs the other way, which is the good news. When the model asks for three tools at once, it is telling you those three are independent. Run them together:</p>
+<aside class="box measured"><p class="box-title">Measured: Serial versus parallel fan-out, three independent tools</p>
+<table>
+<tbody>
+<tr>
+<td style="text-align: right;"><strong>Per-call latency</strong></td>
+<td style="text-align: right;"><strong>Serial</strong></td>
+<td style="text-align: right;"><strong>Parallel</strong></td>
+<td style="text-align: right;"><strong>Speedup</strong></td>
+</tr>
+<tr>
+<td style="text-align: right;">2 ms</td>
+<td style="text-align: right;">18.6 ms</td>
+<td style="text-align: right;">7.0 ms</td>
+<td style="text-align: right;">2.7<span class="math inline">×</span></td>
+</tr>
+<tr>
+<td style="text-align: right;">10 ms</td>
+<td style="text-align: right;">85.8 ms</td>
+<td style="text-align: right;">30.5 ms</td>
+<td style="text-align: right;">2.8<span class="math inline">×</span></td>
+</tr>
+<tr>
+<td style="text-align: right;">40 ms</td>
+<td style="text-align: right;">286.7 ms</td>
+<td style="text-align: right;">98.1 ms</td>
+<td style="text-align: right;">2.9<span class="math inline">×</span></td>
+</tr>
+</tbody>
+</table>
+<p>Three calls, so the ceiling is 3<span class="math inline">×</span>. The gap between 2.8 and 3.0 is thread scheduling and the slowest of the three servers.</p>
+</aside>
+<p>Notice that the speedup gets <em>better</em> as latency rises. Serial fan-out pays the sum of the latencies; parallel pays the maximum. The worse your network, the more the mistake costs you, which is a deeply unfair property of the universe and one you should exploit.</p>
+</section>
+<section id="the-n-times-m-problem-and-why-a-protocol-is-the-answer" class="level2">
+<h2>The N times M problem, and why a protocol is the answer</h2>
+<p>Let us back up and ask why MCP exists, because the answer is not “standardisation is nice.”</p>
+<p>You have <span class="math inline"><em>N</em></span> AI applications and <span class="math inline"><em>M</em></span> systems worth connecting them to. Without a shared contract, you write <span class="math inline"><em>N</em> × <em>M</em></span> integrations, and worse, you <em>maintain</em> <span class="math inline"><em>N</em> × <em>M</em></span> integrations. Four hosts and five systems is twenty pieces of bespoke glue, each with its own auth, its own error handling, and its own person who understands it and is currently on holiday.</p>
+<figure id="fig:nxm-problem">
+<img src="figures/nxm-problem.svg" />
+<figcaption>Twenty integrations, or nine. This is the same argument that produced ODBC, LSP, and every other narrow waist in computing history, and it works for the same reason.</figcaption>
+</figure>
+<p>With a protocol you write <span class="math inline"><em>N</em> + <em>M</em></span>. Nine. Each host implements a client once, each system exposes a server once, and the contract in the middle is somebody else’s problem to specify.</p>
+<p>This is the Language Server Protocol argument, and it is worth dwelling on why LSP worked, because it tells you what MCP has to get right. Before LSP, every editor implemented Go To Definition for every language. After LSP, editors implemented one client and languages implemented one server, and the ecosystem exploded. The waist was narrow enough to implement in a weekend and expressive enough to be worth implementing.</p>
+<section id="why-not-a-framework" class="level3">
+<h3>Why not a framework?</h3>
+<p>Fair question, since frameworks got there first.</p>
+<p>A framework is a library you import. It works beautifully as long as everyone is in the same process, in the same language, on the same release cadence. The moment your risk team ships Python, your platform team ships TypeScript, and a vendor ships a binary you cannot recompile, a library is the wrong shape. You need something that survives a process boundary and a version skew.</p>
+<p>That is a protocol. And once it is a protocol, it needs a wire format, a versioning story, and a deprecation policy, which is precisely what Chapter <a href="ch02.html#ch:architecture">2</a> is about.</p>
+</section>
+<section id="positioning-against-the-alternatives" class="level3">
+<h3>Positioning against the alternatives</h3>
+<p>You have choices, and MCP is not always the right one. Here is my honest read as of mid-2026.</p>
+<table id="tab:positioning">
+<caption>Where each approach earns its keep. If you are one team, one language, one model provider, and one system, provider-native function calling is genuinely the right answer and you should use it.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Approach</strong></td>
+<td style="text-align: left;"><strong>Optimises for</strong></td>
+<td style="text-align: left;"><strong>Costs you</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Provider-native function calling</td>
+<td style="text-align: left;">Lowest possible friction; zero extra infrastructure</td>
+<td style="text-align: left;">Rewrite per provider; no discovery, consent, or resource story</td>
+</tr>
+<tr>
+<td style="text-align: left;">OpenAPI-driven tool use</td>
+<td style="text-align: left;">Reusing an API surface you already document</td>
+<td style="text-align: left;">REST shape is wrong for planning; catalogues balloon (<a href="ch05.html#ch:tools">Chapter 5</a>)</td>
+</tr>
+<tr>
+<td style="text-align: left;">Framework tool abstractions</td>
+<td style="text-align: left;">Speed inside one language and one process</td>
+<td style="text-align: left;">Version lock-in; no cross-organisation reuse</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>MCP</strong></td>
+<td style="text-align: left;"><strong>Many hosts, many systems, separate teams, real trust boundaries</strong></td>
+<td style="text-align: left;"><strong>A protocol to learn, and a host to run</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">A2A and agent-to-agent protocols</td>
+<td style="text-align: left;">Agents negotiating with peer agents</td>
+<td style="text-align: left;">Different problem; composes with MCP rather than replacing it</td>
+</tr>
+</tbody>
+</table>
+<p>The A2A comparison is the one people ask about most, so: they are orthogonal. MCP connects an agent to <em>capabilities</em>. A2A connects an agent to <em>other agents</em>. Chapter <a href="ch14.html#ch:multi-agent">14</a> builds a system that is both, because an agent that consumes MCP tools on one side and exposes MCP tools on the other is a completely ordinary thing to want.</p>
+</section>
+</section>
+<section id="sec:meridian" class="level2">
+<h2>Meet Meridian</h2>
+<p>Meridian is the instrumented reference application for this book. It is a financial analytics assistant, and it exists so that no claim in these pages has to be taken on faith.</p>
+<dl>
+<dt><code>meridian-risk</code></dt>
+<dd>
+<p>Credit scoring. Tools, resources, prompts, MRTR approvals, the Tasks extension, and an MCP App template. The busiest server.</p>
+</dd>
+<dt><code>meridian-compliance</code></dt>
+<dd>
+<p>Transaction review with a human in the loop, an immutable audit log, and (on request) the tool-poisoning payload from Chapter <a href="ch19.html#ch:threats">19</a>.</p>
+</dd>
+<dt><code>meridian-fraud</code></dt>
+<dd>
+<p>Fast, read-only behavioural signals. The cheap parallel call.</p>
+</dd>
+<dt><code>meridian-marketdata</code></dt>
+<dd>
+<p>Reference rates. Everything it returns is identical for every caller, which makes it the one place a shared gateway cache genuinely pays.</p>
+</dd>
+</dl>
+<p>Plus a host, a client, an agent loop, a measurement harness, and 134 tests.</p>
+<p>The whole thing has no third-party runtime dependencies, which was a deliberate and slightly obsessive decision. The SDKs are good and you should use them in production. But they were still shipping the handshake-era protocol while this book was being written, and a book about the wire that hides the wire behind somebody’s convenience wrapper is not doing its job. So <code>meridian/protocol/</code> is a complete implementation of <code>2026-07-28</code> in about two thousand lines of standard-library Python. You can read all of it in an evening.</p>
+<section id="try-it-now" class="level3">
+<h3>Try it now</h3>
+<pre class="bash" data-language="bash"><code>git clone https://github.com/krimler/Building-Awesome-MCP-Apps
+cd Building-Awesome-MCP-Apps
+make test     # 134 tests, roughly two seconds
+make bench    # every number in this book</code></pre>
+<p>It also connects to real clients. This is Claude Code driving three Meridian servers at once:</p>
+<pre class="bash" data-language="bash"><code>claude -p &quot;Assess ACC-1042 for risk, screen it for fraud, and get the 1Y and
+5Y reference rates.&quot; --mcp-config .mcp.json</code></pre>
+<pre class="text" data-language="text"><code>RISK:  55.4 elevated
+FRAUD: watch 1
+CURVE: 1Y=3.96 5Y=3.68</code></pre>
+<p>Those values match the fixtures exactly, which is the point. <code>meridian/VERIFICATION.md</code> records the full transcript.</p>
+<p>There is a wrinkle in that command worth flagging now, because it shaped several later chapters. Claude Code, like most clients shipping in 2026, still opens a connection with an <code>initialize</code> handshake. Revision <code>2026-07-28</code> deleted that handshake. A strictly conforming modern server would therefore be completely correct and completely unusable. Meridian ships a dual-era bridge to handle exactly this, and Chapter <a href="ch02.html#ch:architecture">2</a> explains how the specification tells you to build one.</p>
+</section>
+<section id="the-baseline-numbers" class="level3">
+<h3>The baseline numbers</h3>
+<p>These are the figures every later chapter improves on. Write them down.</p>
+<aside class="box measured"><p class="box-title">Measured: Meridian, before anything is optimised</p>
+<table>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Metric</strong></td>
+<td style="text-align: right;"><strong>Baseline</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Wall clock, one task</td>
+<td style="text-align: right;">1<span>,</span>366.4 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;">Model share of wall clock</td>
+<td style="text-align: right;">96.1 %</td>
+</tr>
+<tr>
+<td style="text-align: left;">Loop iterations</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr>
+<td style="text-align: left;">Tool calls</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr>
+<td style="text-align: left;">Total tokens</td>
+<td style="text-align: right;">4<span>,</span>009</td>
+</tr>
+<tr>
+<td style="text-align: left;">Cost per task</td>
+<td style="text-align: right;">$0.0125</td>
+</tr>
+<tr>
+<td style="text-align: left;">Tool catalogue</td>
+<td style="text-align: right;">10 tools, 1<span>,</span>246 tokens</td>
+</tr>
+<tr>
+<td style="text-align: left;">Cache hit rate</td>
+<td style="text-align: right;">0 % (nothing cached yet)</td>
+</tr>
+</tbody>
+</table>
+</aside>
+<p>By Chapter <a href="ch17.html#ch:optimizing">17</a> that task is meaningfully faster and cheaper, and every step of the change is attributed to a specific technique with a specific measurement. No hand-waving.</p>
+</section>
+</section>
+<section id="sec:machine" class="level2">
+<h2>How to read the numbers in this book</h2>
+<p>Two things you are owed up front.</p>
+<section id="the-machine" class="level3">
+<h3>The machine</h3>
+<p>Every measurement was taken on Apple Silicon (arm64), macOS 15.7.3, Python 3.14.6. Your absolute numbers will differ. The <em>ratios</em> are what travel, and ratios are what the arguments rest on.</p>
+<p>Transport figures are loopback figures. That is deliberate. Localhost has essentially no physics, which isolates protocol overhead so you can see it without your office wi-fi in the way. Here is what that isolation buys:</p>
+<aside class="box measured"><p class="box-title">Measured: Same call, three transports</p>
+<table>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Transport</strong></td>
+<td style="text-align: right;"><strong>Mean</strong></td>
+<td style="text-align: right;"><strong>Overhead over in-process</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">In-process (control)</td>
+<td style="text-align: right;">0.031 ms</td>
+<td style="text-align: right;">baseline</td>
+</tr>
+<tr>
+<td style="text-align: left;">stdio</td>
+<td style="text-align: right;">0.060 ms</td>
+<td style="text-align: right;">+0.029 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;">Streamable HTTP</td>
+<td style="text-align: right;">0.161 ms</td>
+<td style="text-align: right;">+0.130 ms</td>
+</tr>
+</tbody>
+</table>
+<p>The in-process transport still serialises and deserialises, so this is a fair comparison rather than a flattering one.</p>
+</aside>
+<p>Subtract the control from the other two and you have transport cost with server execution removed. That subtraction is the single most useful trick in Chapter <a href="ch16.html#ch:measuring">16</a>, and it is the only honest way to answer “is my server slow, or is my transport slow.”</p>
+<p>Add your own network latency on top. A cross-region hop is 40 to 90 milliseconds and swamps all three rows, which is exactly why Chapter <a href="ch03.html#ch:transport">3</a> cares about connection reuse and Chapter <a href="ch17.html#ch:optimizing">17</a> cares about round-trip counts.</p>
+</section>
+<section id="sec:simulated" class="level3">
+<h3>What is simulated</h3>
+<p>Model inference is simulated. A book cannot ship a reproducible language model, so Meridian uses a stub with a stated distribution:</p>
+<pre class="python" data-language="python"><code>TTFT_MEAN_MS         = 340.0   # time to first token
+TTFT_STDEV_MS        = 90.0
+MS_PER_OUTPUT_TOKEN  = 7.5
+CHARS_PER_TOKEN      = 4.0     # rough, and rough is fine for ratios
+INPUT_USD_PER_MTOK   = 3.00
+OUTPUT_USD_PER_MTOK  = 15.00</code></pre>
+<p>Those constants are calibrated against published figures for mid-size hosted models in mid-2026. They are stated here so you can disagree with them precisely rather than vaguely. Edit <code>meridian/host/model.py</code>, rerun <code>make bench</code>, and every number in the book moves with you.</p>
+<p>Everything downstream of inference is measured for real: serialisation, transport, server execution, cache hit rates, round-trip counts, catalogue token cost, and process cold starts.</p>
+<aside class="keyidea">
+<p>When a measurement box in this book gives you a number, the number came out of a program you can run. When part of it is modelled, the box says so. If you catch me violating this, open an issue.</p>
+</aside>
+</section>
+</section>
+<section id="what-you-should-do-on-monday" class="level2">
+<h2>What you should do on Monday</h2>
+<p>Before you read another chapter, go and find out three things about the system you already have.</p>
+<ol>
+<li><p><strong>How many loop iterations does a typical task take?</strong> Not tool calls. Iterations. Each one is a full model turn. If the answer is more than four, that is where your latency lives and no amount of server tuning will touch it.</p></li>
+<li><p><strong>How many tokens does your tool catalogue cost per turn?</strong> Serialise your merged <code>tools/list</code> output, divide the character count by four, and multiply by the number of turns in a task. Chapter <a href="ch05.html#ch:tools">5</a> measures a catalogue that costs 4,371 extra tokens on every single turn, which worked out to $26 per thousand tasks in pure waste. That was a real catalogue, and it was not the worst one I have seen.</p></li>
+<li><p><strong>What fraction of your requests could have been served from cache?</strong> If you are not honouring <code>ttlMs</code>, the answer is most of them. Meridian avoided 577 of 600 resource reads with a 96.2 % hit rate on a realistic access pattern.</p></li>
+</ol>
+<p>Three numbers. An afternoon. They will tell you which chapter to read next better than my table of contents can.</p>
+</section>
+<section id="where-this-is-going" class="level2">
+<h2>Where this is going</h2>
+<p>The rest of Part I gets you to the wire: the stateless architecture in Chapter <a href="ch02.html#ch:architecture">2</a>, both transports byte by byte in Chapter <a href="ch03.html#ch:transport">3</a>, and OAuth as MCP actually uses it in Chapter <a href="ch04.html#ch:authorization">4</a>. Part II is the primitives, one chapter each, every one of them following the same pattern of mechanics, then cost, then guidance.</p>
+<p>But the frame never changes. Three budgets. Round trips are the enemy. Measure before you optimise, and measure the thing you actually ship.</p>
+<p>Onward.</p>
+</section>
+</section>
+<div class="pager">
+<a href="how-to-read.html"><span class="dir">Previous</span>How to read this book</a>
+<a href="ch02.html" style="text-align:right"><span class="dir">Next</span>The MCP Architectural Model</a>
+</div>
+</main>
+</div>
+<script>
+(function(){
+  var nav = document.querySelector('nav.toc');
+  var btn = document.querySelector('.menu-btn');
+  if(btn && nav){
+    if(window.innerWidth <= 940) nav.classList.add('collapsed');
+    btn.addEventListener('click', function(){ nav.classList.toggle('collapsed'); });
+  }
+  // Wrap tables so wide ones scroll rather than overflowing the page.
+  document.querySelectorAll('main table').forEach(function(t){
+    if(t.parentElement.classList.contains('table-wrap')) return;
+    var w = document.createElement('div');
+    w.className = 'table-wrap';
+    t.parentNode.insertBefore(w, t);
+    w.appendChild(t);
+  });
+})();
+</script>
+</body>
+</html>

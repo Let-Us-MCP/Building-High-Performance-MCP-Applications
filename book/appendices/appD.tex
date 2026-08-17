@@ -1,0 +1,206 @@
+\chapter{Security Hardening Checklist}
+\label{ch:security-checklist}
+
+Chapters~\ref{ch:threats} and~\ref{ch:access-control} in one page.
+
+Start with the architectural section. Everything after it is defence in depth,
+and defence in depth on top of a bad architecture is decoration.
+
+\section{Architecture: the trifecta}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item[$\square$] \textbf{List your agent contexts.} Each loop is one.
+\item[$\square$] \textbf{For each, mark the three ingredients:} access to private
+data, exposure to untrusted content, and an exfiltration channel.
+\item[$\square$] \textbf{Any context with all three needs a named control.} Not
+``we are careful''. A specific, testable one.
+\item[$\square$] \textbf{Split privileges} so the reading context and the sending
+context are not the same context.
+\item[$\square$] \textbf{Write a test for each control}, or it will be
+refactored away. (\chapref{threats})
+\end{itemize}
+
+\section{Host}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item[$\square$] Consent prompts show \textbf{arguments}, not just tool names.
+(\chapref{building-hosts})
+\item[$\square$] Standing approvals are \textbf{scoped to a tool}, never
+``allow everything''.
+\item[$\square$] Related prompts are batched, so users do not learn to click.
+\item[$\square$] Tool definitions are \textbf{pinned after approval}; a changed
+hash re-prompts. (\chapref{threats})
+\item[$\square$] Tool annotations from untrusted servers are \textbf{not}
+believed. (\chapref{tools})
+\item[$\square$] Auto-approved read-only tools are reviewed for what private data
+they can read. (\chapref{threats})
+\item[$\square$] Tool calls come from \textbf{structured output}, never from
+parsing text.
+\item[$\square$] Arbitrary \texttt{https://} resource URIs are \textbf{not}
+auto-fetched. (\chapref{threats})
+\item[$\square$] Step, token, and cost budgets are set to numbers.
+(\chapref{agent-loop})
+\item[$\square$] An unhealthy server drops out of the catalogue without taking
+the host with it. (\chapref{building-hosts})
+\item[$\square$] The default input provider \textbf{declines}.
+\end{itemize}
+
+\section{Server}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item[$\square$] Every tool input validated against its schema at the edge.
+(\chapref{building-servers})
+\item[$\square$] Remote \texttt{\$ref} \textbf{never} dereferenced. Schemas that
+fail to resolve are rejected, not treated as permissive. (\chapref{tools})
+\item[$\square$] Schema depth and subschema count bounded. (\chapref{tools})
+\item[$\square$] Tool visibility filtered by \textbf{authorization}, never by
+connection. (\chapref{building-servers})
+\item[$\square$] Handlers check authorization too. Filtering the catalogue is a
+menu, not a lock. (\chapref{access-control})
+\item[$\square$] Forbidden and nonexistent return the \textbf{same error}, or
+your errors enumerate your data. (\chapref{access-control})
+\item[$\square$] Handles are opaque, high-entropy, expiring, and authorized on
+every use. (\chapref{building-servers})
+\item[$\square$] Resource reads authorized per URI; file paths sanitised against
+traversal. (\chapref{resources})
+\item[$\square$] Mutating tools take an idempotency key, because retries are
+routine. (\chapref{transport})
+\item[$\square$] Tool outputs sanitised, and rate limits applied.
+\item[$\square$] Extensions declared only when implemented.
+(\chapref{building-servers})
+\end{itemize}
+
+\section{MRTR and \texttt{requestState}}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item[$\square$] \textbf{Integrity protected} with a MAC, verified in constant
+time.
+\item[$\square$] \textbf{Bound to the principal}, blocking cross-user replay.
+\item[$\square$] \textbf{Bound to the request}, blocking cross-request replay.
+\item[$\square$] \textbf{Expiring}, with a short TTL.
+\item[$\square$] Signed with a \textbf{fleet-wide} secret, not per process.
+\item[$\square$] Rotation window longer than the state TTL.
+(\chapref{operations})
+\item[$\square$] \textbf{No secrets inside.} HMAC gives integrity, not
+confidentiality.
+\item[$\square$] Single-use enforced \textbf{server-side} if the operation
+requires it. Binding and expiry do not provide it.
+\item[$\square$] Never send an input request the client did not declare support
+for. (\chapref{mrtr})
+\item[$\square$] Form mode \textbf{never} for passwords, keys, tokens, or payment
+credentials. URL mode instead. (\chapref{mrtr})
+\item[$\square$] URL mode verifies that the user who \emph{opens} the URL is the
+user it was minted for. (\chapref{mrtr})
+\end{itemize}
+
+\section{Transport}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item[$\square$] \texttt{Origin} validated; \texttt{403} when disallowed.
+(\chapref{transport})
+\item[$\square$] Local servers bind to \texttt{127.0.0.1}, not
+\texttt{0.0.0.0}.
+\item[$\square$] Header and body agreement enforced, \texttt{400} with
+\texttt{-32020} on mismatch. This is the request-smuggling control.
+\item[$\square$] Base64 sentinel encoding applied, including to values that
+merely resemble the sentinel.
+\item[$\square$] Sensitive parameters \textbf{not} marked \texttt{x-mcp-header};
+headers are visible to intermediaries. (\chapref{tools})
+\item[$\square$] TLS everywhere that is not a local pipe.
+\item[$\square$] stdio servers get an explicit environment allowlist.
+(\chapref{operations})
+\end{itemize}
+
+\section{Authorization}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item[$\square$] Protected resource metadata published at
+\texttt{/.well-known/\allowbreak oauth-protected-\allowbreak resource}.
+(\chapref{authorization})
+\item[$\square$] Audience binding (RFC 8707) enforced. Tokens issued for someone
+else are rejected.
+\item[$\square$] \textbf{No token passthrough.} Never forward the client's token
+to a third party.
+\item[$\square$] \texttt{iss} validated before redeeming a code, by simple string
+comparison, with no normalisation, including on error responses.
+\item[$\square$] Scope challenges include everything the operation needs, in one
+challenge.
+\item[$\square$] Clients request the \textbf{union} on step-up, not just the new
+scope.
+\item[$\square$] Re-auth retries are bounded.
+\item[$\square$] Client credentials keyed by issuer, never reused across
+authorization servers.
+\end{itemize}
+
+\section{MCP Apps}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item[$\square$] Templates reviewed before rendering; predeclaration exists to
+make this possible. (\chapref{apps})
+\item[$\square$] Declared CSP origins read and allowlisted. A \texttt{connect-src}
+to an unknown host is an exfiltration request in writing.
+\item[$\square$] Network denied by default.
+\item[$\square$] \texttt{postMessage} origin and payload shape validated on every
+message.
+\item[$\square$] \textbf{UI-initiated tool calls traverse the normal consent and
+audit path.} No exceptions.
+\item[$\square$] Tools degrade to useful text for hosts that render nothing.
+\end{itemize}
+
+\section{Multi-agent}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item[$\square$] Delegation depth checked \textbf{before} doing work.
+(\chapref{multi-agent})
+\item[$\square$] Budgets are \textbf{remaining and decrementing}, not per-node
+allowances, or fan-out multiplies them.
+\item[$\square$] An agent with no budget assumes the \textbf{smallest}, never
+unlimited.
+\item[$\square$] Children act with \textbf{their own} scoped credentials.
+\item[$\square$] Circuit breakers, with a half-open probe.
+\item[$\square$] \texttt{traceparent} propagated through every hop.
+\end{itemize}
+
+\section{Audit}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item[$\square$] Append-only, and in a different store from application data.
+(\chapref{access-control})
+\item[$\square$] Written \textbf{before} the action, so timeouts are recorded.
+\item[$\square$] Principal from the \textbf{token}, never from an argument.
+\item[$\square$] \texttt{traceparent} recorded, so one incident is one query.
+\item[$\square$] Approver recorded by \textbf{name} for human-gated operations.
+\item[$\square$] \textbf{Inputs recorded, not only actions}: a digest, source, and
+length of what entered the model's context. Without this an injection is
+invisible in the record. (\chapref{threats})
+\item[$\square$] Hashes rather than content, so the log does not become a second
+copy of the data.
+\item[$\square$] Retention longer than your realistic detection time.
+\item[$\square$] \texttt{clientInfo} logged but \textbf{never} used for
+decisions.
+\end{itemize}
+
+\section{The twelve questions}
+
+Run these against a live deployment. Each has a yes-or-no answer, and each
+answer is a finding or a relief.
+
+\begin{enumerate}[leftmargin=1.6em, itemsep=2pt]
+\item Does any agent context hold private data, untrusted content, and a way out?
+\item Can a tool result reach the model without being marked as data?
+\item Which private data can your auto-approved read-only tools reach?
+\item Can the host fetch an arbitrary \texttt{https://} resource URI?
+\item Are tool definitions pinned after approval?
+\item Is \texttt{requestState} integrity-protected, principal-bound, and
+request-bound? All three?
+\item Can a compromised server reach the internet?
+\item Does the audit log record what entered the model's context?
+\item Are tool calls ever extracted by parsing text?
+\item Do MCP App tool calls traverse the consent path?
+\item Which servers' annotations do you trust, and why?
+\item What happens when a server returns 40\,MB?
+\end{enumerate}
+
+Question three finds more real problems than the rest combined, because
+auto-approving read-only tools is so obviously reasonable and ``read-only'' does
+not mean ``harmless''.

@@ -1,0 +1,527 @@
+\chapter{Deployment and Operations}
+\label{ch:operations}
+
+\epigraph{``Get busy living, or get busy dying.''}{Andy Dufresne,
+\emph{The Shawshank Redemption} (1994)}
+
+Andy's plan worked because he did the same small thing every night for nineteen
+years. Operations is that. Not heroics at three in the morning, but the
+unglamorous compounding of health checks that mean something, drains that
+actually drain, and alerts that fire before the user notices.
+
+The good news for MCP specifically: the stateless core deleted most of the hard
+parts of this chapter before it was written.
+
+\section{What statelessness bought you}
+
+Worth listing explicitly, because if you deployed a 2025-era MCP server you spent
+real effort on all of these.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXX@{}}
+\toprule
+\thead{Concern} & \thead{Handshake era} & \thead{2026-07-28} \\
+\midrule
+Load balancing   & Sticky sessions, session affinity & Round robin \\
+Session store    & Redis, or affinity you regret & None \\
+Scaling out      & Drain sessions, migrate state & Add a replica \\
+Deploys          & Sessions break or must migrate & Requests retry \\
+Serverless       & Awkward at best & First-class \\
+Crash recovery   & Rebuild session state & Lose one request \\
+\bottomrule
+\end{tabularx}
+\caption{The right-hand column is why this chapter is shorter than it would have
+been a year ago.}
+\label{tab:statelessness-ops}
+\end{table}
+
+\keyidea{If you find yourself needing sticky sessions for an MCP server, you have
+per-request state somewhere it should not be. Find it. It is usually a task
+store, a signing secret, or a cache with a per-process lifetime.}
+
+\section{Three topologies}
+
+\subsection{stdio sidecar}
+
+One server process per host, launched as a subprocess. No network.
+
+\textbf{Good for:} local tools, filesystem access, developer machines, anything
+where the user's own credentials are the right credentials.
+
+\textbf{Operational profile:} no ports, no TLS, no auth infrastructure. The
+process boundary is the isolation boundary. Cold start is 44.6\,ms, which
+Chapter~\ref{ch:optimizing} says to amortise with a pool.
+
+\textbf{Watch for:} the server inheriting more environment than it should. A
+subprocess gets the parent's environment by default, including credentials for
+things it has no business touching.
+
+\begin{py}
+self._proc = subprocess.Popen(
+    command,
+    stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE if capture_stderr else None,
+    env={**os.environ, **(env or {})},
+    ...
+)
+\end{py}
+
+Meridian merges the parent environment because it is a book. A hardened launcher
+passes an explicit allowlist instead.
+
+\subsection{Containerised Streamable HTTP}
+
+The default for anything shared.
+
+\begin{py}
+FROM python:3.13-slim
+WORKDIR /app
+COPY meridian/ ./meridian/
+ENV PYTHONUNBUFFERED=1
+EXPOSE 8931
+CMD ["python3", "-m", "meridian.serve", "risk", "--http", "8931"]
+\end{py}
+
+\texttt{PYTHONUNBUFFERED=1} matters more than it looks: buffered stderr means
+your logs arrive in 4\,KB chunks, which during an incident means they arrive
+after you needed them.
+
+Behind it, a plain round-robin load balancer. No affinity configuration. That is
+the entire deployment story now.
+
+\subsection{Serverless}
+
+Newly viable, and genuinely so.
+
+\textbf{Good for:} spiky traffic, low steady-state volume, and anything where you
+would rather not run a fleet.
+
+\textbf{The catch, and it is the whole catch:} cold start. Your first request
+pays interpreter boot plus imports plus whatever runs at module scope. Meridian's
+\texttt{servers/data.py} builds 240 accounts, 1,440 transactions, and 120 filings
+at import time, which is fine at 40\,ms and would not be at four seconds.
+
+Two rules for serverless MCP servers:
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item \textbf{Nothing expensive at module scope.} Lazy-load anything heavy, so a
+cold container answers \texttt{tools/list} without loading your scoring model.
+\item \textbf{Tasks need external storage.} Obviously, but people forget: a
+container that answered \texttt{tools/call} will not be the one that answers
+\texttt{tasks/get}.
+\end{itemize}
+
+\section{Health checks that mean something}
+
+Most MCP health checks are wrong, and in an interesting way. They check that the
+process is listening, which tells you almost nothing.
+
+A useful health check exercises the protocol:
+
+\begin{py}
+def healthy(server) -> tuple[bool, dict]:
+    """Health means `server/discover` answers correctly, not that a port is open.
+
+    A process can accept connections while its catalogue is empty, its
+    dependencies are down, or its handlers all raise. Answering discovery
+    proves routing, capability derivation, and serialisation all work.
+    """
+    probe = {
+        "jsonrpc": "2.0", "id": "health", "method": "server/discover",
+        "params": {"_meta": {
+            KEY_PROTOCOL_VERSION: PROTOCOL_VERSION,
+            KEY_CLIENT_CAPABILITIES: {},
+        }},
+    }
+    resp = server.handle(probe)
+    if "error" in resp:
+        return False, {"reason": resp["error"]["message"]}
+    result = resp["result"]
+    return (
+        PROTOCOL_VERSION in result.get("supportedVersions", [])
+        and bool(result.get("capabilities")),
+        {"capabilities": sorted(result.get("capabilities", {}))},
+    )
+\end{py}
+
+Three levels, and use all three:
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXl@{}}
+\toprule
+\thead{Check} & \thead{Proves} & \thead{Frequency} \\
+\midrule
+Liveness: process responds
+  & It has not deadlocked & seconds \\
+Readiness: \texttt{server/discover} returns capabilities
+  & Routing and serialisation work & seconds \\
+Deep: one real tool call against a known fixture
+  & Dependencies are reachable & minutes \\
+\bottomrule
+\end{tabularx}
+\caption{The deep check is the one that catches a server whose database went
+away, and it is the one most people skip.}
+\label{tab:health-checks}
+\end{table}
+
+\begin{notebox}{Do not use \texttt{ping}}
+It was removed in \texttt{2026-07-28}. If your health check sends it, a modern
+server answers \texttt{-32601} and your orchestrator concludes the server is
+unhealthy and restarts it, forever.
+
+The dual-era bridge answers \texttt{ping} for exactly this reason, which is a
+compatibility shim rather than a recommendation.
+\end{notebox}
+
+\section{Graceful drain}
+
+Statelessness makes this easy, and there is still a right order.
+
+\begin{enumerate}[leftmargin=1.6em, itemsep=3pt]
+\item \textbf{Fail readiness.} The load balancer stops sending new requests.
+\item \textbf{Finish in-flight requests.} They are short. Give them a bounded
+window.
+\item \textbf{Close \texttt{subscriptions/listen} streams gracefully.} This is
+the MCP-specific step and it is the one people miss.
+\item \textbf{Exit.}
+\end{enumerate}
+
+Step three deserves attention. A subscription stream that just dies tells the
+client nothing. A stream that closes with the response to its originating
+request tells it ``this ended on purpose'':
+
+\begin{py}
+def close_gracefully(self) -> None:
+    """End the subscription with a proper JSON-RPC response.
+
+    A stream that just dies tells the client nothing. A stream that closes
+    with the response to the original `subscriptions/listen` request tells
+    it "this ended on purpose, do not reconnect in a panic". The difference
+    matters at three in the morning.
+    """
+    self._send_raw(jsonrpc.result_response(
+        self.id, {"_meta": {KEY_SUBSCRIPTION_ID: self.id}}))
+    self.closed = True
+\end{py}
+
+Without it, every client treats your rolling deploy as an outage and reconnects
+immediately, all at once, to the replicas that are still up.
+
+On stdio, drain means honouring EOF on stdin:
+
+\begin{py}
+def close(self, timeout: float = 5.0) -> None:
+    try:
+        self._proc.stdin.close()
+    except Exception:
+        pass
+    try:
+        self._proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        # Escalate only if the server ignored the EOF on stdin.
+        self._proc.terminate()
+\end{py}
+
+\section{Rolling out a capability change}
+
+The awkward case: you are adding a tool, and for a while some replicas have it
+and some do not.
+
+\begin{dangerbox}{The split-catalogue window}
+Replica A has the new tool. Replica B does not. A client fetches
+\texttt{tools/list} from A, caches it for five minutes, then calls the new tool
+and hits B, which returns \texttt{-32602}.
+
+Round-robin load balancing plus client-side caching makes this the \emph{normal}
+case during a deploy, not an edge case.
+\end{dangerbox}
+
+Three mitigations, and use the first two always:
+
+\textbf{Deploy the handler before the declaration.} Ship a release where the tool
+works but is not listed. Then ship a release that lists it. Now no replica ever
+advertises something it cannot do.
+
+\textbf{Keep TTLs short enough that the window closes.} Meridian's
+\texttt{tools/list} TTL is five minutes, so a deploy is fully visible within five
+minutes of finishing.
+
+\textbf{Emit \texttt{listChanged} when the rollout completes.} Clients with an
+open subscription refetch immediately instead of waiting out the TTL.
+
+Removal runs in reverse: stop listing it, wait for the TTL plus a margin, then
+delete the handler. And if it is a public server, apply the deprecation window
+from Chapter~\ref{ch:architecture} to your own surface. Your callers deserve the
+same twelve months the specification gives you.
+
+\section{Multi-tenancy without sessions}
+
+Tenancy used to ride on the session. There is no session, so it rides on the
+credential, which is better.
+
+\begin{py}
+def visible_tools(self, ctx: RequestContext) -> list[Tool]:
+    """Override to filter by scope. The set may vary by authorization,
+    never by connection."""
+\end{py}
+
+Four rules:
+
+\textbf{Tenant comes from the token, never from an argument.} A tenant id in
+\texttt{arguments} is a suggestion from a model that read attacker-controlled
+text. A tenant id in a validated token claim is a fact.
+
+\textbf{Fold tenancy into every cache key.} Meridian folds the auth context in
+unconditionally, public or private, precisely so a mislabelled response cannot
+leak across tenants.
+
+\textbf{Bind MRTR state to the principal.} Chapter~\ref{ch:mrtr} covers it. Across
+tenants it is the difference between an approval and an incident.
+
+\textbf{Put the tenant in \texttt{baggage} for tracing, and nothing else.}
+Sliceable traces, no sensitive data crossing trust boundaries.
+
+\section{Alerting}
+
+Chapter~\ref{ch:measuring} covered the protocol alerts. These are the
+operational ones, and each has an MCP-specific flavour.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXX@{}}
+\toprule
+\thead{Alert} & \thead{Symptom} & \thead{Usual cause} \\
+\midrule
+Tool-call loop
+  & Same tool, same arguments, many times in one task
+  & Unhelpful error message; the model cannot self-correct \\
+Subscription storm
+  & \texttt{subscriptions/listen} count spikes
+  & A deploy dropped streams without graceful closure \\
+Timeout spike on one method
+  & p99 up on \texttt{tools/call}, flat elsewhere
+  & One tool's dependency is degraded \\
+Cache stampede
+  & Request spike at a TTL boundary
+  & Synchronised TTLs; add jitter \\
+Task store growth
+  & Store size climbing without bound
+  & Expiry sweep not running \\
+\bottomrule
+\end{tabularx}
+\caption{Five alerts. The first is the one that costs money silently.}
+\label{tab:ops-alerts}
+\end{table}
+
+The tool-call loop deserves elaboration because it is uniquely agentic. A model
+calls a tool, gets an unhelpful error, retries identically, gets the same error,
+and repeats until the step budget stops it. Every cycle is a full model turn.
+Nothing is down, nothing errors at the infrastructure level, and your bill goes
+up.
+
+The fix is Chapter~\ref{ch:tools}: error messages a model can act on. The alert
+is a detector for having failed to do that.
+
+Cache stampede is worth a sentence too. A thousand clients that started together
+have synchronised TTLs, so they all expire together and all refetch together.
+Jitter the TTL by a few percent per client and the herd disperses.
+
+\section{Capacity planning}
+
+The useful thing about MCP servers: they are ordinary request-response services
+and your existing capacity model applies.
+
+The unusual thing: your traffic shape is driven by \emph{loop iterations}, not by
+user actions. One user request becomes three model turns becomes three tool
+calls, sometimes fanned out in parallel bursts.
+
+So plan for the burst. From Chapter~\ref{ch:measuring}, work forward:
+
+\begin{plain}
+tasks/second                    x  round trips/task
+                                =  requests/second (mean)
+
+requests/second (mean)          x  fan-out width
+                                =  concurrent requests at the burst
+\end{plain}
+
+Meridian at 100 tasks/second: 3 round trips each is 300 requests/second mean,
+and a fan-out of 3 means bursts of up to 900 concurrent. Provisioning for the
+mean gives you a service that falls over during every parallel fan-out, which is
+to say during every task.
+
+\section{Load testing to failure}
+
+Do it before production does it for you, and test the right thing.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXX@{}}
+\toprule
+\thead{Test} & \thead{What it finds} & \thead{Why MCP-specific} \\
+\midrule
+Sustained load
+  & Steady-state capacity & Baseline \\
+Burst load
+  & Fan-out behaviour & Real traffic is bursty by construction \\
+Cold cache
+  & Load with no client caching & Your first minute after a deploy \\
+Split catalogue
+  & Half the replicas on the new version & The deploy window above \\
+Slow dependency
+  & Behaviour when a downstream is degraded & Timeouts consume step budgets \\
+\bottomrule
+\end{tabularx}
+\caption{The last row is the interesting one: in an agent system a slow
+dependency does not just add latency, it consumes the caller's step budget and
+produces no information.}
+\label{tab:load-tests}
+\end{table}
+
+\subsection{What breaks first}
+
+From running Meridian's compliance server under load, in the order it happened:
+
+\begin{enumerate}[leftmargin=1.6em, itemsep=3pt]
+\item \textbf{Thread pool exhaustion under fan-out.} Bursts are three times mean
+concurrency and the pool was sized for the mean.
+\item \textbf{The audit log became the bottleneck.} Every call writes a record
+synchronously, so the log's write path caps your throughput. Batch it, or write
+it asynchronously with a durable queue in front.
+\item \textbf{SSE streams accumulated.} Clients that vanish without closing leave
+streams open. Keep-alives detect it; without them, file descriptors leak until
+the process stops accepting connections.
+\end{enumerate}
+
+None of those are protocol problems. All three are consequences of the traffic
+shape the protocol produces.
+
+\section{Configuration and secrets}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXl@{}}
+\toprule
+\thead{Setting} & \thead{Notes} & \thead{Scope} \\
+\midrule
+MRTR signing secret & Rotatable, verify old and new during rotation & \textbf{fleet} \\
+Task store URL      & Shared and durable & fleet \\
+TTL values          & Tune per resource, jitter per client & fleet \\
+Auth issuer, audience & Per environment & fleet \\
+Page size           & Balance round trips against response size & per server \\
+Extension toggles   & Only if implemented & per server \\
+\bottomrule
+\end{tabularx}
+\caption{The bold row is the one that produces intermittent, replica-count-
+proportional failures when it is wrong.}
+\label{tab:config}
+\end{table}
+
+Rotating the MRTR secret needs care, because an in-flight elicitation may be
+sealed with the old key. Accept both during the rotation window, sign only with
+the new one, and make the window longer than the state TTL. Otherwise every
+approval in flight at rotation time fails, and the failure looks exactly like
+tampering.
+
+\section{Meridian in production}
+
+\begin{plain}
+                     internet
+                        |
+                 [ API gateway ]     TLS, OAuth, rate limits,
+                        |            routes on Mcp-Method / Mcp-Name
+        +---------------+---------------+
+        |               |               |
+   [ risk x3 ]   [ compliance x2 ]  [ fraud x3 ]   [ marketdata x2 ]
+        |               |               |               |
+        +---------------+---------------+---------------+
+                        |
+              [ shared task store ]     durable, expiring
+              [ signing secret    ]     from the secret manager
+\end{plain}
+
+Every replica count above one is possible because there is nothing to make
+sticky. The gateway routes on headers without parsing bodies, caches
+\texttt{public} results from market data, and enforces per-method rate limits.
+
+\begin{measurebox}{What the gateway cache is worth}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+& \thead{Per-task setup} & \thead{Requests, 20 tasks} \\
+\midrule
+No client caching   & 274.1\,ms & 164 \\
+Honouring \texttt{ttlMs} & 2.5\,ms & 8 \\
+\bottomrule
+\end{tabular}
+
+\vspace{6pt}
+\footnotesize
+Client-side. A shared gateway cache in front of \texttt{marketdata}, whose
+results are \texttt{public}, removes most of the remainder for every client at
+once.
+\end{measurebox}
+
+\section{The runbook}
+
+What you want written down before you need it.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+\thead{Symptom} & \thead{First thing to check} \\
+\midrule
+Intermittent failures, roughly $1-1/N$
+  & Per-process state: signing secret, task store, cache \\
+Clients cannot connect at all
+  & Era mismatch. Probe with \texttt{server/discover} by hand \\
+Everything times out on stdio
+  & Something wrote to \texttt{stdout} \\
+Latency up, server metrics flat
+  & Iterations per task. It is a round-trip problem \\
+Cost up, latency flat
+  & Catalogue tokens. Somebody added tools \\
+Cache hit rate collapsed
+  & TTLs changed, or \texttt{tools/list} ordering went unstable \\
+Streaming stopped working through the proxy
+  & \texttt{X-Accel-Buffering: no} \\
+Approvals failing since the deploy
+  & Signing secret rotation window too short \\
+\bottomrule
+\end{tabularx}
+\caption{Eight symptoms, eight first moves. Every one of them appears somewhere
+earlier in this book.}
+\label{tab:runbook}
+\end{table}
+
+\section{What to remember}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item Statelessness deleted sticky sessions, session stores, and session
+migration. If you still need affinity, find the per-process state.
+\item Health checks should call \texttt{server/discover}, not open a socket. Do
+not use \texttt{ping}; it was removed.
+\item Drain in order, and close subscription streams gracefully or every deploy
+looks like an outage.
+\item Deploy the handler before the declaration; remove the declaration before
+the handler.
+\item Tenancy comes from the token, folds into every cache key, and binds MRTR
+state.
+\item Plan capacity for the fan-out burst, not the mean.
+\item Alert on tool-call loops. They cost money while every dashboard stays
+green.
+\item Jitter your TTLs.
+\item Rotate the MRTR signing secret with an overlap window longer than the state
+TTL.
+\end{itemize}
+
+That closes Part~IV. You can build it, measure it, make it fast, and run it.
+Part~V is about the people trying to break it.

@@ -1,0 +1,409 @@
+\chapter{Multi-Agent Topologies}
+\label{ch:multi-agent}
+
+\epigraph{``There is no spoon.''}{Spoon Boy, \emph{The Matrix} (1999)}
+
+The line is usually quoted as mysticism. It is actually a debugging technique:
+the constraint you are struggling against is a category you invented. In
+multi-agent systems the invented category is ``agent'' as a special kind of
+thing. There is no agent. There is a host that also happens to be a server, and
+once you see that, the whole topic collapses into things you already know.
+
+\section{An agent is a host and a server at the same time}
+
+That is the entire architectural insight.
+
+\begin{itemize}[leftmargin=1.6em, itemsep=2pt]
+\item On its \textbf{consumer} side, it is a host: it connects to servers,
+merges catalogues, runs a loop.
+\item On its \textbf{provider} side, it is a server: it exposes tools that
+happen to be implemented by running a loop.
+\end{itemize}
+
+Nothing in the protocol distinguishes ``a tool that queries a database'' from ``a
+tool that runs a four-step agent loop and returns a synthesis''. The caller sees
+a tool call. This is a good property, and it is why MCP does not need a
+multi-agent extension.
+
+\begin{py}
+risk_agent = Server("meridian-risk-agent", "1.0.0", instructions=(
+    "Delegated credit analysis. Give it an account and a question; it will "
+    "consult the risk, fraud, and market-data servers and return a synthesis."
+))
+
+@risk_agent.tool(
+    "analyse_account",
+    "Full credit analysis of one account: risk score, fraud signals, and "
+    "indicative pricing, synthesised into a recommendation.",
+    {
+        "type": "object",
+        "properties": {
+            "accountId": {"type": "string", "pattern": "^ACC-[0-9]{4}$"},
+            "question": {"type": "string",
+                         "description": "What the caller wants to know"},
+        },
+        "required": ["accountId"],
+    },
+)
+def analyse_account(ctx: RequestContext):
+    budget = _inherit_budget(ctx)          # see below
+    result = AgentLoop(inner_host, model,
+                       max_steps=budget.steps,
+                       token_budget=budget.tokens,
+                       cost_budget_usd=budget.dollars).run(
+        f"Analyse {ctx.arguments['accountId']}. "
+        f"{ctx.arguments.get('question', '')}")
+    return text_result(result.answer,
+                       structured={"iterations": len(result.iterations),
+                                   "costUsd": result.cost_usd})
+\end{py}
+
+A tool whose implementation is a loop. The caller cannot tell, and mostly should
+not need to.
+
+\section{Three shapes}
+
+\bookfig[1.0]{multi-agent}{The three topologies, what each one buys, and what
+each one costs. The box at the bottom applies to all three.}{multi-agent}
+
+\subsection{Supervisor tree}
+
+One coordinator, several specialists. The shape most teams reach for, and
+usually correctly.
+
+\textbf{Isolation:} a specialist that fails, hangs, or misbehaves is contained by
+the supervisor. It can retry, route around, or report.
+
+\textbf{Failure mode:} the supervisor is a single point of failure and, more
+insidiously, a single point of context. Every specialist's summary lands in the
+supervisor's window, which fills.
+
+\subsection{Peer mesh}
+
+Agents call each other directly. No coordinator.
+
+\textbf{Isolation:} none, structurally. Peers route around damage, which is
+resilience of a different kind.
+
+\textbf{Failure mode:} cycles. A calls B calls C calls A, and now you have an
+infinite recursion distributed across three machines with a token meter attached.
+
+\subsection{Hierarchy}
+
+Levels, each summarising for the one above. Portfolio, sector, account.
+
+\textbf{Isolation:} good, and the context property is the real prize: each level
+sees summaries rather than raw results, so the top-level window stays small
+regardless of how many accounts exist.
+
+\textbf{Failure mode:} depth multiplies latency. Three levels means the leaf's
+model turn, the middle's model turn, and the top's model turn, in series. A
+1.4-second task becomes a four-second task.
+
+\section{The four counters}
+
+Whatever the shape, four things must travel with a delegated request, and all
+four ride in \texttt{\_meta}.
+
+\begin{py}
+DEPTH_KEY   = "com.meridian/delegationDepth"
+TOKENS_KEY  = "com.meridian/tokenBudgetRemaining"
+DOLLARS_KEY = "com.meridian/costBudgetRemaining"
+# `traceparent` is already reserved by the spec for the fourth.
+
+MAX_DELEGATION_DEPTH = 3
+
+def _inherit_budget(ctx: RequestContext) -> Budget:
+    """Read the caller's remaining budget, or assume the smallest.
+
+    An agent that receives no budget must not assume an unlimited one. That
+    default is how a misconfigured caller turns into a four-figure invoice.
+    """
+    meta = ctx.raw_meta
+    depth = int(meta.get(DEPTH_KEY, 0))
+    if depth >= MAX_DELEGATION_DEPTH:
+        raise errors.InvalidParams(
+            f"Delegation depth {depth} exceeds the limit of "
+            f"{MAX_DELEGATION_DEPTH}")
+    return Budget(
+        depth=depth + 1,
+        tokens=int(meta.get(TOKENS_KEY, DEFAULT_TOKEN_BUDGET)),
+        dollars=float(meta.get(DOLLARS_KEY, DEFAULT_COST_BUDGET)),
+        steps=max(1, MAX_STEPS - depth * 2),
+    )
+\end{py}
+
+Four decisions in that function, each worth stating:
+
+\textbf{Depth is checked before any work.} Refusing at depth 3 costs one request.
+Discovering the recursion at depth 30 costs thirty.
+
+\textbf{The default budget is small, not infinite.} An agent that receives no
+budget is talking to a caller that has not thought about budgets, which is
+exactly when a conservative default matters most.
+
+\textbf{Steps shrink with depth.} A leaf agent does not need eight iterations. If
+it does, the decomposition is wrong.
+
+\textbf{Budgets are \emph{remaining}, not allocated.} This is the one people get
+wrong. Passing ``you may spend \$0.50'' to three children authorises \$1.50.
+Passing what is left, and decrementing as results return, authorises \$0.50
+total.
+
+\begin{dangerbox}{Budget fan-out is multiplicative}
+A supervisor with a \$1.00 budget delegating to 3 agents, each delegating to 3
+more, each running 8 steps: if every level passes its full budget down, the
+system is authorised to spend \$9.00 and will happily do so.
+
+Depth limits alone do not fix this. You need the budget to be a shared,
+decrementing quantity rather than a per-node allowance.
+\end{dangerbox}
+
+\section{Circuit breakers}
+
+Budgets stop runaway spending. Circuit breakers stop runaway \emph{waiting}.
+
+\begin{py}
+class CircuitBreaker:
+    """Stop calling something that is clearly broken.
+
+    Three states. Closed: normal. Open: fail fast without calling. Half-open:
+    let exactly one probe through and decide from its outcome. The half-open
+    state is what stops a recovering service being flattened by every client
+    reconnecting at once.
+    """
+
+    def __init__(self, *, threshold: int = 5, cooldown: float = 30.0):
+        self.threshold = threshold
+        self.cooldown = cooldown
+        self.failures = 0
+        self.opened_at: float | None = None
+
+    def allows(self, now: float) -> bool:
+        if self.opened_at is None:
+            return True
+        if now - self.opened_at >= self.cooldown:
+            self.opened_at = None      # half-open: one probe gets through
+            self.failures = self.threshold - 1
+            return True
+        return False
+
+    def record(self, ok: bool, now: float) -> None:
+        if ok:
+            self.failures = 0
+            self.opened_at = None
+        else:
+            self.failures += 1
+            if self.failures >= self.threshold:
+                self.opened_at = now
+\end{py}
+
+Failing fast is better than timing out, for a reason specific to agent systems:
+a timeout consumes the caller's step budget while producing no information. A
+fast failure lets the model try something else with the steps it has left.
+
+\section{Discovery at scale}
+
+Two servers you configure by hand. Two hundred you do not.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXX@{}}
+\toprule
+\thead{Mechanism} & \thead{Good for} & \thead{Watch out for} \\
+\midrule
+Static config (\texttt{.mcp.json})
+  & Development, small fixed fleets
+  & Drift between environments \\
+The official MCP Registry
+  & Public, discoverable servers
+  & Anything public is untrusted (\chapref{threats}) \\
+A private registry
+  & Enterprise fleets, approval workflows
+  & You now operate a registry \\
+Runtime binding
+  & Selecting a server per task from a catalogue
+  & Discovery latency in the critical path \\
+\bottomrule
+\end{tabularx}
+\caption{Discovery options. Most organisations end up with static config for
+development and a private registry for production.}
+\label{tab:discovery}
+\end{table}
+
+Whatever you use, \texttt{server/discover} is cacheable with a TTL, so honour it.
+A supervisor rediscovering twelve servers per task is spending twelve round trips
+on information that changes when somebody deploys.
+
+\section{Tracing across the tree}
+
+This is where multi-agent systems become debuggable or do not.
+
+One trace id, propagated through every hop, so a request that fans out to three
+agents and eleven servers is one trace with a shape you can read.
+
+\begin{py}
+body["_meta"] = build_request_meta(
+    self.capabilities, self.info,
+    protocol_version=self.protocol_version,
+    progress_token=progress_token,
+    traceparent=traceparent,
+)
+\end{py}
+
+W3C trace context, in the reserved \texttt{traceparent} key. The specification
+carves out an explicit exception to the reverse-DNS prefix rule for exactly this,
+which tells you how important the working group considered it.
+
+Without it, a slow request in a three-level hierarchy is eleven separate log
+searches and a guess. With it, it is one waterfall. Chapter~\ref{ch:measuring}
+builds the waterfall.
+
+\section{Meridian's supervisor}
+
+Three specialists, one coordinator, one traced request.
+
+\begin{py}
+supervisor = Host(name="meridian-supervisor",
+                  consent=ConsentPolicy(auto_allow_read_only=True),
+                  tool_token_budget=3000)
+
+supervisor.connect("risk",       StreamableHttpClient(RISK_AGENT_URL))
+supervisor.connect("compliance", StreamableHttpClient(COMPLIANCE_AGENT_URL))
+supervisor.connect("fraud",      StreamableHttpClient(FRAUD_AGENT_URL))
+supervisor.discover_all()
+supervisor.refresh_catalogue()
+
+result = AgentLoop(supervisor, model,
+                   max_steps=6,
+                   token_budget=40_000,
+                   cost_budget_usd=0.25,
+                   parallel_fanout=True).run(
+    "Full review of ACC-1042 for the credit committee.")
+\end{py}
+
+\texttt{parallel\_fanout=True} is doing heavy lifting here. The three specialists
+are independent, so the supervisor should call them together. From
+Chapter~\ref{ch:primer}, that is a 2.8$\times$ speedup on the tool-call band, and
+in a hierarchy each level's fan-out compounds.
+
+\subsection{What the trace looks like}
+
+\begin{plain}
+supervisor.analyse_portfolio                        [ 4,180 ms]
+ |- model turn (plan)                               [   440 ms]
+ |- parallel fan-out                                [ 1,820 ms]
+ |   |- risk-agent.analyse_account                  [ 1,820 ms]
+ |   |   |- model turn (plan)                       [   430 ms]
+ |   |   |- risk.assess_account_risk                [    12 ms]
+ |   |   |- marketdata.price_facility               [     9 ms]
+ |   |   `- model turn (synthesise)                 [   410 ms]
+ |   |- fraud-agent.screen                          [   890 ms]
+ |   `- compliance-agent.review                     [ 1,240 ms]
+ `- model turn (synthesise)                         [   470 ms]
+\end{plain}
+
+Read the shape rather than the numbers. The fan-out costs the \emph{maximum} of
+its children (1,820) rather than the sum (3,950), which is what parallelism
+bought. And the leaf tool calls are 12\,ms and 9\,ms against model turns of 430
+and 410, which is Chapter~\ref{ch:primer}'s point restated at a different scale:
+you are paying for thinking, not for calling.
+
+\keyidea{Every level of delegation adds at least two model turns: one to decide
+what to delegate and one to read what came back. Delegate because the
+decomposition genuinely helps, not because the architecture diagram looks
+tidier.}
+
+\section{When not to build a multi-agent system}
+
+The section this chapter exists for.
+
+Multi-agent architectures are intellectually appealing and expensive. Each
+delegation adds model turns, adds a failure mode, adds a trace to correlate, and
+adds a budget to enforce. Sometimes that is worth it. Often it is not.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}XX@{}}
+\toprule
+\thead{Delegate when} & \thead{Do not when} \\
+\midrule
+The sub-task needs a genuinely different tool catalogue
+  & You could have added three tools to one server \\
+The sub-task needs different authorization, and the boundary is real
+  & The boundary is organisational rather than technical \\
+Sub-tasks are independent and parallel fan-out pays
+  & They are sequential, so you pay depth for no concurrency \\
+Context isolation is the point: the child sees data the parent must not
+  & You are isolating context you could have summarised in one turn \\
+Different teams own different agents and deploy independently
+  & One team owns all of it \\
+\bottomrule
+\end{tabularx}
+\caption{The right-hand column describes most systems that have a multi-agent
+architecture.}
+\label{tab:when-delegate}
+\end{table}
+
+The honest test: \emph{would this be a function call if the components were in
+one process?} If yes, and you have made it an agent, you have added several
+hundred milliseconds and a distributed systems problem in exchange for an
+organisational boundary you could have drawn with a module.
+
+\section{Security across agent boundaries}
+
+Every boundary is a trust boundary, and delegation makes it easy to forget that.
+
+\begin{dangerbox}{Confused deputy, delegated}
+A supervisor holds broad authorization. A specialist agent asks it to call a
+tool. If the supervisor executes on behalf of the specialist using the
+supervisor's own credentials, the specialist has just escalated to the
+supervisor's privileges.
+
+Which is the confused deputy from Chapter~\ref{ch:authorization}, one layer up
+and much easier to build by accident, because the specialist is ``one of ours''.
+\end{dangerbox}
+
+Three rules:
+
+\textbf{Delegate authorization, not just work.} The child should act with its
+own credentials, scoped to what it needs. Token exchange exists for this.
+
+\textbf{Never pass through a token.} It was forbidden in
+Chapter~\ref{ch:authorization} and it is still forbidden here.
+
+\textbf{Audit the delegation, not just the leaves.} An audit log showing
+\texttt{assess\_account\_risk} was called tells you nothing about who decided to
+call it. Record the chain.
+
+And the one that people find surprising: an agent that consumes untrusted content
+and then calls another agent has extended the injection surface. If a compliance
+agent reads poisoned guidance text and then delegates to a risk agent, the
+injection now reaches a system with different privileges.
+Chapter~\ref{ch:threats} follows that thread to its conclusion.
+
+\section{What to remember}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item An agent is a host on one side and a server on the other. The protocol
+needs no extension for this.
+\item Supervisor trees for isolation, peer meshes for resilience, hierarchies for
+context management. Pick for the property you need.
+\item Four counters travel in \texttt{\_meta}: depth, token budget, cost budget,
+trace id.
+\item Check depth before doing work. Default to a small budget, never an
+unlimited one.
+\item Budgets must be remaining-and-decrementing, not per-node allowances, or
+fan-out multiplies them.
+\item Circuit breakers with a half-open probe, because a timeout burns the
+caller's step budget and tells it nothing.
+\item Propagate \texttt{traceparent}, or a slow request becomes eleven log
+searches.
+\item Every delegation adds at least two model turns. Delegate for real reasons.
+\item Delegate authorization along with work, never a token.
+\end{itemize}
+
+That closes Part~III. You can build all of it now. Part~IV is about finding out
+whether it is any good.

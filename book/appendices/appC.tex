@@ -1,0 +1,188 @@
+\chapter{Performance Checklist}
+\label{ch:perf-checklist}
+
+Chapter~\ref{ch:optimizing} in one page. Work down it in order; the ordering is
+by return per unit effort, measured on Meridian and stable across the systems I
+have looked at.
+
+Every item cites where the reasoning lives.
+
+\section{First: measure}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item[$\square$] \textbf{Count loop iterations per task.} Not tool calls.
+Iterations, because each is a full model turn. (\chapref{measuring})
+\item[$\square$] \textbf{Decompose one iteration} into model, transport, server
+execution, and consent. Every millisecond belongs to one band.
+(\chapref{measuring})
+\item[$\square$] \textbf{Measure catalogue tokens per turn.} Serialise
+\texttt{tools/list}, divide characters by four. (\chapref{tools})
+\item[$\square$] \textbf{Check your cache hit rate.} If you are not honouring
+\texttt{ttlMs}, it is zero. (\chapref{resources})
+\item[$\square$] \textbf{Subtract an in-process control} to separate transport
+from execution. (\chapref{measuring})
+\end{itemize}
+
+\section{Then: cut round trips}
+
+The largest returns, always.
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item[$\square$] \textbf{Add batch variants} of any tool the model calls in a
+loop. Forty accounts becomes one call. (\chapref{tools})
+\item[$\square$] \textbf{Let the model batch independent calls} into one turn.
+Worth roughly thirteen times more than fan-out. (\chapref{optimizing})
+\item[$\square$] \textbf{Fan out what it batched.} 2.8$\times$ on three calls,
+better as latency rises. (\chapref{tools})
+\item[$\square$] \textbf{Front-load MRTR inputs} into tool schemas. An
+elicitation is roughly 375\,ms. (\chapref{mrtr})
+\item[$\square$] \textbf{Ask for everything at once} when you must elicit. One
+interim result, not three. (\chapref{mrtr})
+\item[$\square$] \textbf{Collapse read-then-combine chains} into one tool. If
+your traces show a fixed sequence, ship it as a tool. (\chapref{tools})
+\end{itemize}
+
+\section{Then: cache}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item[$\square$] \textbf{Honour \texttt{ttlMs}.} 164 setup requests became 8
+across 20 tasks. Do this first of everything in this section.
+(\chapref{optimizing})
+\item[$\square$] \textbf{Check freshness on access}, never poll on the TTL.
+Polling is a self-inflicted thundering herd. (\chapref{resources})
+\item[$\square$] \textbf{Jitter TTLs} per client so caches do not expire
+together. (\chapref{operations})
+\item[$\square$] \textbf{Set \texttt{cacheScope: public}} where it is genuinely
+true, so gateways can share. Never on anything personalised.
+(\chapref{resources})
+\item[$\square$] \textbf{Fold the auth context into every cache key}, public or
+private. (\chapref{access-control})
+\item[$\square$] \textbf{Invalidate on \texttt{listChanged}}, so long TTLs are
+safe. (\chapref{resources})
+\item[$\square$] \textbf{Return tools in a deterministic order}, or you silently
+lose the provider's prompt cache. (\chapref{tools})
+\item[$\square$] \textbf{Keep stable content first} in prompts, variable content
+last. (\chapref{prompts})
+\item[$\square$] \textbf{Never cache MRTR retries} or interim results.
+(\chapref{resources})
+\end{itemize}
+
+\section{Then: spend tokens deliberately}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item[$\square$] \textbf{Delete tools nobody calls.} Check telemetry; 90 days of
+no calls is pure cost. (\chapref{tools})
+\item[$\square$] \textbf{Replace REST mirrors with task-shaped tools.} 5,617
+tokens became 1,246. (\chapref{tools})
+\item[$\square$] \textbf{Compress descriptions.} Lead with the outcome, never
+mention your transport. (\chapref{tools})
+\item[$\square$] \textbf{Set a catalogue token budget in the host} and put it on
+a dashboard. (\chapref{building-hosts})
+\item[$\square$] \textbf{Add output schemas} to remove parse-retry loops. Use
+\texttt{enum} generously. (\chapref{tools})
+\item[$\square$] \textbf{Bound tool results} before they enter context.
+(\chapref{agent-loop})
+\item[$\square$] \textbf{Prefer \texttt{structuredContent}} over the prose
+mirror when summarising. (\chapref{agent-loop})
+\item[$\square$] \textbf{Return resource links} instead of embedding large
+documents. (\chapref{resources})
+\end{itemize}
+
+\section{Then: stream}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item[$\square$] \textbf{Stream model tokens.} TTFT is 340\,ms of a 440\,ms turn.
+(\chapref{agent-loop})
+\item[$\square$] \textbf{Forward progress notifications.} Free UX from any server
+that emits them. (\chapref{tasks})
+\item[$\square$] \textbf{Show tool calls as they happen.} (\chapref{agent-loop})
+\item[$\square$] \textbf{Show partial results} rather than waiting for the final
+synthesis. (\chapref{optimizing})
+\item[$\square$] \textbf{Send \texttt{X-Accel-Buffering: no}}, or a proxy
+un-streams everything you just streamed. (\chapref{transport})
+\end{itemize}
+
+\section{Then: transport}
+
+Smallest returns, listed last on purpose.
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item[$\square$] \textbf{Reuse connections.} Saves two round trips per call over
+TLS. (\chapref{optimizing})
+\item[$\square$] \textbf{Warm pools for stdio.} Cold start is roughly 750 warm
+calls. (\chapref{transport})
+\item[$\square$] \textbf{Route on \texttt{Mcp-Method} and \texttt{Mcp-Name}} at
+the gateway, without parsing bodies. (\chapref{transport})
+\item[$\square$] \textbf{Tune task polling} to \texttt{pollIntervalMs}, with
+backoff and jitter. (\chapref{tasks})
+\end{itemize}
+
+\section{Finally: route models}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item[$\square$] \textbf{Small models for glue turns}: tool selection, result
+extraction, summarisation. (\chapref{agent-loop})
+\item[$\square$] \textbf{Large models for planning, judgement, and synthesis.}
+(\chapref{agent-loop})
+\item[$\square$] \textbf{Verify the frontier with evals}, not intuition.
+(\chapref{measuring})
+\item[$\square$] \textbf{Remember a cheap wrong answer costs a full recovery
+cycle.} (\chapref{optimizing})
+\end{itemize}
+
+\section{Guardrails, which are not optional}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item[$\square$] Step budget. (\chapref{agent-loop})
+\item[$\square$] Token budget. (\chapref{agent-loop})
+\item[$\square$] Cost budget. (\chapref{agent-loop})
+\item[$\square$] Depth limit and decrementing budgets, if you delegate.
+(\chapref{multi-agent})
+\item[$\square$] Circuit breakers on flaky dependencies. (\chapref{multi-agent})
+\end{itemize}
+
+\section{Do not bother}
+
+Measured, and not worth your time.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+\thead{Tempting} & \thead{Why not} \\
+\midrule
+Shrinking the \texttt{\_meta} envelope
+  & 197 bytes on a request whose unit of work is hundreds of milliseconds \\
+Rewriting the server in a faster language
+  & Server execution is 3.8\,\% of the task \\
+Optimising JSON parsing
+  & Same reason \\
+Trimming the catalogue for latency
+  & It saves tokens and zero milliseconds. Different budget \\
+\bottomrule
+\end{tabularx}
+\caption{From Chapter~\ref{ch:optimizing}. Publishing what did not work is how
+you stop the next person repeating it.}
+\label{tab:dont-bother}
+\end{table}
+
+\section{The Meridian result}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+& \thead{Before} & \thead{After} & \thead{Change} \\
+\midrule
+Loop iterations & 4 & 2 & -50\,\% \\
+Wall clock & 1{,}753\,ms & 1{,}014\,ms & -42.2\,\% \\
+Tokens per task & 22{,}846 & 2{,}692 & -88.2\,\% \\
+Cost per task & \$0.0690 & \$0.0086 & -87.6\,\% \\
+Setup requests, 20 tasks & 164 & 8 & -95.1\,\% \\
+\bottomrule
+\end{tabular}
+\caption{Four changes. No new hardware. Reproduce with \texttt{make bench}.}
+\label{tab:perf-summary}
+\end{table}

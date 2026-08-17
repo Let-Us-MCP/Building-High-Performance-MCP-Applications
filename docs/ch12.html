@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Building Hosts and Clients &middot; Building Awesome MCP Apps</title>
+<meta name="description" content="Building Hosts and Clients. What every AI application developer should know about the Model Context Protocol">
+<meta property="og:title" content="Building Hosts and Clients">
+<meta property="og:description" content="Building Hosts and Clients. What every AI application developer should know about the Model Context Protocol">
+<style>
+:root{
+  --ink:#15181D; --muted:#5B6472; --rule:#D8DDE4; --wash:#F5F6F8;
+  --paper:#FFFFFF; --accent:#0F5C8C; --accent-soft:#E7F0F6;
+  --warm:#B4531A; --warm-soft:#FBF0E7; --good:#2C6E49; --good-soft:#E9F2EC;
+  --danger:#9B2226; --danger-soft:#FAECEC;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#E7EAEE; --muted:#98A2B0; --rule:#2C333D; --wash:#171B21;
+    --paper:#0F1216; --accent:#63AEDC; --accent-soft:#14232E;
+    --warm:#E08B4F; --warm-soft:#2A1D13; --good:#6FBF8E; --good-soft:#13221A;
+    --danger:#E4796F; --danger-soft:#291516;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--serif);font-size:18px;line-height:1.62;
+  -webkit-text-size-adjust:100%}
+.layout{display:grid;grid-template-columns:288px minmax(0,1fr);
+  max-width:1280px;margin:0 auto;gap:0}
+nav.toc{position:sticky;top:0;height:100vh;overflow-y:auto;padding:26px 20px 60px;
+  border-right:1px solid var(--rule);font-family:var(--sans);font-size:14px}
+nav.toc .brand{display:block;font-weight:700;font-size:16px;color:var(--ink);
+  text-decoration:none;line-height:1.3;margin-bottom:4px}
+nav.toc .tagline{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.45}
+nav.toc .part{margin:18px 0 6px;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);font-weight:700}
+nav.toc a{display:block;padding:4px 8px;margin-left:-8px;border-radius:5px;
+  color:var(--muted);text-decoration:none}
+nav.toc a:hover{background:var(--wash);color:var(--ink)}
+nav.toc a.current{background:var(--accent-soft);color:var(--accent);font-weight:600}
+main{padding:44px 52px 120px;min-width:0;max-width:78ch}
+h1,h2,h3,h4{font-family:var(--sans);line-height:1.25;color:var(--ink)}
+h1{font-size:2.05em;margin:0 0 .55em;letter-spacing:-.015em}
+h2{font-size:1.42em;margin:2em 0 .5em;padding-top:.35em}
+h3{font-size:1.14em;margin:1.7em 0 .4em}
+h4{font-size:1em;margin:1.4em 0 .3em;color:var(--muted)}
+p{margin:0 0 1.05em}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.855em;background:var(--wash);
+  padding:.12em .36em;border-radius:4px;word-break:break-word}
+pre{background:var(--wash);border-left:3px solid var(--rule);
+  border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+  font-size:13.5px;line-height:1.5;margin:1.3em 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+pre.json,pre.http{background:var(--accent-soft);border-left-color:var(--accent)}
+aside.box{border-left:3px solid var(--rule);background:var(--wash);
+  padding:14px 18px;margin:1.5em 0;border-radius:0 6px 6px 0;font-size:.955em}
+aside.box .box-title{font-family:var(--sans);font-weight:700;font-size:12px;
+  letter-spacing:.07em;text-transform:uppercase;margin:0 0 .55em}
+aside.box.legacy{border-left-color:var(--warm);background:var(--warm-soft)}
+aside.box.legacy .box-title{color:var(--warm)}
+aside.box.measured{border-left-color:var(--good);background:var(--good-soft)}
+aside.box.measured .box-title{color:var(--good)}
+aside.box.threat{border-left-color:var(--danger);background:var(--danger-soft)}
+aside.box.threat .box-title{color:var(--danger)}
+aside.box.note .box-title{color:var(--muted)}
+aside.keyidea{border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:14px 18px;margin:1.6em 0;border-radius:0 6px 6px 0;
+  font-family:var(--sans);font-style:italic;font-size:.97em}
+aside.keyidea p:last-child,aside.box p:last-child{margin-bottom:0}
+aside.keyidea pre,aside.keyidea code,aside.keyidea table{font-style:normal}
+aside.epigraph{border:0;margin:0 0 2em;padding:0 0 0 clamp(0px,7%,52px);
+  color:var(--muted);font-size:.97em}
+aside.epigraph p{margin:0 0 .3em}
+main figure{margin:2em 0;text-align:center}
+main figure img{max-width:100%;height:auto;border-radius:6px}
+@media (prefers-color-scheme: dark){
+  main figure img{background:#fff;padding:10px;border-radius:8px}
+}
+figcaption{font-family:var(--sans);font-size:13.5px;color:var(--muted);
+  margin-top:.7em;text-align:left;line-height:1.5}
+.table-wrap{overflow-x:auto;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:14.5px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+thead th{border-bottom:2px solid var(--rule);font-weight:700}
+caption{caption-side:bottom;font-size:13.5px;color:var(--muted);
+  text-align:left;padding-top:.7em;line-height:1.5}
+ul,ol{padding-left:1.35em;margin:0 0 1.05em}
+li{margin-bottom:.32em}
+dl{margin:0 0 1.05em}
+dt{font-weight:700;font-family:var(--sans);font-size:.95em;margin-top:.75em}
+dd{margin:.15em 0 0 1.35em}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
+.pager{display:flex;justify-content:space-between;gap:16px;margin-top:4em;
+  padding-top:1.5em;border-top:1px solid var(--rule);font-family:var(--sans);
+  font-size:14px}
+.pager a{text-decoration:none;max-width:46%}
+.pager .dir{display:block;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted)}
+.masthead{border-bottom:1px solid var(--rule);padding-bottom:1.8em;margin-bottom:2.2em}
+.masthead .kicker{font-family:var(--sans);font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);font-weight:700}
+.lede{font-size:1.12em;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:14px;margin:1.8em 0}
+.card{border:1px solid var(--rule);border-radius:9px;padding:15px 17px;
+  font-family:var(--sans);font-size:14px}
+.card h3{margin:0 0 .35em;font-size:15px}
+.card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+.menu-btn{display:none}
+@media (max-width:940px){
+  body{font-size:17px}
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:0;
+    border-bottom:1px solid var(--rule);max-height:none}
+  nav.toc.collapsed .toc-body{display:none}
+  main{padding:28px 20px 90px}
+  .menu-btn{display:inline-block;font-family:var(--sans);font-size:13px;
+    background:var(--wash);border:1px solid var(--rule);color:var(--ink);
+    border-radius:6px;padding:6px 11px;cursor:pointer;margin-bottom:10px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc"><button class="menu-btn" type="button">Contents</button>
+<div class="toc-body">
+<a class="brand" href="index.html">Building Awesome MCP Apps</a>
+<p class="tagline">What every AI application developer should know about the Model Context Protocol</p>
+<a href="preface.html">Preface</a>
+<a href="how-to-read.html">How to read this book</a>
+<div class="part">Part I. Protocol Fundamentals</div>
+<a href="ch01.html">A Primer on Latency, Tokens, and Context</a>
+<a href="ch02.html">The MCP Architectural Model</a>
+<a href="ch03.html">Building Blocks of the Transport</a>
+<a href="ch04.html">Authorization on the Wire</a>
+<div class="part">Part II. The Primitives</div>
+<a href="ch05.html">Tools: The Execution Layer</a>
+<a href="ch06.html">Resources: The Context Layer</a>
+<a href="ch07.html">Prompts: Workflow Blueprints</a>
+<a href="ch08.html">Multi Round-Trip Requests</a>
+<a href="ch09.html">Extensions and Tasks</a>
+<a href="ch10.html">MCP Apps: Interactive Interfaces</a>
+<div class="part">Part III. Building MCP Applications</div>
+<a href="ch11.html">Building Servers</a>
+<a href="ch12.html" class="current">Building Hosts and Clients</a>
+<a href="ch13.html">The Agent Loop, State, and Memory</a>
+<a href="ch14.html">Multi-Agent Topologies</a>
+<div class="part">Part IV. Performance Engineering</div>
+<a href="ch15.html">Testing and Debugging</a>
+<a href="ch16.html">Measuring MCP Applications</a>
+<a href="ch17.html">Optimizing for Latency, Tokens, and Cost</a>
+<a href="ch18.html">Deployment and Operations</a>
+<div class="part">Part V. Security and Trust</div>
+<a href="ch19.html">Threat Modeling Agentic Applications</a>
+<a href="ch20.html">Access Control, Audit, and MCP in the Enterprise</a>
+<div class="part">Back matter</div>
+<a href="epilogue.html">Epilogue: The Evolving Protocol</a>
+<div class="part">Appendices</div>
+<a href="appendix-a.html">A. Method and Message Reference</a>
+<a href="appendix-b.html">B. Transport Decision Matrix</a>
+<a href="appendix-c.html">C. Performance Checklist</a>
+<a href="appendix-d.html">D. Security Hardening Checklist</a>
+<a href="appendix-e.html">E. The Meridian Companion Repository</a>
+<a href="about.html">About the author</a>
+</div></nav>
+<main>
+<section id="ch:building-hosts" class="level1">
+<h1>Building Hosts and Clients</h1>
+<aside class="epigraph">
+<p><em>“I’m the guy doing his job. You must be the other guy.”</em></p>
+<p>Sean Dignam, <em>The Departed</em> (2006)</p>
+</aside>
+<p>Dignam’s whole character is about who is actually accountable when several parties are nominally responsible. Which is the host’s problem exactly. The model suggests, the server executes, the user watches, and when something goes wrong the host is the guy doing his job or the other guy. There is no third option, because the host is the only component that can see all of it.</p>
+<p>Building a server is mostly craft. Building a host is mostly judgement, and this chapter is about the five judgements that matter.</p>
+<section id="what-a-host-is-actually-for" class="level2">
+<h2>What a host is actually for</h2>
+<p>A client is thin: attach <code>_meta</code>, send, parse, run the MRTR loop. A few hundred lines, and Meridian’s is one file.</p>
+<p>A host is the hard part, and it has five jobs:</p>
+<ol>
+<li><p>Manage many server connections, with discovery, caching, and reconnection.</p></li>
+<li><p>Merge their catalogues into one namespace the model can reason about.</p></li>
+<li><p>Route the model’s intents back to the right server.</p></li>
+<li><p>Enforce a context budget across all of them.</p></li>
+<li><p>Be the consent, audit, and policy boundary.</p></li>
+</ol>
+<p>Jobs four and five are the ones that get skipped in a prototype and then never retrofitted.</p>
+</section>
+<section id="connecting" class="level2">
+<h2>Connecting</h2>
+<pre class="python" data-language="python"><code>def connect(self, label: str, transport, *, input_provider=None,
+            auth_context: str = &quot;anon&quot;) -&gt; ServerBinding:
+    client = Client(
+        transport,
+        name=self.name, version=self.version,
+        capabilities=self.capabilities,
+        cache=self.cache,
+        input_provider=input_provider,
+        server_label=label,
+        auth_context=auth_context,
+    )
+    binding = ServerBinding(label=label, client=client,
+                            connected_at=time.time())
+    with self._lock:
+        self.bindings[label] = binding
+    return binding</code></pre>
+<p>One client per server, as the architecture requires. The label is the namespace prefix, and it must be stable across restarts because it ends up in conversation history and audit logs.</p>
+<section id="discover-in-parallel-or-pay-the-sum" class="level3">
+<h3>Discover in parallel, or pay the sum</h3>
+<p>The first mistake almost everybody ships:</p>
+<pre class="python" data-language="python"><code>def discover_all(self, parallel: bool = True) -&gt; dict[str, dict]:
+    &quot;&quot;&quot;Fetch every server&#39;s capabilities.
+
+    In parallel, because these are independent and doing them in sequence
+    is the first unnecessary serialisation most hosts ship with.
+    &quot;&quot;&quot;
+    def one(binding):
+        try:
+            result = binding.client.discover()
+            binding.capabilities = result.get(&quot;capabilities&quot;, {})
+            binding.healthy = True
+            return binding.label, result
+        except Exception as exc:
+            binding.healthy = False
+            binding.last_error = f&quot;{type(exc).__name__}: {exc}&quot;
+            return binding.label, {}
+    ...</code></pre>
+<p>Twelve servers at 60 ms each is 720 ms serially and 60 ms in parallel. On a desktop application that is the difference between an app that feels ready and one that shows a spinner every launch.</p>
+<p>Note the exception handling. <strong>One unreachable server must not prevent the other eleven from working.</strong> A host that fails startup because a rarely used server is down has coupled everything to everything.</p>
+<pre class="python" data-language="python"><code>def test_discovery_reports_capabilities_per_server(self):
+    discovered = self.host.discover_all()
+    self.assertIn(&quot;tools&quot;, discovered[&quot;risk&quot;][&quot;capabilities&quot;])
+    self.assertIn(tasks_ext.EXTENSION_ID,
+                  discovered[&quot;risk&quot;][&quot;capabilities&quot;][&quot;extensions&quot;])</code></pre>
+</section>
+<section id="honour-the-discovery-ttl" class="level3">
+<h3>Honour the discovery TTL</h3>
+<p><code>server/discover</code> is cacheable, and Meridian’s servers say one hour. Re-discovering on every task wastes a round trip per server per task for information that changes when somebody deploys.</p>
+<p>The shared <code>ResultCache</code> handles it, which means the host gets this for free by not doing anything special.</p>
+</section>
+</section>
+<section id="namespacing-which-is-not-optional" class="level2">
+<h2>Namespacing, which is not optional</h2>
+<p>Tool names are unique <em>per server</em>. Two servers each exposing <code>search</code> is normal and expected. Flatten them into one catalogue and one of them disappears.</p>
+<pre class="python" data-language="python"><code>def catalogue(self) -&gt; list[dict]:
+    &quot;&quot;&quot;The merged, namespaced, budgeted tool list the model actually sees.
+
+    Namespacing is not optional once you have more than one server. Tool
+    names are unique per server and nothing more, so two servers each
+    offering `search` is normal, expected, and fatal if you flatten them.
+    &quot;&quot;&quot;
+    out = []
+    with self._lock:
+        for label in sorted(self.bindings):
+            binding = self.bindings[label]
+            for tool in binding.tools:
+                entry = dict(tool)
+                entry[&quot;name&quot;] = f&quot;{label}{NAMESPACE_SEPARATOR}{tool[&#39;name&#39;]}&quot;
+                entry[&quot;_server&quot;] = label
+                out.append(entry)
+    ...</code></pre>
+<pre class="python" data-language="python"><code>def test_namespacing_keeps_collisions_apart(self):
+    &quot;&quot;&quot;Two servers may each define the same tool name. That is legal.&quot;&quot;&quot;
+    host = Host()
+    host.connect(&quot;alpha&quot;, InProcessTransport(make(&quot;alpha&quot;)))
+    host.connect(&quot;beta&quot;, InProcessTransport(make(&quot;beta&quot;)))
+    host.refresh_catalogue()
+
+    names = [t[&quot;name&quot;] for t in host.catalogue()]
+    self.assertEqual(sorted(names), [&quot;alpha.search&quot;, &quot;beta.search&quot;])
+    self.assertEqual(
+        host.call_tool(&quot;alpha.search&quot;)[&quot;content&quot;][0][&quot;text&quot;], &quot;from alpha&quot;)
+    self.assertEqual(
+        host.call_tool(&quot;beta.search&quot;)[&quot;content&quot;][0][&quot;text&quot;], &quot;from beta&quot;)</code></pre>
+<p>Note <code>sorted(self.bindings)</code>. Deterministic ordering across servers, for the same prompt-cache reason as Chapter <a href="ch05.html#ch:tools">5</a>. A host that iterates a dictionary in insertion order will reorder its catalogue whenever a server reconnects, and quietly lose every prompt-cache hit.</p>
+<aside class="box note"><p class="box-title">Choosing a separator</p>
+<p>Meridian uses <code>.</code>, giving <code>risk.assess_account_risk</code>. Tool names allow letters, digits, underscore, hyphen, and dot, so any of them works.</p>
+<p>Whatever you pick, pick it once. The namespaced name appears in conversation history and in audit logs, and changing the separator invalidates both.</p>
+</aside>
+</section>
+<section id="the-context-budget" class="level2">
+<h2>The context budget</h2>
+<p>Here is the job nobody assigns to anybody, so it does not get done.</p>
+<aside class="keyidea">
+<p>The host is the context window’s memory allocator. Nothing else can be: a server cannot see the other servers, and the model cannot see its own budget. If the host does not enforce a limit, there is no limit.</p>
+</aside>
+<p>Connect to eight servers with twenty tools each and your model spends 30,000 tokens per turn on descriptions before it reads a word of the actual task.</p>
+<pre class="python" data-language="python"><code>def _apply_budget(self, tools: list[dict], budget: int) -&gt; list[dict]:
+    &quot;&quot;&quot;Drop tools once the catalogue exceeds its token allowance.
+
+    Crude on purpose. The interesting question is not the eviction policy,
+    it is that a budget exists at all: without one, a host wired to eight
+    servers silently spends thirty thousand tokens per turn on descriptions
+    of tools the model will never call.
+    &quot;&quot;&quot;
+    kept, spent = [], 0
+    for tool in tools:
+        cost = estimate_tokens(
+            f&quot;{tool.get(&#39;name&#39;,&#39;&#39;)}{tool.get(&#39;description&#39;,&#39;&#39;)}&quot;
+            f&quot;{tool.get(&#39;inputSchema&#39;,&#39;&#39;)}&quot;)
+        if spent + cost &gt; budget:
+            continue
+        kept.append(tool)
+        spent += cost
+    return kept</code></pre>
+<p>Truncation is the crudest possible policy and I am not defending it. Better ones, roughly in order of effort:</p>
+<ul>
+<li><p><strong>Relevance filtering.</strong> Retrieve the tools plausibly related to the current task and send only those. Costs a retrieval step, saves thousands of tokens.</p></li>
+<li><p><strong>Tiering.</strong> Always include a small core; include the rest only when the task looks like it needs them.</p></li>
+<li><p><strong>Progressive disclosure.</strong> Expose a <code>list_more_tools</code> tool. The model asks when it needs to.</p></li>
+<li><p><strong>Just delete some.</strong> Genuinely the best option, and the one people skip because it requires a conversation with a team.</p></li>
+</ul>
+<p>Whatever you choose, measure it:</p>
+<pre class="python" data-language="python"><code>def catalogue_tokens(self) -&gt; int:
+    return sum(
+        estimate_tokens(f&quot;{t.get(&#39;name&#39;,&#39;&#39;)}{t.get(&#39;description&#39;,&#39;&#39;)}&quot;
+                        f&quot;{t.get(&#39;inputSchema&#39;,&#39;&#39;)}{t.get(&#39;outputSchema&#39;,&#39;&#39;)}&quot;)
+        for t in self.catalogue())</code></pre>
+<aside class="box measured"><p class="box-title">Measured: Meridian’s merged catalogue</p>
+<table>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Configuration</strong></td>
+<td style="text-align: right;"><strong>Tools</strong></td>
+<td style="text-align: right;"><strong>Tokens per turn</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Four servers, task-shaped catalogue</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">1<span>,</span>246</td>
+</tr>
+<tr>
+<td style="text-align: left;">Four servers, REST-mirror catalogue</td>
+<td style="text-align: right;">38</td>
+<td style="text-align: right;">5<span>,</span>617</td>
+</tr>
+</tbody>
+</table>
+<p>This is the number to put on a dashboard. It moves whenever anybody adds a tool anywhere, and nobody notices until it is 12,000.</p>
+</aside>
+</section>
+<section id="routing" class="level2">
+<h2>Routing</h2>
+<p>Split the namespaced name, find the binding, apply consent, call.</p>
+<pre class="python" data-language="python"><code>def call_tool(self, qualified: str, arguments: dict | None = None, **kw) -&gt; dict:
+    &quot;&quot;&quot;Route one call, after the consent gate.&quot;&quot;&quot;
+    label, name = self.split_name(qualified)
+    binding = self.bindings.get(label)
+    if binding is None:
+        raise McpError(-32602, f&quot;No server named {label!r}&quot;)
+
+    tool = self.find_tool(qualified) or {}
+    decision = self.consent.check(qualified, tool, arguments or {})
+    self.audit.append({
+        &quot;tool&quot;: qualified, &quot;decision&quot;: decision, &quot;at&quot;: time.time(),
+        &quot;arguments&quot;: arguments or {},
+    })
+    if decision == ConsentDecision.DENY:
+        return tool_error(f&quot;The user declined the call to {qualified}.&quot;)
+
+    return binding.client.call_tool(name, arguments or {}, **kw)</code></pre>
+<p>Two details worth copying.</p>
+<p><strong>A denial returns a tool execution error, not an exception.</strong> The model should learn that the call was refused and adapt, rather than have the loop crash. “The user declined” is information the model can use.</p>
+<p><strong>Audit before executing.</strong> The record is written whatever happens next, including if the server times out. An audit log that only records successes is not an audit log.</p>
+<section id="parallel-fan-out" class="level3">
+<h3>Parallel fan-out</h3>
+<pre class="python" data-language="python"><code>with concurrent.futures.ThreadPoolExecutor(max_workers=len(calls)) as pool:
+    futures = [pool.submit(self.call_tool, c[&quot;name&quot;], c.get(&quot;arguments&quot;))
+               for c in calls]
+    results = []
+    for future in futures:
+        try:
+            results.append(future.result())
+        except McpError as exc:
+            results.append(tool_error(f&quot;{exc.message}&quot;))
+    return results</code></pre>
+<p>Iterating futures in submission order preserves result ordering regardless of completion order, and catching per-future means one failure produces one error result rather than discarding two successful calls you already paid for.</p>
+</section>
+</section>
+<section id="consent-that-people-do-not-rage-click" class="level2">
+<h2>Consent that people do not rage-click</h2>
+<p>The hardest UX problem in this book.</p>
+<p>Prompt for everything and users learn to click Approve without reading, which is worse than not prompting because now you have the audit trail of consent without any of the reality. Prompt for nothing and the model gets to do anything.</p>
+<p>Meridian’s default policy:</p>
+<pre class="python" data-language="python"><code>class ConsentPolicy:
+    &quot;&quot;&quot;Where the human stays in the loop.
+
+    The default says yes to anything a server marked read-only and asks about
+    everything else. That is a defensible default, and it is also exactly the
+    kind of thing an attacker will try to talk their way past, which is why
+    Chapter 19 argues the annotations must be treated as untrusted unless the
+    server is.
+    &quot;&quot;&quot;</code></pre>
+<p>Four rules I would defend in a design review:</p>
+<p><strong>Auto-approve read-only tools from trusted servers.</strong> Reading is reversible. The word “trusted” is load-bearing, and Chapter <a href="ch19.html#ch:threats">19</a> explains what happens when it is misplaced.</p>
+<p><strong>Show the arguments, not the tool name.</strong> “Call <code>send_email</code>?” is not consent. “Send email to <code>board@example.com</code> with subject <code>Q3 numbers</code>?” is. The dangerous part is always in the arguments.</p>
+<p><strong>Let users grant scoped standing approval.</strong> “Always allow <code>risk.assess_account_risk</code>” is reasonable. “Always allow everything” is a checkbox that ends careers.</p>
+<p><strong>Batch related prompts.</strong> A model fanning out to three read tools should produce one prompt, not three. Three prompts train the click reflex.</p>
+<pre class="python" data-language="python"><code>def test_read_only_hint_is_auto_allowed(self):
+    seen = []
+    host = wire_host(consent=ConsentPolicy(
+        auto_allow_read_only=True,
+        on_ask=lambda name, args: seen.append(name) or True))
+    host.call_tool(&quot;risk.assess_account_risk&quot;, {&quot;accountId&quot;: &quot;ACC-1000&quot;})
+    self.assertEqual(seen, [], &quot;a read-only tool should not have prompted&quot;)</code></pre>
+</section>
+<section id="handling-the-three-interruptions" class="level2">
+<h2>Handling the three interruptions</h2>
+<p>A host loop has to cope with three things that are not “here is your answer”, and none of them should block the others.</p>
+<section id="input_required" class="level3">
+<h3><code>input_required</code></h3>
+<p>The MRTR loop lives in the client, so the host’s involvement is supplying an <code>InputProvider</code>:</p>
+<pre class="python" data-language="python"><code>class InputProvider:
+    &quot;&quot;&quot;How a host answers a server&#39;s questions.
+
+    A real host renders a form and waits for a human. Tests supply canned
+    answers. Both satisfy this interface, which is the point: the MRTR loop
+    below does not care which one it is talking to.
+    &quot;&quot;&quot;
+    def elicit(self, key: str, params: dict) -&gt; dict:
+        return {&quot;action&quot;: &quot;decline&quot;}</code></pre>
+<p>The default declines. That is deliberate: a host that has not been wired up should refuse rather than invent answers on the user’s behalf.</p>
+</section>
+<section id="task-updates" class="level3">
+<h3>Task updates</h3>
+<p>Polling must not block the loop. Poll on a background thread, surface status to the user, and let the model keep working on anything that does not depend on the task.</p>
+</section>
+<section id="subscription-events" class="level3">
+<h3>Subscription events</h3>
+<p>A <code>subscriptions/listen</code> stream delivers notifications whenever the server feels like it, which is to say in the middle of something else. Route them to cache invalidation and carry on:</p>
+<pre class="python" data-language="python"><code>def on_notification(self, msg: dict) -&gt; None:
+    method = msg.get(&quot;method&quot;, &quot;&quot;)
+    if method == &quot;notifications/tools/list_changed&quot;:
+        self.cache.invalidate_method(self.label, &quot;tools/list&quot;)
+    elif method == &quot;notifications/resources/updated&quot;:
+        uri = (msg.get(&quot;params&quot;) or {}).get(&quot;uri&quot;)
+        if uri:
+            self.cache.invalidate_uri(self.label, uri)</code></pre>
+<p>A tools-list change mid-task deserves a thought. Refresh immediately and the model may see the catalogue change between turns, which is confusing but correct. Defer until the task ends and the model may call a tool that no longer exists, which produces a clean error it can recover from. Meridian defers, and I think that is right: catalogue churn mid-task is rarer than task coherence matters.</p>
+</section>
+</section>
+<section id="talking-to-servers-from-both-eras" class="level2">
+<h2>Talking to servers from both eras</h2>
+<p>Chapter <a href="ch02.html#ch:architecture">2</a> covered detection. The client-side rule, once more, because it is the thing people get wrong:</p>
+<pre class="python" data-language="python"><code>def probe_era(self) -&gt; str:
+    &quot;&quot;&quot;Decide whether this server is `modern` or `legacy`, once.&quot;&quot;&quot;
+    try:
+        self.discover()
+        return &quot;modern&quot;
+    except errors.McpError as exc:
+        if exc.code in (errors.UNSUPPORTED_PROTOCOL_VERSION,
+                        errors.MISSING_REQUIRED_CLIENT_CAPABILITY,
+                        errors.HEADER_MISMATCH):
+            return &quot;modern&quot;
+        return &quot;legacy&quot;
+    except Exception:
+        return &quot;legacy&quot;</code></pre>
+<p>A recognised modern error means <em>modern server, fix your request</em>. Anything else means legacy. Cache the verdict per server process or origin, and re-probe only if the cached assumption later fails.</p>
+</section>
+<section id="health-and-degradation" class="level2">
+<h2>Health and degradation</h2>
+<p>Servers go down. A host with four of them and one outage should be a host with three working servers.</p>
+<pre class="python" data-language="python"><code>def stats(self) -&gt; dict:
+    return {
+        &quot;servers&quot;: {
+            label: {
+                &quot;healthy&quot;: b.healthy,
+                &quot;tools&quot;: len(b.tools),
+                &quot;lastError&quot;: b.last_error,
+                **b.client.stats.to_json(),
+            }
+            for label, b in self.bindings.items()
+        },
+        &quot;catalogueTools&quot;: len(self.catalogue()),
+        &quot;catalogueTokens&quot;: self.catalogue_tokens(),
+    }</code></pre>
+<p>Three degradation rules:</p>
+<p><strong>Drop the tools, keep the host.</strong> An unhealthy server contributes nothing to the catalogue. The model never sees tools it cannot call, so it never plans around them.</p>
+<p><strong>Tell the model, not just the log.</strong> If a capability the user asked for is unavailable, that belongs in the context so the model can say so rather than looping.</p>
+<p><strong>Reconnect with backoff and jitter.</strong> A dozen hosts reconnecting to a recovering server on a fixed one-second timer is how a recovering server stops recovering.</p>
+</section>
+<section id="building-a-minimal-host" class="level2">
+<h2>Building a minimal host</h2>
+<p>Meridian’s, in full, is about thirty lines:</p>
+<pre class="python" data-language="python"><code>host = Host(
+    capabilities=ClientCapabilities(
+        elicitation={&quot;form&quot;: {}, &quot;url&quot;: {}},
+        extensions={tasks_ext.EXTENSION_ID: {}},
+    ),
+    consent=ConsentPolicy(auto_allow_read_only=True),
+    tool_token_budget=4000,
+)
+
+host.connect(&quot;risk&quot;, StreamableHttpClient(&quot;http://localhost:8931/mcp&quot;),
+             input_provider=FormPrompt())
+host.connect(&quot;compliance&quot;, StreamableHttpClient(&quot;http://localhost:8932/mcp&quot;),
+             input_provider=FormPrompt())
+host.connect(&quot;fraud&quot;, StreamableHttpClient(&quot;http://localhost:8933/mcp&quot;))
+host.connect(&quot;marketdata&quot;, StreamableHttpClient(&quot;http://localhost:8934/mcp&quot;))
+
+host.discover_all()        # parallel
+host.refresh_catalogue()   # parallel
+
+result = AgentLoop(host, model, max_steps=8,
+                   token_budget=60_000,
+                   cost_budget_usd=0.50).run(&quot;Full review of ACC-1042.&quot;)</code></pre>
+<p>Every argument there is a decision Chapter <a href="ch13.html#ch:agent-loop">13</a> will justify. The important thing is that they are all in one place, visible, and set to a number rather than to infinity.</p>
+</section>
+<section id="instrumenting-from-the-start" class="level2">
+<h2>Instrumenting from the start</h2>
+<p>Retrofitting measurement is miserable, and Chapter <a href="ch16.html#ch:measuring">16</a> depends on these existing.</p>
+<pre class="python" data-language="python"><code>@dataclass
+class CallStats:
+    &quot;&quot;&quot;The counters Chapter 16 turns into a dashboard.&quot;&quot;&quot;
+    requests: int = 0
+    mrtr_rounds: int = 0
+    retries: int = 0
+    errors: int = 0
+    bytes_sent: int = 0
+    bytes_received: int = 0
+    latency_ms: list[float] = field(default_factory=list)</code></pre>
+<p><code>mrtr_rounds</code> deserves special mention. It is the count of extra round trips forced by servers asking questions, and it is the single best early indicator that a tool schema is missing a field. If it climbs, somebody is asking at runtime for something they could have taken as a parameter.</p>
+<p>Trace context propagation is one field, and it is what makes Chapter <a href="ch16.html#ch:measuring">16</a> possible at all:</p>
+<pre class="python" data-language="python"><code>def _envelope(self, method, params=None, *, progress_token=None,
+              traceparent=None):
+    body = dict(params or {})
+    body[&quot;_meta&quot;] = build_request_meta(
+        self.capabilities, self.info,
+        protocol_version=self.protocol_version,
+        progress_token=progress_token,
+        traceparent=traceparent,
+    )
+    return jsonrpc.Request(self.ids.next(), method, body).to_json()</code></pre>
+<p>W3C trace context in <code>_meta</code>, under the reserved <code>traceparent</code> key. One line, and your host-to-server spans join up in whatever tracing backend you already run.</p>
+</section>
+<section id="what-to-remember" class="level2">
+<h2>What to remember</h2>
+<ul>
+<li><p>One client per server. The host owns everything else.</p></li>
+<li><p>Discover and refresh in parallel, and let one dead server stay dead without taking the host with it.</p></li>
+<li><p>Namespace every tool, deterministically, and never change the separator.</p></li>
+<li><p>The host is the context window’s memory allocator. Set a budget, measure it, put it on a dashboard.</p></li>
+<li><p>A denied call is a tool execution error the model can adapt to, not an exception.</p></li>
+<li><p>Audit before executing.</p></li>
+<li><p>Show arguments in consent prompts, allow scoped standing approvals, batch related prompts.</p></li>
+<li><p>The default input provider declines.</p></li>
+<li><p>Probe the era once, cache the verdict, and read the error body rather than the status code.</p></li>
+<li><p>Instrument on day one, including <code>traceparent</code>. <code>mrtr_rounds</code> is your early warning for a missing schema field.</p></li>
+</ul>
+<p>Next: the loop that ties it together, and the budgets that stop it running forever.</p>
+</section>
+</section>
+<div class="pager">
+<a href="ch11.html"><span class="dir">Previous</span>Building Servers</a>
+<a href="ch13.html" style="text-align:right"><span class="dir">Next</span>The Agent Loop, State, and Memory</a>
+</div>
+</main>
+</div>
+<script>
+(function(){
+  var nav = document.querySelector('nav.toc');
+  var btn = document.querySelector('.menu-btn');
+  if(btn && nav){
+    if(window.innerWidth <= 940) nav.classList.add('collapsed');
+    btn.addEventListener('click', function(){ nav.classList.toggle('collapsed'); });
+  }
+  // Wrap tables so wide ones scroll rather than overflowing the page.
+  document.querySelectorAll('main table').forEach(function(t){
+    if(t.parentElement.classList.contains('table-wrap')) return;
+    var w = document.createElement('div');
+    w.className = 'table-wrap';
+    t.parentNode.insertBefore(w, t);
+    w.appendChild(t);
+  });
+})();
+</script>
+</body>
+</html>

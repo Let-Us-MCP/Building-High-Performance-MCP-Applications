@@ -1,0 +1,68 @@
+% Chapter 10. The MCP Apps security contract, drawn as what is blocked.
+\documentclass[tikz,border=6pt]{standalone}
+\input{_style}
+\begin{document}
+\begin{tikzpicture}[x=1cm, y=1cm]
+
+  % --- host -------------------------------------------------------------
+  \draw[draw=accent, line width=1.2pt, rounded corners=4pt,
+        fill=accentsoft, fill opacity=0.28]
+    (-0.8,-1.6) rectangle (10.4,5.2);
+  \node[anchor=north west, font=\sffamily\bfseries\small, text=accent]
+    at (-0.7,5.1) {HOST};
+
+  \node[box, minimum width=24mm, font=\sffamily\scriptsize] (conv)    at (0.9,4.2) {conversation};
+  \node[boxw, minimum width=24mm, font=\sffamily\scriptsize] (model)  at (0.9,3.0) {model};
+  \node[box, minimum width=24mm, font=\sffamily\scriptsize] (cookies) at (0.9,1.8) {cookies, storage};
+
+  % --- the iframe -------------------------------------------------------
+  \draw[draw=warm, line width=1.2pt, densely dashed, rounded corners=4pt,
+        fill=warmsoft, fill opacity=0.5]
+    (6.0,1.1) rectangle (10.0,4.9);
+  \node[anchor=north west, font=\sffamily\bfseries\scriptsize, text=warm]
+    at (6.1,4.8) {SANDBOXED IFRAME};
+  \node[align=center, font=\sffamily\scriptsize] at (8.0,3.5)
+    {\texttt{ui://meridian/}\\\texttt{risk-dashboard}\\[4pt] server-supplied HTML};
+  \node[note, text=warm, align=center] at (8.0,1.8)
+    {default CSP: no network unless\\the server declared origins};
+
+  % --- the barrier ------------------------------------------------------
+  \draw[draw=danger, line width=1.4pt, densely dotted] (4.6,1.15) -- (4.6,4.85);
+  \foreach \y in {4.2, 1.8} {
+    \draw[draw=danger, line width=1.6pt] (4.42,\y-0.16) -- (4.78,\y+0.16);
+    \draw[draw=danger, line width=1.6pt] (4.42,\y+0.16) -- (4.78,\y-0.16);
+  }
+  \node[note, text=danger, align=center] at (4.6,5.05) {no access};
+
+  \node[note, text=danger, anchor=east, align=right] at (4.35,4.62)
+    {cannot read\\the conversation};
+  \node[note, text=danger, anchor=east, align=right] at (4.35,1.55)
+    {cannot read cookies,\\storage, or the parent DOM};
+
+  % --- the only channel -------------------------------------------------
+  \node[boxa, minimum width=34mm, align=center, font=\sffamily\scriptsize]
+    (bridge) at (8.0,-0.7)
+    {\textbf{postMessage bridge}\\JSON-RPC, \texttt{ui/*} methods};
+  \draw[<->, draw=accent, line width=1.2pt] (8.0,1.1) -- (bridge);
+
+  \node[boxa, minimum width=36mm, align=center, font=\sffamily\scriptsize]
+    (policy) at (2.2,-0.7)
+    {host consent + audit\\\emph{the same path as always}};
+  \draw[<->, draw=accent, line width=1.2pt] (bridge) -- (policy);
+
+  \node[boxg, minimum width=24mm, font=\sffamily\scriptsize] (server) at (12.7,-0.7)
+    {MCP server};
+  \draw[<->, draw=accent, line width=1.2pt] (bridge)
+    -- node[tag, above] {tools/call} (server);
+
+  % --- the rule ---------------------------------------------------------
+  \node[boxd, minimum width=150mm, align=left, font=\sffamily\scriptsize]
+    at (6.0,-2.9)
+    {\textbf{The rule that makes the rest work.} A tool call started by a click
+     inside the iframe traverses the host's normal consent and audit path,
+     exactly as if the model had asked for it.\\
+     There is no shortcut for being inside the host. Chapter 19 is about what
+     happens to hosts that grant one.};
+
+\end{tikzpicture}
+\end{document}

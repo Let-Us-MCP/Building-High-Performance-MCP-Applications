@@ -1,0 +1,65 @@
+% Chapter 6. cacheScope is an access-control decision wearing performance clothing.
+\documentclass[tikz,border=6pt]{standalone}
+\input{_style}
+\begin{document}
+\begin{tikzpicture}[x=1cm, y=1cm]
+
+% ---------------------------------------------------------------- public
+\begin{scope}[xshift=0cm]
+  \node[lblink, font=\sffamily\bfseries] at (2.6,3.5) {\texttt{cacheScope: "public"}};
+  \node[note, align=center] at (2.6,3.1) {no user-specific data};
+
+  \node[box, minimum width=15mm, font=\sffamily\scriptsize] (a1) at (0.3,2.0) {Alice};
+  \node[box, minimum width=15mm, font=\sffamily\scriptsize] (b1) at (0.3,1.1) {Bob};
+  \node[box, minimum width=15mm, font=\sffamily\scriptsize] (c1) at (0.3,0.2) {Carol};
+
+  \node[boxa, minimum width=20mm, minimum height=22mm, align=center,
+        font=\sffamily\scriptsize] (gw1) at (2.6,1.1) {shared\\gateway\\cache};
+
+  \node[boxg, minimum width=18mm, font=\sffamily\scriptsize] (s1) at (5.0,1.1) {server};
+
+  \foreach \x in {a1,b1,c1} { \draw[flow] (\x) -- (gw1); }
+  \draw[flow] (gw1) -- node[tag, above, font=\ttfamily\tiny] {1 fetch} (s1);
+
+  \node[note, align=center, text=good] at (2.6,-0.9)
+    {one fetch serves everybody\\\emph{this is where caching pays}};
+  \node[note, align=center, text=muted] at (2.6,-1.9)
+    {reference curves, sector spreads,\\public filings, tool catalogues};
+\end{scope}
+
+% --------------------------------------------------------------- private
+\begin{scope}[xshift=7.8cm]
+  \node[lblink, font=\sffamily\bfseries] at (2.6,3.5) {\texttt{cacheScope: "private"}};
+  \node[note, align=center] at (2.6,3.1) {varies by who is asking};
+
+  \node[box, minimum width=15mm, font=\sffamily\scriptsize] (a2) at (0.3,2.0) {Alice};
+  \node[box, minimum width=15mm, font=\sffamily\scriptsize] (b2) at (0.3,1.1) {Bob};
+  \node[box, minimum width=15mm, font=\sffamily\scriptsize] (c2) at (0.3,0.2) {Carol};
+
+  \node[boxw, minimum width=20mm, minimum height=6mm, font=\sffamily\tiny] (ca) at (2.6,2.0) {Alice's cache};
+  \node[boxw, minimum width=20mm, minimum height=6mm, font=\sffamily\tiny] (cb) at (2.6,1.1) {Bob's cache};
+  \node[boxw, minimum width=20mm, minimum height=6mm, font=\sffamily\tiny] (cc) at (2.6,0.2) {Carol's cache};
+
+  \node[boxg, minimum width=18mm, font=\sffamily\scriptsize] (s2) at (5.0,1.1) {server};
+
+  \draw[flow] (a2) -- (ca); \draw[flow] (b2) -- (cb); \draw[flow] (c2) -- (cc);
+  \draw[flow] (ca) -- (s2); \draw[flow] (cb) -- (s2); \draw[flow] (cc) -- (s2);
+
+  \node[note, align=center, text=warm] at (2.6,-0.9)
+    {one fetch per authorization context\\never shared across them};
+  \node[note, align=center, text=muted] at (2.6,-1.9)
+    {account summaries, transactions,\\anything scoped to a user};
+\end{scope}
+
+% --------------------------------------------------------------- warning
+\node[boxd, minimum width=150mm, align=left, font=\sffamily\scriptsize]
+  at (6.5,-3.4)
+  {\textbf{The failure mode.} Marking a personalised response \texttt{public}
+   does not merely leak it, it invites a shared gateway to serve one user's
+   data to another and call it a cache hit.\\
+   The specification is explicit: a \texttt{public} result may be shared
+   \emph{even when it came from an authenticated endpoint}. Access control is
+   never \texttt{cacheScope}'s job.};
+
+\end{tikzpicture}
+\end{document}

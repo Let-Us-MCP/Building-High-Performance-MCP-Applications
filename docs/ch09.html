@@ -1,0 +1,603 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Extensions and Tasks &middot; Building Awesome MCP Apps</title>
+<meta name="description" content="Extensions and Tasks. What every AI application developer should know about the Model Context Protocol">
+<meta property="og:title" content="Extensions and Tasks">
+<meta property="og:description" content="Extensions and Tasks. What every AI application developer should know about the Model Context Protocol">
+<style>
+:root{
+  --ink:#15181D; --muted:#5B6472; --rule:#D8DDE4; --wash:#F5F6F8;
+  --paper:#FFFFFF; --accent:#0F5C8C; --accent-soft:#E7F0F6;
+  --warm:#B4531A; --warm-soft:#FBF0E7; --good:#2C6E49; --good-soft:#E9F2EC;
+  --danger:#9B2226; --danger-soft:#FAECEC;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#E7EAEE; --muted:#98A2B0; --rule:#2C333D; --wash:#171B21;
+    --paper:#0F1216; --accent:#63AEDC; --accent-soft:#14232E;
+    --warm:#E08B4F; --warm-soft:#2A1D13; --good:#6FBF8E; --good-soft:#13221A;
+    --danger:#E4796F; --danger-soft:#291516;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--serif);font-size:18px;line-height:1.62;
+  -webkit-text-size-adjust:100%}
+.layout{display:grid;grid-template-columns:288px minmax(0,1fr);
+  max-width:1280px;margin:0 auto;gap:0}
+nav.toc{position:sticky;top:0;height:100vh;overflow-y:auto;padding:26px 20px 60px;
+  border-right:1px solid var(--rule);font-family:var(--sans);font-size:14px}
+nav.toc .brand{display:block;font-weight:700;font-size:16px;color:var(--ink);
+  text-decoration:none;line-height:1.3;margin-bottom:4px}
+nav.toc .tagline{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.45}
+nav.toc .part{margin:18px 0 6px;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);font-weight:700}
+nav.toc a{display:block;padding:4px 8px;margin-left:-8px;border-radius:5px;
+  color:var(--muted);text-decoration:none}
+nav.toc a:hover{background:var(--wash);color:var(--ink)}
+nav.toc a.current{background:var(--accent-soft);color:var(--accent);font-weight:600}
+main{padding:44px 52px 120px;min-width:0;max-width:78ch}
+h1,h2,h3,h4{font-family:var(--sans);line-height:1.25;color:var(--ink)}
+h1{font-size:2.05em;margin:0 0 .55em;letter-spacing:-.015em}
+h2{font-size:1.42em;margin:2em 0 .5em;padding-top:.35em}
+h3{font-size:1.14em;margin:1.7em 0 .4em}
+h4{font-size:1em;margin:1.4em 0 .3em;color:var(--muted)}
+p{margin:0 0 1.05em}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.855em;background:var(--wash);
+  padding:.12em .36em;border-radius:4px;word-break:break-word}
+pre{background:var(--wash);border-left:3px solid var(--rule);
+  border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+  font-size:13.5px;line-height:1.5;margin:1.3em 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+pre.json,pre.http{background:var(--accent-soft);border-left-color:var(--accent)}
+aside.box{border-left:3px solid var(--rule);background:var(--wash);
+  padding:14px 18px;margin:1.5em 0;border-radius:0 6px 6px 0;font-size:.955em}
+aside.box .box-title{font-family:var(--sans);font-weight:700;font-size:12px;
+  letter-spacing:.07em;text-transform:uppercase;margin:0 0 .55em}
+aside.box.legacy{border-left-color:var(--warm);background:var(--warm-soft)}
+aside.box.legacy .box-title{color:var(--warm)}
+aside.box.measured{border-left-color:var(--good);background:var(--good-soft)}
+aside.box.measured .box-title{color:var(--good)}
+aside.box.threat{border-left-color:var(--danger);background:var(--danger-soft)}
+aside.box.threat .box-title{color:var(--danger)}
+aside.box.note .box-title{color:var(--muted)}
+aside.keyidea{border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:14px 18px;margin:1.6em 0;border-radius:0 6px 6px 0;
+  font-family:var(--sans);font-style:italic;font-size:.97em}
+aside.keyidea p:last-child,aside.box p:last-child{margin-bottom:0}
+aside.keyidea pre,aside.keyidea code,aside.keyidea table{font-style:normal}
+aside.epigraph{border:0;margin:0 0 2em;padding:0 0 0 clamp(0px,7%,52px);
+  color:var(--muted);font-size:.97em}
+aside.epigraph p{margin:0 0 .3em}
+main figure{margin:2em 0;text-align:center}
+main figure img{max-width:100%;height:auto;border-radius:6px}
+@media (prefers-color-scheme: dark){
+  main figure img{background:#fff;padding:10px;border-radius:8px}
+}
+figcaption{font-family:var(--sans);font-size:13.5px;color:var(--muted);
+  margin-top:.7em;text-align:left;line-height:1.5}
+.table-wrap{overflow-x:auto;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:14.5px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+thead th{border-bottom:2px solid var(--rule);font-weight:700}
+caption{caption-side:bottom;font-size:13.5px;color:var(--muted);
+  text-align:left;padding-top:.7em;line-height:1.5}
+ul,ol{padding-left:1.35em;margin:0 0 1.05em}
+li{margin-bottom:.32em}
+dl{margin:0 0 1.05em}
+dt{font-weight:700;font-family:var(--sans);font-size:.95em;margin-top:.75em}
+dd{margin:.15em 0 0 1.35em}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
+.pager{display:flex;justify-content:space-between;gap:16px;margin-top:4em;
+  padding-top:1.5em;border-top:1px solid var(--rule);font-family:var(--sans);
+  font-size:14px}
+.pager a{text-decoration:none;max-width:46%}
+.pager .dir{display:block;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted)}
+.masthead{border-bottom:1px solid var(--rule);padding-bottom:1.8em;margin-bottom:2.2em}
+.masthead .kicker{font-family:var(--sans);font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);font-weight:700}
+.lede{font-size:1.12em;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:14px;margin:1.8em 0}
+.card{border:1px solid var(--rule);border-radius:9px;padding:15px 17px;
+  font-family:var(--sans);font-size:14px}
+.card h3{margin:0 0 .35em;font-size:15px}
+.card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+.menu-btn{display:none}
+@media (max-width:940px){
+  body{font-size:17px}
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:0;
+    border-bottom:1px solid var(--rule);max-height:none}
+  nav.toc.collapsed .toc-body{display:none}
+  main{padding:28px 20px 90px}
+  .menu-btn{display:inline-block;font-family:var(--sans);font-size:13px;
+    background:var(--wash);border:1px solid var(--rule);color:var(--ink);
+    border-radius:6px;padding:6px 11px;cursor:pointer;margin-bottom:10px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc"><button class="menu-btn" type="button">Contents</button>
+<div class="toc-body">
+<a class="brand" href="index.html">Building Awesome MCP Apps</a>
+<p class="tagline">What every AI application developer should know about the Model Context Protocol</p>
+<a href="preface.html">Preface</a>
+<a href="how-to-read.html">How to read this book</a>
+<div class="part">Part I. Protocol Fundamentals</div>
+<a href="ch01.html">A Primer on Latency, Tokens, and Context</a>
+<a href="ch02.html">The MCP Architectural Model</a>
+<a href="ch03.html">Building Blocks of the Transport</a>
+<a href="ch04.html">Authorization on the Wire</a>
+<div class="part">Part II. The Primitives</div>
+<a href="ch05.html">Tools: The Execution Layer</a>
+<a href="ch06.html">Resources: The Context Layer</a>
+<a href="ch07.html">Prompts: Workflow Blueprints</a>
+<a href="ch08.html">Multi Round-Trip Requests</a>
+<a href="ch09.html" class="current">Extensions and Tasks</a>
+<a href="ch10.html">MCP Apps: Interactive Interfaces</a>
+<div class="part">Part III. Building MCP Applications</div>
+<a href="ch11.html">Building Servers</a>
+<a href="ch12.html">Building Hosts and Clients</a>
+<a href="ch13.html">The Agent Loop, State, and Memory</a>
+<a href="ch14.html">Multi-Agent Topologies</a>
+<div class="part">Part IV. Performance Engineering</div>
+<a href="ch15.html">Testing and Debugging</a>
+<a href="ch16.html">Measuring MCP Applications</a>
+<a href="ch17.html">Optimizing for Latency, Tokens, and Cost</a>
+<a href="ch18.html">Deployment and Operations</a>
+<div class="part">Part V. Security and Trust</div>
+<a href="ch19.html">Threat Modeling Agentic Applications</a>
+<a href="ch20.html">Access Control, Audit, and MCP in the Enterprise</a>
+<div class="part">Back matter</div>
+<a href="epilogue.html">Epilogue: The Evolving Protocol</a>
+<div class="part">Appendices</div>
+<a href="appendix-a.html">A. Method and Message Reference</a>
+<a href="appendix-b.html">B. Transport Decision Matrix</a>
+<a href="appendix-c.html">C. Performance Checklist</a>
+<a href="appendix-d.html">D. Security Hardening Checklist</a>
+<a href="appendix-e.html">E. The Meridian Companion Repository</a>
+<a href="about.html">About the author</a>
+</div></nav>
+<main>
+<section id="ch:tasks" class="level1">
+<h1>Extensions and Tasks</h1>
+<aside class="epigraph">
+<p><em>“I’ll be back.”</em></p>
+<p>The Terminator, <em>The Terminator</em> (1984)</p>
+</aside>
+<p>The whole appeal of that line is the confidence of the deferral. Not “wait here”. Not “I will hold this door open indefinitely”. Just: this is going to take a while, and I will return.</p>
+<p>That is the Tasks extension in one sentence. And Tasks arriving as an extension rather than as core protocol is the other half of this chapter, because the extensions framework is how MCP now grows without breaking.</p>
+<section id="the-extensions-framework" class="level2">
+<h2>The extensions framework</h2>
+<p>The problem every successful protocol hits: a feature that half the ecosystem needs and the other half never will. Put it in core and you burden everyone. Put it nowhere and it gets reinvented five incompatible ways.</p>
+<p>MCP’s answer is negotiated extensions, and the mechanism is deliberately small. Both sides advertise support in a map keyed by identifier:</p>
+<pre class="json" data-language="json"><code>{
+  &quot;capabilities&quot;: {
+    &quot;tools&quot;: {},
+    &quot;extensions&quot;: {
+      &quot;io.modelcontextprotocol/tasks&quot;: {},
+      &quot;io.modelcontextprotocol/ui&quot;: {
+        &quot;mimeTypes&quot;: [&quot;text/html;profile=mcp-app&quot;]
+      }
+    }
+  }
+}</code></pre>
+<p>Clients declare theirs per request, inside <code>io.modelcontextprotocol/clientCapabilities</code>. Servers declare theirs in <code>server/discover</code>. Identifiers follow the <code>_meta</code> key rules, so they carry a mandatory reverse-DNS prefix, and the <code>io.modelcontextprotocol/</code> prefix is reserved for official ones.</p>
+<p>The settings object is the extension’s own business. Empty means “supported, nothing to configure”.</p>
+<section id="the-fallback-rule" class="level3">
+<h3>The fallback rule</h3>
+<p>One line, and it is the important one:</p>
+<aside class="keyidea">
+<p>If one party supports an extension and the other does not, the supporting party must either fall back to core behaviour or reject the request with a clear error. It must never send a shape the other side cannot parse.</p>
+</aside>
+<p>Meridian’s risk server does exactly this. It supports Tasks. It checks whether the caller does, per request, and takes the synchronous path when they do not:</p>
+<pre class="python" data-language="python"><code>def underwrite_loan(ctx: RequestContext):
+    account_id = ctx.arguments[&quot;accountId&quot;]
+    account = ACCOUNTS.get(account_id)
+    if account is None:
+        return tool_error(f&quot;No account {account_id}.&quot;)
+
+    # Only return a task to a client that asked for the extension. To one
+    # that did not, the fast path is the only correct answer.
+    if not ctx.capabilities.supports_extension(tasks_ext.EXTENSION_ID):
+        return _underwrite_now(account, ctx.arguments)
+
+    task = server.tasks.create(status=tasks_ext.WORKING,
+                               status_message=&quot;queued&quot;, poll_interval_ms=200)
+    ...</code></pre>
+<p>Both paths are tested, because “we fall back gracefully” is a claim that rots:</p>
+<pre class="python" data-language="python"><code>def test_client_without_the_extension_gets_the_synchronous_answer(self):
+    server = risk.build_server()
+    tasks_ext.install(server)
+    client = Client(InProcessTransport(server),
+                    capabilities=ClientCapabilities())
+    result = client.call_tool(&quot;underwrite_loan&quot;,
+                              {&quot;accountId&quot;: &quot;ACC-1000&quot;, &quot;amountUsd&quot;: 250_000})
+    self.assertEqual(result[&quot;resultType&quot;], &quot;complete&quot;)
+    self.assertIn(&quot;decision&quot;, result[&quot;structuredContent&quot;])</code></pre>
+</section>
+<section id="why-this-design-is-good" class="level3">
+<h3>Why this design is good</h3>
+<p>Three reasons, and the third is the one that will matter in 2028.</p>
+<p><strong>The core stays small.</strong> Tasks moved <em>out</em> of core in this revision. That is a protocol getting smaller, which almost never happens, and it happened because the extensions framework gave it somewhere to go.</p>
+<p><strong>Extensions version independently.</strong> MCP Apps was finalised <code>2026-01-26</code> while core was on a different cycle. Neither had to wait.</p>
+<p><strong>Vendors get a legitimate path.</strong> Your company can ship <code>com.acme/audit</code> without forking the protocol or squatting on a reserved prefix. If it turns out to be generally useful, the road to standardisation runs through a SEP rather than through a fait accompli.</p>
+</section>
+</section>
+<section id="why-not-just-block" class="level2">
+<h2>Why not just block?</h2>
+<p>Now Tasks proper. And the fair question first: why not hold the connection open?</p>
+<p>Sometimes you should. If the work takes 200 milliseconds, blocking is simpler and cheaper and you should do that. Tasks solve four problems that blocking cannot, and if none of them apply to you, do not use Tasks.</p>
+<dl>
+<dt>Timeouts you do not control</dt>
+<dd>
+<p>Every intermediary between you and the client has an opinion about how long a request may take. Load balancers, proxies, CDNs, and mobile radios all reap idle connections, typically somewhere between 30 and 120 seconds.</p>
+</dd>
+<dt>Crash resilience</dt>
+<dd>
+<p>A task id is durable. Client restarts, laptop lid closes, network changes from wi-fi to cellular, and the same id still resolves. A blocked request survives none of that, and Chapter <a href="ch03.html#ch:transport">3</a> removed stream resumability, so a broken stream loses the whole request.</p>
+</dd>
+<dt>Progress visibility</dt>
+<dd>
+<p>A blocked request is opaque. A task has a status, a message, and a progress fraction.</p>
+</dd>
+<dt>Mid-flight input</dt>
+<dd>
+<p>The killer feature. A task can move to <code>input_required</code>, surface a question, and wait, without anyone holding a connection open or inventing a second channel.</p>
+</dd>
+</dl>
+</section>
+<section id="the-lifecycle" class="level2">
+<h2>The lifecycle</h2>
+<figure id="fig:task-lifecycle">
+<img src="figures/task-lifecycle.svg" />
+<figcaption>Five states, three of them terminal. The two notes at the bottom are the traps, and both of them have bitten somebody.</figcaption>
+</figure>
+<table id="tab:task-states">
+<caption>The bolded row is the trap: a poller that stops when the status is not <code>working</code> will hang forever on a task that is waiting for a human.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Status</strong></td>
+<td style="text-align: left;"><strong>Terminal</strong></td>
+<td style="text-align: left;"><strong>Meaning</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>working</code></td>
+<td style="text-align: left;">no</td>
+<td style="text-align: left;">In progress</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>input_required</code></td>
+<td style="text-align: left;"><strong>no</strong></td>
+<td style="text-align: left;">Needs client input. See <code>inputRequests</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>completed</code></td>
+<td style="text-align: left;">yes</td>
+<td style="text-align: left;"><code>result</code> holds what the call would have returned</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>failed</code></td>
+<td style="text-align: left;">yes</td>
+<td style="text-align: left;"><code>error</code> holds a JSON-RPC error</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>cancelled</code></td>
+<td style="text-align: left;">yes</td>
+<td style="text-align: left;">Cancelled, and cancellation is cooperative</td>
+</tr>
+</tbody>
+</table>
+<section id="creation" class="level3">
+<h3>Creation</h3>
+<p>The server decides, per request, whether to return a task. There is no per-tool flag and no per-request opt-in beyond the client’s capability declaration. That was a deliberate simplification in the redesign: the server knows how long the work will take, and the client should not have to guess.</p>
+<pre class="json" data-language="json"><code>{
+  &quot;jsonrpc&quot;: &quot;2.0&quot;,
+  &quot;id&quot;: 1,
+  &quot;result&quot;: {
+    &quot;resultType&quot;: &quot;task&quot;,
+    &quot;task&quot;: {
+      &quot;taskId&quot;: &quot;tsk_a1b2c3d4e5f6&quot;,
+      &quot;status&quot;: &quot;working&quot;,
+      &quot;statusMessage&quot;: &quot;queued&quot;,
+      &quot;ttlMs&quot;: 3600000,
+      &quot;pollIntervalMs&quot;: 200
+    }
+  }
+}</code></pre>
+<p>One requirement that sounds like an implementation detail and is not: the task must be <strong>durably created before the response is sent</strong>. If the server crashes between sending the id and persisting the task, the client holds a handle to nothing, and it will poll that handle politely until its timeout.</p>
+</section>
+<section id="polling" class="level3">
+<h3>Polling</h3>
+<pre class="json" data-language="json"><code>{ &quot;jsonrpc&quot;: &quot;2.0&quot;, &quot;id&quot;: 2, &quot;method&quot;: &quot;tasks/get&quot;,
+  &quot;params&quot;: { &quot;taskId&quot;: &quot;tsk_a1b2c3d4e5f6&quot; } }</code></pre>
+<p>Two things clients get wrong here, and Meridian’s loop guards both:</p>
+<pre class="python" data-language="python"><code>def poll_until_done(client, task_id, *, timeout=30.0,
+                    on_status=None, input_provider=None):
+    &quot;&quot;&quot;Client-side polling loop, honouring the server&#39;s suggested cadence.
+
+    Two things people get wrong here. First, ignoring `pollIntervalMs` and
+    hammering every 50 ms, which turns one long request into four hundred short
+    ones. Second, forgetting that `input_required` is not terminal: a task that
+    stops to ask a question sits there until somebody answers it.
+    &quot;&quot;&quot;
+    deadline = time.time() + timeout
+    while time.time() &lt; deadline:
+        task = client.call(&quot;tasks/get&quot;, {&quot;taskId&quot;: task_id}, use_cache=False)
+        state = task.get(&quot;task&quot;, task)
+        status = state.get(&quot;status&quot;)
+
+        if status in TERMINAL:
+            if status == FAILED:
+                err = state.get(&quot;error&quot;) or {}
+                raise errors.McpError(err.get(&quot;code&quot;, errors.INTERNAL_ERROR),
+                                      err.get(&quot;message&quot;, &quot;task failed&quot;))
+            return state.get(&quot;result&quot;) or {}
+
+        if status == INPUT_REQUIRED and input_provider is not None:
+            answers = {}
+            for key, req in (state.get(&quot;inputRequests&quot;) or {}).items():
+                if req.get(&quot;method&quot;) == &quot;elicitation/create&quot;:
+                    answers[key] = input_provider.elicit(key,
+                                                         req.get(&quot;params&quot;) or {})
+            client.call(&quot;tasks/update&quot;,
+                        {&quot;taskId&quot;: task_id, &quot;inputResponses&quot;: answers},
+                        use_cache=False)
+
+        interval = max(0.05, state.get(&quot;pollIntervalMs&quot;, 500) / 1000.0)
+        time.sleep(interval)</code></pre>
+<aside class="box measured"><p class="box-title">Measured: Polling cadence, for a 60-second job (arithmetic, not measured)</p>
+<table>
+<tbody>
+<tr>
+<td style="text-align: right;"><strong>Interval</strong></td>
+<td style="text-align: right;"><strong>Polls</strong></td>
+<td style="text-align: right;"><strong>Wasted requests</strong></td>
+<td style="text-align: right;"><strong>Detection lag</strong></td>
+</tr>
+<tr>
+<td style="text-align: right;">50 ms</td>
+<td style="text-align: right;">1<span>,</span>200</td>
+<td style="text-align: right;">1<span>,</span>199</td>
+<td style="text-align: right;">50 ms</td>
+</tr>
+<tr>
+<td style="text-align: right;">500 ms</td>
+<td style="text-align: right;">120</td>
+<td style="text-align: right;">119</td>
+<td style="text-align: right;">500 ms</td>
+</tr>
+<tr>
+<td style="text-align: right;">2 s</td>
+<td style="text-align: right;">30</td>
+<td style="text-align: right;">29</td>
+<td style="text-align: right;">2 s</td>
+</tr>
+<tr>
+<td style="text-align: right;">10 s</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">10 s</td>
+</tr>
+</tbody>
+</table>
+<p>Straight division, included because the shape of the trade is what matters. The server picks <code>pollIntervalMs</code> because only the server knows the expected duration.</p>
+</aside>
+<p>For long jobs, back off. Poll fast for the first few seconds in case the work was quicker than expected, then widen. And add jitter, or a thousand clients that started together will keep polling together forever.</p>
+</section>
+<section id="mid-flight-input" class="level3">
+<h3>Mid-flight input</h3>
+<p>This is where Tasks and MRTR compose, and it is genuinely elegant.</p>
+<p>A task hits a point needing human judgement. It moves to <code>input_required</code> and surfaces the same <code>inputRequests</code> map from Chapter <a href="ch08.html#ch:mrtr">8</a>. The client answers with <code>tasks/update</code> rather than by retrying the original call, because the original call is long since finished.</p>
+<pre class="json" data-language="json"><code>{
+  &quot;jsonrpc&quot;: &quot;2.0&quot;,
+  &quot;id&quot;: 5,
+  &quot;method&quot;: &quot;tasks/update&quot;,
+  &quot;params&quot;: {
+    &quot;taskId&quot;: &quot;tsk_a1b2c3d4e5f6&quot;,
+    &quot;inputResponses&quot;: {
+      &quot;approval&quot;: { &quot;action&quot;: &quot;accept&quot;,
+                    &quot;content&quot;: { &quot;approver&quot;: &quot;j.okonjo&quot; } }
+    }
+  }
+}</code></pre>
+<p>The server acknowledges with an empty result, and one detail is worth copying:</p>
+<pre class="python" data-language="python"><code>@server.method(&quot;tasks/update&quot;)
+def _update(ctx: RequestContext) -&gt; dict:
+    &quot;&quot;&quot;Deliver answers to a task waiting on input.
+
+    Unknown or already-satisfied keys are ignored rather than rejected. A
+    client that retried a `tasks/update` after a timeout should not get an
+    error for being careful.
+    &quot;&quot;&quot;</code></pre>
+<p>Idempotent updates. A client whose <code>tasks/update</code> timed out will retry, and punishing it for that turns a transient network problem into a failed task.</p>
+</section>
+<section id="cancellation-is-a-request-not-a-command" class="level3">
+<h3>Cancellation is a request, not a command</h3>
+<pre class="json" data-language="json"><code>{ &quot;jsonrpc&quot;: &quot;2.0&quot;, &quot;id&quot;: 6, &quot;method&quot;: &quot;tasks/cancel&quot;,
+  &quot;params&quot;: { &quot;taskId&quot;: &quot;tsk_a1b2c3d4e5f6&quot; } }</code></pre>
+<p>The server acknowledges the <em>intent</em>. It is not obliged to stop, and the task may still reach <code>completed</code>. That is not sloppiness: a task that has already charged a card cannot be un-charged by a cancel arriving 200 milliseconds later, and pretending otherwise would be worse.</p>
+<p>Meridian’s test asserts the honest condition:</p>
+<pre class="python" data-language="python"><code>def test_cancel_is_acknowledged(self):
+    ...
+    client.call(&quot;tasks/cancel&quot;, {&quot;taskId&quot;: task_id}, use_cache=False)
+    self.assertIn(store.get(task_id).status,
+                  (tasks_ext.CANCELLED, tasks_ext.COMPLETED))</code></pre>
+<p>Either outcome is correct. A test that demanded <code>CANCELLED</code> would be asserting something the protocol does not promise.</p>
+</section>
+</section>
+<section id="where-tasks-live-and-why-it-matters" class="level2">
+<h2>Where tasks live, and why it matters</h2>
+<p>Here is the part that turns a nice feature into an operational hazard.</p>
+<aside class="box threat"><p class="box-title">Threat: An in-memory task store reinvents sticky sessions</p>
+<p>The client polls with <code>tasks/get</code>. Behind a load balancer, that poll lands on whichever replica the balancer chooses, which is almost certainly not the one that created the task.</p>
+<p>If your task store is a process-local dictionary, the poll returns “unknown task” and the work is lost. The fix is not session affinity. The fix is a shared, durable store, because the whole point of statelessness was to stop needing affinity.</p>
+</aside>
+<p>Meridian is honest about being a book:</p>
+<pre class="python" data-language="python"><code>class TaskStore:
+    &quot;&quot;&quot;Where tasks live between polls.
+
+    In-memory here, which is a lie a book is allowed to tell once. Any real
+    deployment needs this in something durable and shared, because the whole
+    point is that the next poll may land on a different replica. The moment you
+    put tasks in a process-local dict behind a load balancer, you have
+    reinvented sticky sessions, which is the thing this revision deleted.
+    &quot;&quot;&quot;</code></pre>
+<p>Requirements for a real one:</p>
+<ul>
+<li><p><strong>Shared</strong> across replicas. Redis, Postgres, DynamoDB, anything.</p></li>
+<li><p><strong>Durable</strong> enough to survive a deploy. Task ids outlive processes, which is the feature.</p></li>
+<li><p><strong>Expiring.</strong> <code>ttlMs</code> is a promise about how long the id resolves. Sweep afterwards or the store grows forever.</p></li>
+<li><p><strong>Authorized on every access.</strong> A task id is a name, not a capability. Check the caller on <code>tasks/get</code> as well as on creation, or anyone who can guess an id can read somebody’s underwriting decision.</p></li>
+</ul>
+</section>
+<section id="when-not-to-use-tasks" class="level2">
+<h2>When not to use Tasks</h2>
+<p>The chapter’s most useful section, because the failure mode here is enthusiasm.</p>
+<p>Tasks add a polling loop, a durable store, an expiry policy, and a second code path in every client. That is real complexity, and for short work it buys nothing.</p>
+<table id="tab:when-tasks">
+<caption>Thresholds. The 10-to-60-second band is where measurement beats opinion.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Duration</strong></td>
+<td style="text-align: left;"><strong>Use</strong></td>
+<td style="text-align: left;"><strong>Because</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Under 1 s</td>
+<td style="text-align: left;">Synchronous</td>
+<td style="text-align: left;">Polling costs more than the work</td>
+</tr>
+<tr>
+<td style="text-align: left;">1 to 10 s</td>
+<td style="text-align: left;">Synchronous, with progress notifications</td>
+<td style="text-align: left;">The stream is still healthy; the user sees movement</td>
+</tr>
+<tr>
+<td style="text-align: left;">10 to 60 s</td>
+<td style="text-align: left;">Judgement call</td>
+<td style="text-align: left;">Depends on your intermediaries’ patience</td>
+</tr>
+<tr>
+<td style="text-align: left;">Over 60 s</td>
+<td style="text-align: left;">Tasks</td>
+<td style="text-align: left;">Something in the path will reap the connection</td>
+</tr>
+<tr>
+<td style="text-align: left;">Needs a human</td>
+<td style="text-align: left;">Tasks</td>
+<td style="text-align: left;">Humans take minutes, and connections do not</td>
+</tr>
+<tr>
+<td style="text-align: left;">Wraps a job API</td>
+<td style="text-align: left;">Tasks</td>
+<td style="text-align: left;">You already have a job id; map it</td>
+</tr>
+</tbody>
+</table>
+<p>For the middle band, use progress notifications instead. They keep the user informed without any of the machinery:</p>
+<pre class="python" data-language="python"><code>scored, unknown = [], []
+total = len(ids)
+for i, account_id in enumerate(ids):
+    ...
+    if total &gt; 20 and i % 10 == 0:
+        ctx.progress(i, total, f&quot;scored {i} of {total}&quot;)</code></pre>
+<p>Note the guard. Progress on a three-item loop is noise, and each notification is a frame on the wire that somebody has to read.</p>
+<aside class="box note"><p class="box-title">Progress and tasks are different channels</p>
+<p><code>notifications/progress</code> flows on the <em>response stream of the request it belongs to</em>. It never appears on a <code>subscriptions/listen</code> stream, and it stops existing the moment the request finishes.</p>
+<p>Task status is polled, or pushed via <code>notifications/tasks</code> to clients who subscribed. Different lifetime, different channel, and mixing them up produces a client that waits for progress on a request that ended twenty minutes ago.</p>
+</aside>
+</section>
+<section id="meridians-underwriting-task" class="level2">
+<h2>Meridian’s underwriting task</h2>
+<p>Four stages, progress reported at each:</p>
+<pre class="python" data-language="python"><code>task = server.tasks.create(status=tasks_ext.WORKING,
+                           status_message=&quot;queued&quot;, poll_interval_ms=200)
+
+def work(t):
+    stages = [&quot;pulling filings&quot;, &quot;scoring&quot;, &quot;checking covenants&quot;, &quot;pricing&quot;]
+    for i, stage in enumerate(stages, start=1):
+        server.tasks.update(t.task_id, status_message=stage,
+                            progress=i / len(stages))
+        time.sleep(0.05)
+    return _underwrite_now(account, ctx.arguments)
+
+tasks_ext.run_in_background(server.tasks, task, work)
+return tasks_ext.create_task_result(task)</code></pre>
+<p>And the background runner, whose only real job is making sure the task always reaches a terminal state:</p>
+<pre class="python" data-language="python"><code>def runner() -&gt; None:
+    try:
+        result = work(task)
+        if task.status not in TERMINAL:
+            store.update(task.task_id, status=COMPLETED,
+                         result=result if isinstance(result, dict) else {},
+                         status_message=&quot;done&quot;)
+    except errors.McpError as exc:
+        store.update(task.task_id, status=FAILED, error=exc.to_json())
+    except Exception as exc:
+        store.update(task.task_id, status=FAILED,
+                     error=errors.InternalError(str(exc)).to_json())</code></pre>
+<p>The bare <code>except</code> is deliberate. A task that crashes without reaching a terminal state is a client polling forever, and forever is a long time. <code>failed</code> with an explanation is always better than <code>working</code> with a lie.</p>
+<p>Note also the <code>if task.status not in TERMINAL</code> guard. If the work completed after a cancellation was recorded, the cancellation stands. Terminal means terminal.</p>
+</section>
+<section id="vendor-extensions" class="level2">
+<h2>Vendor extensions</h2>
+<p>You can define your own. Two rules and one piece of advice.</p>
+<p><strong>Prefix it properly.</strong> Reverse DNS, and the second label must not be <code>modelcontextprotocol</code> or <code>mcp</code>. <code>com.acme/audit</code> is fine. <code>com.mcp.acme/audit</code> is reserved and using it is squatting.</p>
+<p><strong>Document the fallback.</strong> What should a peer that does not support it do? Answer that in your specification, not in a support ticket.</p>
+<p>And the advice: before you write one, check whether a tool would do. An extension changes the protocol for everyone who implements it. A tool is a tool. The bar for a new extension should be that the capability genuinely cannot be expressed as a tool, resource, or prompt, which is a higher bar than it first appears.</p>
+</section>
+<section id="what-to-remember" class="level2">
+<h2>What to remember</h2>
+<ul>
+<li><p>Extensions are negotiated through capabilities, with mandatory reverse-DNS identifiers.</p></li>
+<li><p>The fallback rule: revert to core behaviour or reject clearly. Never send a shape the peer cannot parse, and test both paths.</p></li>
+<li><p>Tasks moved out of core into <code>io.modelcontextprotocol/tasks</code>. A protocol got smaller.</p></li>
+<li><p>The server decides per request whether to return a task; the client opts in once via capabilities.</p></li>
+<li><p>Create the task durably <em>before</em> answering.</p></li>
+<li><p><code>input_required</code> is not terminal. Poll at the server’s <code>pollIntervalMs</code>, back off, and add jitter.</p></li>
+<li><p><code>tasks/update</code> must be idempotent. Cancellation is cooperative.</p></li>
+<li><p>An in-memory task store behind a load balancer has reinvented sticky sessions. Use a shared, durable, expiring store, and authorize every access.</p></li>
+<li><p>Under a second, stay synchronous. One to ten seconds, stream progress. Over a minute, or human in the loop, use Tasks.</p></li>
+</ul>
+<p>Next: MCP Apps, where a tool result stops being text and starts being an interface.</p>
+</section>
+</section>
+<div class="pager">
+<a href="ch08.html"><span class="dir">Previous</span>Multi Round-Trip Requests</a>
+<a href="ch10.html" style="text-align:right"><span class="dir">Next</span>MCP Apps: Interactive Interfaces</a>
+</div>
+</main>
+</div>
+<script>
+(function(){
+  var nav = document.querySelector('nav.toc');
+  var btn = document.querySelector('.menu-btn');
+  if(btn && nav){
+    if(window.innerWidth <= 940) nav.classList.add('collapsed');
+    btn.addEventListener('click', function(){ nav.classList.toggle('collapsed'); });
+  }
+  // Wrap tables so wide ones scroll rather than overflowing the page.
+  document.querySelectorAll('main table').forEach(function(t){
+    if(t.parentElement.classList.contains('table-wrap')) return;
+    var w = document.createElement('div');
+    w.className = 'table-wrap';
+    t.parentNode.insertBefore(w, t);
+    w.appendChild(t);
+  });
+})();
+</script>
+</body>
+</html>

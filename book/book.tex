@@ -1,0 +1,69 @@
+% ===========================================================================
+% Building Awesome MCP Apps
+% What every AI application developer should know about the Model Context Protocol
+%
+% Pinned to MCP protocol revision 2026-07-28.
+%
+% Build:  make book      (or: latexmk -pdf -outdir=build book.tex)
+% ===========================================================================
+\documentclass[11pt,twoside,openright]{book}
+
+\input{preamble}
+
+\begin{document}
+
+\frontmatter
+\input{frontmatter/titlepage}
+\input{frontmatter/copyright}
+
+\tableofcontents
+
+\input{frontmatter/preface}
+\input{frontmatter/howtoread}
+
+\mainmatter
+
+\part{Protocol Fundamentals}
+\input{chapters/ch01}
+\input{chapters/ch02}
+\input{chapters/ch03}
+\input{chapters/ch04}
+
+\part{The Primitives}
+\input{chapters/ch05}
+\input{chapters/ch06}
+\input{chapters/ch07}
+\input{chapters/ch08}
+\input{chapters/ch09}
+\input{chapters/ch10}
+
+\part{Building MCP Applications}
+\input{chapters/ch11}
+\input{chapters/ch12}
+\input{chapters/ch13}
+\input{chapters/ch14}
+
+\part{Performance Engineering}
+\input{chapters/ch15}
+\input{chapters/ch16}
+\input{chapters/ch17}
+\input{chapters/ch18}
+
+\part{Security and Trust}
+\input{chapters/ch19}
+\input{chapters/ch20}
+
+\input{chapters/epilogue}
+
+\appendix
+\part{Appendices}
+\input{appendices/appA}
+\input{appendices/appB}
+\input{appendices/appC}
+\input{appendices/appD}
+\input{appendices/appE}
+
+\backmatter
+\input{frontmatter/author}
+
+\end{document}

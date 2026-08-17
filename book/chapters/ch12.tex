@@ -1,0 +1,552 @@
+\chapter{Building Hosts and Clients}
+\label{ch:building-hosts}
+
+\epigraph{``I'm the guy doing his job. You must be the other guy.''}{Sean
+Dignam, \emph{The Departed} (2006)}
+
+Dignam's whole character is about who is actually accountable when several
+parties are nominally responsible. Which is the host's problem exactly. The model
+suggests, the server executes, the user watches, and when something goes wrong
+the host is the guy doing his job or the other guy. There is no third option,
+because the host is the only component that can see all of it.
+
+Building a server is mostly craft. Building a host is mostly judgement, and this
+chapter is about the five judgements that matter.
+
+\section{What a host is actually for}
+
+A client is thin: attach \texttt{\_meta}, send, parse, run the MRTR loop. A few
+hundred lines, and Meridian's is one file.
+
+A host is the hard part, and it has five jobs:
+
+\begin{enumerate}[leftmargin=1.6em, itemsep=3pt]
+\item Manage many server connections, with discovery, caching, and reconnection.
+\item Merge their catalogues into one namespace the model can reason about.
+\item Route the model's intents back to the right server.
+\item Enforce a context budget across all of them.
+\item Be the consent, audit, and policy boundary.
+\end{enumerate}
+
+Jobs four and five are the ones that get skipped in a prototype and then never
+retrofitted.
+
+\section{Connecting}
+
+\begin{py}
+def connect(self, label: str, transport, *, input_provider=None,
+            auth_context: str = "anon") -> ServerBinding:
+    client = Client(
+        transport,
+        name=self.name, version=self.version,
+        capabilities=self.capabilities,
+        cache=self.cache,
+        input_provider=input_provider,
+        server_label=label,
+        auth_context=auth_context,
+    )
+    binding = ServerBinding(label=label, client=client,
+                            connected_at=time.time())
+    with self._lock:
+        self.bindings[label] = binding
+    return binding
+\end{py}
+
+One client per server, as the architecture requires. The label is the namespace
+prefix, and it must be stable across restarts because it ends up in
+conversation history and audit logs.
+
+\subsection{Discover in parallel, or pay the sum}
+
+The first mistake almost everybody ships:
+
+\begin{py}
+def discover_all(self, parallel: bool = True) -> dict[str, dict]:
+    """Fetch every server's capabilities.
+
+    In parallel, because these are independent and doing them in sequence
+    is the first unnecessary serialisation most hosts ship with.
+    """
+    def one(binding):
+        try:
+            result = binding.client.discover()
+            binding.capabilities = result.get("capabilities", {})
+            binding.healthy = True
+            return binding.label, result
+        except Exception as exc:
+            binding.healthy = False
+            binding.last_error = f"{type(exc).__name__}: {exc}"
+            return binding.label, {}
+    ...
+\end{py}
+
+Twelve servers at 60\,ms each is 720\,ms serially and 60\,ms in parallel. On a
+desktop application that is the difference between an app that feels ready and
+one that shows a spinner every launch.
+
+Note the exception handling. \textbf{One unreachable server must not prevent the
+other eleven from working.} A host that fails startup because a rarely used
+server is down has coupled everything to everything.
+
+\begin{py}
+def test_discovery_reports_capabilities_per_server(self):
+    discovered = self.host.discover_all()
+    self.assertIn("tools", discovered["risk"]["capabilities"])
+    self.assertIn(tasks_ext.EXTENSION_ID,
+                  discovered["risk"]["capabilities"]["extensions"])
+\end{py}
+
+\subsection{Honour the discovery TTL}
+
+\texttt{server/discover} is cacheable, and Meridian's servers say one hour.
+Re-discovering on every task wastes a round trip per server per task for
+information that changes when somebody deploys.
+
+The shared \texttt{ResultCache} handles it, which means the host gets this for
+free by not doing anything special.
+
+\section{Namespacing, which is not optional}
+
+Tool names are unique \emph{per server}. Two servers each exposing
+\texttt{search} is normal and expected. Flatten them into one catalogue and one
+of them disappears.
+
+\begin{py}
+def catalogue(self) -> list[dict]:
+    """The merged, namespaced, budgeted tool list the model actually sees.
+
+    Namespacing is not optional once you have more than one server. Tool
+    names are unique per server and nothing more, so two servers each
+    offering `search` is normal, expected, and fatal if you flatten them.
+    """
+    out = []
+    with self._lock:
+        for label in sorted(self.bindings):
+            binding = self.bindings[label]
+            for tool in binding.tools:
+                entry = dict(tool)
+                entry["name"] = f"{label}{NAMESPACE_SEPARATOR}{tool['name']}"
+                entry["_server"] = label
+                out.append(entry)
+    ...
+\end{py}
+
+\begin{py}
+def test_namespacing_keeps_collisions_apart(self):
+    """Two servers may each define the same tool name. That is legal."""
+    host = Host()
+    host.connect("alpha", InProcessTransport(make("alpha")))
+    host.connect("beta", InProcessTransport(make("beta")))
+    host.refresh_catalogue()
+
+    names = [t["name"] for t in host.catalogue()]
+    self.assertEqual(sorted(names), ["alpha.search", "beta.search"])
+    self.assertEqual(
+        host.call_tool("alpha.search")["content"][0]["text"], "from alpha")
+    self.assertEqual(
+        host.call_tool("beta.search")["content"][0]["text"], "from beta")
+\end{py}
+
+Note \texttt{sorted(self.bindings)}. Deterministic ordering across servers, for
+the same prompt-cache reason as Chapter~\ref{ch:tools}. A host that iterates a
+dictionary in insertion order will reorder its catalogue whenever a server
+reconnects, and quietly lose every prompt-cache hit.
+
+\begin{notebox}{Choosing a separator}
+Meridian uses \texttt{.}, giving \texttt{risk.assess\_account\_risk}. Tool names
+allow letters, digits, underscore, hyphen, and dot, so any of them works.
+
+Whatever you pick, pick it once. The namespaced name appears in conversation
+history and in audit logs, and changing the separator invalidates both.
+\end{notebox}
+
+\section{The context budget}
+
+Here is the job nobody assigns to anybody, so it does not get done.
+
+\keyidea{The host is the context window's memory allocator. Nothing else can be:
+a server cannot see the other servers, and the model cannot see its own budget.
+If the host does not enforce a limit, there is no limit.}
+
+Connect to eight servers with twenty tools each and your model spends 30,000
+tokens per turn on descriptions before it reads a word of the actual task.
+
+\begin{py}
+def _apply_budget(self, tools: list[dict], budget: int) -> list[dict]:
+    """Drop tools once the catalogue exceeds its token allowance.
+
+    Crude on purpose. The interesting question is not the eviction policy,
+    it is that a budget exists at all: without one, a host wired to eight
+    servers silently spends thirty thousand tokens per turn on descriptions
+    of tools the model will never call.
+    """
+    kept, spent = [], 0
+    for tool in tools:
+        cost = estimate_tokens(
+            f"{tool.get('name','')}{tool.get('description','')}"
+            f"{tool.get('inputSchema','')}")
+        if spent + cost > budget:
+            continue
+        kept.append(tool)
+        spent += cost
+    return kept
+\end{py}
+
+Truncation is the crudest possible policy and I am not defending it. Better ones,
+roughly in order of effort:
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item \textbf{Relevance filtering.} Retrieve the tools plausibly related to the
+current task and send only those. Costs a retrieval step, saves thousands of
+tokens.
+\item \textbf{Tiering.} Always include a small core; include the rest only when
+the task looks like it needs them.
+\item \textbf{Progressive disclosure.} Expose a \texttt{list\_more\_tools} tool.
+The model asks when it needs to.
+\item \textbf{Just delete some.} Genuinely the best option, and the one people
+skip because it requires a conversation with a team.
+\end{itemize}
+
+Whatever you choose, measure it:
+
+\begin{py}
+def catalogue_tokens(self) -> int:
+    return sum(
+        estimate_tokens(f"{t.get('name','')}{t.get('description','')}"
+                        f"{t.get('inputSchema','')}{t.get('outputSchema','')}")
+        for t in self.catalogue())
+\end{py}
+
+\begin{measurebox}{Meridian's merged catalogue}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\thead{Configuration} & \thead{Tools} & \thead{Tokens per turn} \\
+\midrule
+Four servers, task-shaped catalogue & 10 & 1{,}246 \\
+Four servers, REST-mirror catalogue & 38 & 5{,}617 \\
+\bottomrule
+\end{tabular}
+
+\vspace{6pt}
+\footnotesize
+This is the number to put on a dashboard. It moves whenever anybody adds a tool
+anywhere, and nobody notices until it is 12,000.
+\end{measurebox}
+
+\section{Routing}
+
+Split the namespaced name, find the binding, apply consent, call.
+
+\begin{py}
+def call_tool(self, qualified: str, arguments: dict | None = None, **kw) -> dict:
+    """Route one call, after the consent gate."""
+    label, name = self.split_name(qualified)
+    binding = self.bindings.get(label)
+    if binding is None:
+        raise McpError(-32602, f"No server named {label!r}")
+
+    tool = self.find_tool(qualified) or {}
+    decision = self.consent.check(qualified, tool, arguments or {})
+    self.audit.append({
+        "tool": qualified, "decision": decision, "at": time.time(),
+        "arguments": arguments or {},
+    })
+    if decision == ConsentDecision.DENY:
+        return tool_error(f"The user declined the call to {qualified}.")
+
+    return binding.client.call_tool(name, arguments or {}, **kw)
+\end{py}
+
+Two details worth copying.
+
+\textbf{A denial returns a tool execution error, not an exception.} The model
+should learn that the call was refused and adapt, rather than have the loop
+crash. ``The user declined'' is information the model can use.
+
+\textbf{Audit before executing.} The record is written whatever happens next,
+including if the server times out. An audit log that only records successes is
+not an audit log.
+
+\subsection{Parallel fan-out}
+
+\begin{py}
+with concurrent.futures.ThreadPoolExecutor(max_workers=len(calls)) as pool:
+    futures = [pool.submit(self.call_tool, c["name"], c.get("arguments"))
+               for c in calls]
+    results = []
+    for future in futures:
+        try:
+            results.append(future.result())
+        except McpError as exc:
+            results.append(tool_error(f"{exc.message}"))
+    return results
+\end{py}
+
+Iterating futures in submission order preserves result ordering regardless of
+completion order, and catching per-future means one failure produces one error
+result rather than discarding two successful calls you already paid for.
+
+\section{Consent that people do not rage-click}
+
+The hardest UX problem in this book.
+
+Prompt for everything and users learn to click Approve without reading, which is
+worse than not prompting because now you have the audit trail of consent without
+any of the reality. Prompt for nothing and the model gets to do anything.
+
+Meridian's default policy:
+
+\begin{py}
+class ConsentPolicy:
+    """Where the human stays in the loop.
+
+    The default says yes to anything a server marked read-only and asks about
+    everything else. That is a defensible default, and it is also exactly the
+    kind of thing an attacker will try to talk their way past, which is why
+    Chapter 19 argues the annotations must be treated as untrusted unless the
+    server is.
+    """
+\end{py}
+
+Four rules I would defend in a design review:
+
+\textbf{Auto-approve read-only tools from trusted servers.} Reading is
+reversible. The word ``trusted'' is load-bearing, and Chapter~\ref{ch:threats}
+explains what happens when it is misplaced.
+
+\textbf{Show the arguments, not the tool name.} ``Call \texttt{send\_email}?'' is
+not consent. ``Send email to \texttt{board@example.com} with subject
+\texttt{Q3 numbers}?'' is. The dangerous part is always in the arguments.
+
+\textbf{Let users grant scoped standing approval.} ``Always allow
+\texttt{risk.assess\_account\_risk}'' is reasonable. ``Always allow everything''
+is a checkbox that ends careers.
+
+\textbf{Batch related prompts.} A model fanning out to three read tools should
+produce one prompt, not three. Three prompts train the click reflex.
+
+\begin{py}
+def test_read_only_hint_is_auto_allowed(self):
+    seen = []
+    host = wire_host(consent=ConsentPolicy(
+        auto_allow_read_only=True,
+        on_ask=lambda name, args: seen.append(name) or True))
+    host.call_tool("risk.assess_account_risk", {"accountId": "ACC-1000"})
+    self.assertEqual(seen, [], "a read-only tool should not have prompted")
+\end{py}
+
+\section{Handling the three interruptions}
+
+A host loop has to cope with three things that are not ``here is your answer'',
+and none of them should block the others.
+
+\subsection{\texttt{input\_required}}
+
+The MRTR loop lives in the client, so the host's involvement is supplying an
+\texttt{InputProvider}:
+
+\begin{py}
+class InputProvider:
+    """How a host answers a server's questions.
+
+    A real host renders a form and waits for a human. Tests supply canned
+    answers. Both satisfy this interface, which is the point: the MRTR loop
+    below does not care which one it is talking to.
+    """
+    def elicit(self, key: str, params: dict) -> dict:
+        return {"action": "decline"}
+\end{py}
+
+The default declines. That is deliberate: a host that has not been wired up
+should refuse rather than invent answers on the user's behalf.
+
+\subsection{Task updates}
+
+Polling must not block the loop. Poll on a background thread, surface status to
+the user, and let the model keep working on anything that does not depend on the
+task.
+
+\subsection{Subscription events}
+
+A \texttt{subscriptions/listen} stream delivers notifications whenever the server
+feels like it, which is to say in the middle of something else. Route them to
+cache invalidation and carry on:
+
+\begin{py}
+def on_notification(self, msg: dict) -> None:
+    method = msg.get("method", "")
+    if method == "notifications/tools/list_changed":
+        self.cache.invalidate_method(self.label, "tools/list")
+    elif method == "notifications/resources/updated":
+        uri = (msg.get("params") or {}).get("uri")
+        if uri:
+            self.cache.invalidate_uri(self.label, uri)
+\end{py}
+
+A tools-list change mid-task deserves a thought. Refresh immediately and the
+model may see the catalogue change between turns, which is confusing but
+correct. Defer until the task ends and the model may call a tool that no longer
+exists, which produces a clean error it can recover from. Meridian defers, and I
+think that is right: catalogue churn mid-task is rarer than task coherence
+matters.
+
+\section{Talking to servers from both eras}
+
+Chapter~\ref{ch:architecture} covered detection. The client-side rule, once more,
+because it is the thing people get wrong:
+
+\begin{py}
+def probe_era(self) -> str:
+    """Decide whether this server is `modern` or `legacy`, once."""
+    try:
+        self.discover()
+        return "modern"
+    except errors.McpError as exc:
+        if exc.code in (errors.UNSUPPORTED_PROTOCOL_VERSION,
+                        errors.MISSING_REQUIRED_CLIENT_CAPABILITY,
+                        errors.HEADER_MISMATCH):
+            return "modern"
+        return "legacy"
+    except Exception:
+        return "legacy"
+\end{py}
+
+A recognised modern error means \emph{modern server, fix your request}. Anything
+else means legacy. Cache the verdict per server process or origin, and re-probe
+only if the cached assumption later fails.
+
+\section{Health and degradation}
+
+Servers go down. A host with four of them and one outage should be a host with
+three working servers.
+
+\begin{py}
+def stats(self) -> dict:
+    return {
+        "servers": {
+            label: {
+                "healthy": b.healthy,
+                "tools": len(b.tools),
+                "lastError": b.last_error,
+                **b.client.stats.to_json(),
+            }
+            for label, b in self.bindings.items()
+        },
+        "catalogueTools": len(self.catalogue()),
+        "catalogueTokens": self.catalogue_tokens(),
+    }
+\end{py}
+
+Three degradation rules:
+
+\textbf{Drop the tools, keep the host.} An unhealthy server contributes nothing
+to the catalogue. The model never sees tools it cannot call, so it never plans
+around them.
+
+\textbf{Tell the model, not just the log.} If a capability the user asked for is
+unavailable, that belongs in the context so the model can say so rather than
+looping.
+
+\textbf{Reconnect with backoff and jitter.} A dozen hosts reconnecting to a
+recovering server on a fixed one-second timer is how a recovering server stops
+recovering.
+
+\section{Building a minimal host}
+
+Meridian's, in full, is about thirty lines:
+
+\begin{py}
+host = Host(
+    capabilities=ClientCapabilities(
+        elicitation={"form": {}, "url": {}},
+        extensions={tasks_ext.EXTENSION_ID: {}},
+    ),
+    consent=ConsentPolicy(auto_allow_read_only=True),
+    tool_token_budget=4000,
+)
+
+host.connect("risk", StreamableHttpClient("http://localhost:8931/mcp"),
+             input_provider=FormPrompt())
+host.connect("compliance", StreamableHttpClient("http://localhost:8932/mcp"),
+             input_provider=FormPrompt())
+host.connect("fraud", StreamableHttpClient("http://localhost:8933/mcp"))
+host.connect("marketdata", StreamableHttpClient("http://localhost:8934/mcp"))
+
+host.discover_all()        # parallel
+host.refresh_catalogue()   # parallel
+
+result = AgentLoop(host, model, max_steps=8,
+                   token_budget=60_000,
+                   cost_budget_usd=0.50).run("Full review of ACC-1042.")
+\end{py}
+
+Every argument there is a decision Chapter~\ref{ch:agent-loop} will justify. The
+important thing is that they are all in one place, visible, and set to a number
+rather than to infinity.
+
+\section{Instrumenting from the start}
+
+Retrofitting measurement is miserable, and Chapter~\ref{ch:measuring} depends on
+these existing.
+
+\begin{py}
+@dataclass
+class CallStats:
+    """The counters Chapter 16 turns into a dashboard."""
+    requests: int = 0
+    mrtr_rounds: int = 0
+    retries: int = 0
+    errors: int = 0
+    bytes_sent: int = 0
+    bytes_received: int = 0
+    latency_ms: list[float] = field(default_factory=list)
+\end{py}
+
+\texttt{mrtr\_rounds} deserves special mention. It is the count of extra round
+trips forced by servers asking questions, and it is the single best early
+indicator that a tool schema is missing a field. If it climbs, somebody is
+asking at runtime for something they could have taken as a parameter.
+
+Trace context propagation is one field, and it is what makes
+Chapter~\ref{ch:measuring} possible at all:
+
+\begin{py}
+def _envelope(self, method, params=None, *, progress_token=None,
+              traceparent=None):
+    body = dict(params or {})
+    body["_meta"] = build_request_meta(
+        self.capabilities, self.info,
+        protocol_version=self.protocol_version,
+        progress_token=progress_token,
+        traceparent=traceparent,
+    )
+    return jsonrpc.Request(self.ids.next(), method, body).to_json()
+\end{py}
+
+W3C trace context in \texttt{\_meta}, under the reserved
+\texttt{traceparent} key. One line, and your host-to-server spans join up in
+whatever tracing backend you already run.
+
+\section{What to remember}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item One client per server. The host owns everything else.
+\item Discover and refresh in parallel, and let one dead server stay dead
+without taking the host with it.
+\item Namespace every tool, deterministically, and never change the separator.
+\item The host is the context window's memory allocator. Set a budget, measure
+it, put it on a dashboard.
+\item A denied call is a tool execution error the model can adapt to, not an
+exception.
+\item Audit before executing.
+\item Show arguments in consent prompts, allow scoped standing approvals, batch
+related prompts.
+\item The default input provider declines.
+\item Probe the era once, cache the verdict, and read the error body rather than
+the status code.
+\item Instrument on day one, including \texttt{traceparent}. \texttt{mrtr\_rounds}
+is your early warning for a missing schema field.
+\end{itemize}
+
+Next: the loop that ties it together, and the budgets that stop it running
+forever.

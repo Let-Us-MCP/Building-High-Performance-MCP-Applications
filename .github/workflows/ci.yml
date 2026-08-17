@@ -1,0 +1,66 @@
+name: CI
+
+# The book's claim is that the code runs and the numbers are reproducible.
+# This workflow is what keeps that claim true. It deliberately does not build
+# the PDF: TeX in CI is slow and brittle, and a broken build shows up locally
+# on the next `make book` anyway.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Tests and benchmarks
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Run the test suite
+        # No dependencies to install. That is the point.
+        run: python3 -m unittest discover -s meridian/tests -t . -v
+
+      - name: Run the benchmarks
+        # Not asserted on: timings vary too much on shared runners. This proves
+        # the harness still runs, which is what regresses in practice.
+        run: python3 -m meridian.bench.run --json /tmp/bench.json
+
+      - name: Check the servers start and answer
+        run: |
+          printf '%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}' \
+            | python3 -m meridian.serve risk \
+            | python3 -c "import json,sys; r=json.load(sys.stdin)['result']; assert '2026-07-28' in r['supportedVersions'], r; print('discover OK:', r['_meta']['io.modelcontextprotocol/serverInfo'])"
+
+  prose:
+    name: Prose and cross-references
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Prose rules
+        # No em dashes, no slop, no repetition, no characters T1 cannot set.
+        run: python3 tools/lint_prose.py
+
+      - name: Cross-reference integrity
+        run: python3 tools/check_refs.py
+
+      - name: Printed numbers match the committed benchmark run
+        run: python3 tools/check_numbers.py
+
+      - name: Site links
+        # docs/ is committed, so this checks what readers actually get.
+        run: python3 tools/check_site.py

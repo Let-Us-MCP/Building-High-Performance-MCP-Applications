@@ -1,0 +1,509 @@
+\chapter{Authorization on the Wire}
+\label{ch:authorization}
+
+\epigraph{``You shall not pass!''}{Gandalf, \emph{The Fellowship of the Ring}
+(2001)}
+
+Gandalf's line is the most famous authorization decision in cinema, and it is
+worth noticing what it actually was. He did not check a credential. He asserted
+a boundary, at a chokepoint, against something that had every intention of
+walking straight through. That is the job. The credential is just the paperwork.
+
+This is a security chapter with a performance chapter hiding inside it, which is
+the same structure \emph{High Performance Browser Networking} used for TLS, and
+for the same reason. Auth is not a policy you configure once. It is a sequence
+of network round trips that happen before your application does any work at all,
+and if you do not amortise them you will pay for them forever.
+
+\section{The shape of it}
+
+MCP does not invent an auth scheme. It profiles OAuth 2.1 and a stack of RFCs
+around it, taking a deliberately small subset. The roles map cleanly:
+
+\begin{description}[leftmargin=1.4em, style=nextline, itemsep=3pt]
+\item[The MCP server is an OAuth resource server.] It accepts access tokens and
+validates them. It does not issue them.
+\item[The MCP client is an OAuth client.] It obtains tokens on behalf of a user.
+\item[The authorization server is somebody else's problem.] Entra ID, Okta,
+Keycloak, or your own. MCP specifies how a client \emph{finds} it, not how it
+works.
+\end{description}
+
+Two scoping rules before we go further.
+
+Authorization is \textbf{optional}. Plenty of MCP servers need none.
+
+Authorization is \textbf{for HTTP}. On stdio the specification says explicitly
+that you should \emph{not} do this, and should take credentials from the
+environment instead. The client launched the process; it can hand it an API key
+through the environment block. Running an OAuth flow against your own subprocess
+is theatre.
+
+\begin{py}
+{
+  "mcpServers": {
+    "meridian-risk": {
+      "command": "python3",
+      "args": ["-m", "meridian.serve", "risk"],
+      "env": { "MERIDIAN_API_KEY": "..." }
+    }
+  }
+}
+\end{py}
+
+\section{The full flow, and its price tag}
+
+\bookfig[1.0]{oauth-flow}{OAuth 2.1 as MCP profiles it. Count the round trips on
+the left. Every one of them happens before your server does a single unit of
+useful work.}{oauth-flow}
+
+Walking it:
+
+\textbf{1. The challenge.} The client makes an unauthenticated request. The
+server answers 401 with a \texttt{WWW-Authenticate} header that points at its
+metadata and, ideally, names the scopes needed:
+
+\begin{http}
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer resource_metadata="https://mcp.meridian.example/.well-known/oauth-protected-resource",
+                         scope="risk:read"
+\end{http}
+
+That \texttt{scope} parameter is a courtesy with real value. Without it the
+client falls back to requesting everything in \texttt{scopes\_supported}, which
+means the user sees a consent screen asking for more than the operation needs,
+which means the user learns to click through consent screens.
+
+\textbf{2. Protected resource metadata.} Required, by RFC 9728. The client
+fetches it and learns which authorization servers this resource trusts.
+
+\textbf{3. Authorization server metadata.} The client tries OAuth 2.0
+Authorization Server Metadata and OpenID Connect Discovery in priority order.
+Clients must support both, because the ecosystem is split and will stay split.
+
+\textbf{4. Authorization.} PKCE, always. The \texttt{resource} parameter,
+always. Browser, consent, redirect with a code.
+
+\textbf{5. Token exchange.} Code plus verifier plus resource, in exchange for an
+access token.
+
+Then, finally, the original request runs.
+
+\begin{measurebox}{What the handshake costs (modelled)}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\thead{Step} & \thead{Round trips} & \thead{Typical} \\
+\midrule
+401 challenge                        & 1 & 40\,ms \\
+Protected resource metadata          & 1 & 40\,ms \\
+Authorization server metadata        & 1 & 60\,ms \\
+Authorization (includes a human)     & 1 & seconds \\
+Token exchange                       & 1 & 80\,ms \\
+\midrule
+\textbf{Machine time before first work} & \textbf{4} & \textbf{\textasciitilde{}220\,ms} \\
+\bottomrule
+\end{tabular}
+
+\vspace{6pt}
+\footnotesize
+Modelled at 40\,ms per hop, not measured; Meridian's benchmark auth is local and
+would flatter these badly. The number that matters is the round-trip count,
+which is exact.
+\end{measurebox}
+
+Four machine round trips, plus a human. If you pay that per request you have
+built something unusable. If you pay it once per session and cache aggressively,
+it disappears. That is the entire performance content of this chapter, and it is
+worth stating as a rule:
+
+\keyidea{Steps 1 through 3 are properties of the server, not of the request.
+Cache them per origin, for hours. The token is a property of the user and the
+scope set. Cache it until it expires, and refresh it before it does, not after.}
+
+\section{Client identity in 2026}
+
+Here is the part that changed, and it changed for a good reason.
+
+MCP's awkward case is a client and a server with no prior relationship. A user
+installs some MCP client, points it at some MCP server, and expects it to work.
+There is no administrator to pre-register an OAuth client.
+
+The 2025 answer was Dynamic Client Registration: the client POSTs to a
+registration endpoint and gets credentials. It works, and it has a nasty
+property. Every client instance registers separately, so an authorization server
+accumulates registrations forever, most of them belonging to a laptop that was
+reimaged eight months ago. It is a write endpoint open to the internet that
+grows without bound.
+
+\subsection{Client ID Metadata Documents}
+\label{sec:client-identity}
+
+The replacement is neat. The client id \emph{is} an HTTPS URL, and that URL
+serves the client's metadata:
+
+\begin{wire}
+{
+  "client_id": "https://app.example.com/oauth/client-metadata.json",
+  "client_name": "Example MCP Client",
+  "client_uri": "https://app.example.com",
+  "logo_uri": "https://app.example.com/logo.png",
+  "redirect_uris": [
+    "http://127.0.0.1:3000/callback",
+    "http://localhost:3000/callback"
+  ],
+  "grant_types": ["authorization_code"],
+  "response_types": ["code"],
+  "token_endpoint_auth_method": "none"
+}
+\end{wire}
+
+The authorization server sees a URL-shaped \texttt{client\_id}, fetches it,
+validates that the document's \texttt{client\_id} matches the URL exactly,
+checks the \texttt{redirect\_uri} against the list, and proceeds.
+
+What this buys:
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item \textbf{No registration round trip.} The zero-numbered step in
+\figref{oauth-flow} happens on the authorization server's own time, and it is
+cacheable under ordinary HTTP cache headers.
+\item \textbf{No unbounded registration table.} One document serves every
+instance of the client.
+\item \textbf{Portability.} The same client id works at every authorization
+server, because it resolves on demand. Credentials from DCR are bound to the
+issuer that minted them and must be re-registered when it changes.
+\end{itemize}
+
+Servers advertise support with one metadata field:
+
+\begin{wire}
+{ "client_id_metadata_document_supported": true }
+\end{wire}
+
+The client's selection order, when it supports everything:
+
+\begin{enumerate}[leftmargin=1.6em, itemsep=2pt]
+\item Pre-registered credentials, if it has them for this server
+\item Client ID Metadata Documents, if the AS advertises support
+\item Dynamic Client Registration, if the AS has a \texttt{registration\_endpoint}
+\item Ask the user to paste a client id
+\end{enumerate}
+
+\begin{legacybox}{Dynamic Client Registration (RFC 7591)}
+Deprecated as of \texttt{2026-07-28}, eligible for removal no earlier than
+2027-07-28. Retained because plenty of 2025-era authorization servers speak
+nothing else.
+
+If you must use it, specify \texttt{application\_type} explicitly. Omitting it
+defaults to \texttt{"web"} under OpenID Connect, which rejects the
+\texttt{localhost} redirect URIs that desktop and CLI clients need. Use
+\texttt{"native"} for anything local. This is a genuinely common failure and the
+error message is never helpful.
+
+Also: key persisted credentials by the authorization server's \texttt{issuer}.
+Reusing a client id across authorization servers is a specification violation,
+and it fails in confusing ways rather than clean ones.
+\end{legacybox}
+
+\section{Two validations that stop real attacks}
+
+Most of OAuth's complexity is scar tissue. Two pieces of it are worth
+understanding rather than merely implementing.
+
+\subsection{Audience binding, or: do not be a confused deputy}
+
+RFC 8707. The client must send a \texttt{resource} parameter naming the server
+the token is for, on both the authorization request and the token request:
+
+\begin{plain}
+&resource=https%3A%2F%2Fmcp.meridian.example
+\end{plain}
+
+The server must then validate that tokens presented to it were issued for it.
+
+\begin{dangerbox}{The confused deputy}
+Without audience binding: a user authorizes a malicious MCP server. That server
+receives a token. It presents the same token to your server. If your server
+checks only that the token is valid and signed by an issuer it trusts, it now
+acts on the user's behalf at the attacker's direction.
+
+The token was real. The user did consent. They simply consented to something
+else.
+\end{dangerbox}
+
+Three rules follow, and the specification states all three as MUST:
+
+\begin{itemize}[leftmargin=1.6em, itemsep=2pt]
+\item Clients must not send a token to any server other than the one its
+authorization server issued it for.
+\item Servers must accept only tokens valid for their own resources.
+\item Servers must not accept or forward any other token.
+\end{itemize}
+
+That third one forbids token passthrough, and it is worth being blunt: an MCP
+server that takes the client's token and replays it at a third-party API is
+doing the forbidden thing. Chapter~\ref{ch:mrtr} covers the correct pattern,
+which is URL-mode elicitation, and Chapter~\ref{ch:access-control} covers why
+the shortcut is so tempting.
+
+\subsection{Issuer validation, RFC 9207}
+
+New in this revision, and small enough to skip by accident.
+
+Before redirecting the user, the client records the \texttt{issuer} from the
+authorization server's validated metadata. When the authorization code comes
+back, the response should carry an \texttt{iss} parameter, and the client must
+compare it before redeeming the code.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}llX@{}}
+\toprule
+\thead{AS advertises \texttt{iss}} & \thead{\texttt{iss} present} & \thead{Client action} \\
+\midrule
+true  & yes & Compare, by simple string comparison \\
+true  & no  & \textbf{Reject the response} \\
+false & yes & Compare anyway \\
+false & no  & Proceed \\
+\bottomrule
+\end{tabularx}
+\caption{RFC 9207 validation. Row two is the one that exists specifically to
+stop mix-up attacks.}
+\label{tab:iss-validation}
+\end{table}
+
+Two details people get wrong.
+
+\textbf{Simple string comparison.} After URL-decoding, do not normalise. No case
+folding on scheme or host, no default-port elision, no trailing-slash
+adjustment, no percent-encoding normalisation. Normalising creates equivalence
+classes, and equivalence classes are where attackers live.
+
+\textbf{It applies to error responses too.} If \texttt{iss} does not match, do
+not display \texttt{error\_description}. That string is attacker-controlled and
+you were about to render it in your UI.
+
+\section{Scopes without making the user hate you}
+
+Scope design is where auth stops being mechanics and starts being product
+design.
+
+The principle is least privilege, and the mechanism is step-up: request the
+minimum, and ask for more when an operation actually needs it. When a call needs
+a scope the token lacks:
+
+\begin{http}
+HTTP/1.1 403 Forbidden
+WWW-Authenticate: Bearer error="insufficient_scope",
+                         scope="risk:write",
+                         resource_metadata="https://mcp.meridian.example/.well-known/oauth-protected-resource",
+                         error_description="Writing a risk override requires risk:write"
+\end{http}
+
+Note 403 rather than 401. A 401 means ``I do not know who you are''; a 403 means
+``I know exactly who you are and you may not do that''. Clients branch on this,
+so getting it wrong sends them into a re-authentication loop that cannot succeed.
+
+Two rules for servers, both about not being annoying:
+
+\textbf{Challenge with everything the operation needs, at once.} Returning one
+missing scope, then another on the retry, forces a separate consent round trip
+per scope. Determine the full set, then emit it together.
+
+\textbf{Be consistent.} Whatever strategy you pick for constructing scope sets,
+apply it uniformly. Clients cache and predict; a server that varies its
+challenges defeats both.
+
+And one rule for clients, which is the one that gets forgotten:
+
+\keyidea{On a step-up, request the \emph{union} of what you already had and what
+was just challenged. Requesting only the new scope silently drops the old ones,
+and the next operation fails in a way that looks like a server bug.}
+
+\section{Failure mid-loop}
+
+Now the operationally interesting part, which the specifications do not really
+address because it is an application concern.
+
+An agent loop runs for a while. Tokens expire. What happens when step 7 of a
+12-step task gets a 401?
+
+The wrong answer is to fail the task. The user's work is half done, the model
+holds context that took real money to build, and throwing it away to re-run an
+OAuth flow from scratch is the worst of both worlds.
+
+The right answer treats re-auth as a recoverable interruption:
+
+\begin{py}
+def call_with_reauth(self, name, arguments, *, max_attempts=2):
+    """Refresh once, retry once, then stop.
+
+    The retry limit matters. A server that returns 401 for a reason the
+    client cannot fix (a revoked grant, a disabled account) will do so
+    forever, and an unbounded retry turns that into an outage plus a
+    denial-of-service against your own authorization server.
+    """
+    for attempt in range(max_attempts):
+        try:
+            return self.call_tool(name, arguments)
+        except Unauthorized:
+            if attempt + 1 == max_attempts:
+                raise
+            if not self.refresh_token():
+                raise            # refresh failed; a human is needed
+    raise Unauthorized("re-authentication did not help")
+\end{py}
+
+Better still, do not get there. Refresh proactively when a token is within some
+margin of expiry, so the refresh happens between loop iterations rather than
+inside one.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+\thead{Situation} & \thead{What the host should do} \\
+\midrule
+Access token expired, refresh token valid
+  & Refresh silently. The user sees nothing. \\
+Refresh token expired or revoked
+  & Pause the loop, keep the context, prompt for re-auth, resume. \\
+Insufficient scope (403)
+  & Step up with the union of scopes, then retry the one operation. \\
+Grant revoked entirely
+  & Fail cleanly and say so. Do not retry; you are attacking your own AS. \\
+\bottomrule
+\end{tabularx}
+\caption{Auth failure modes and their handling. Only the last one should ever
+lose the task.}
+\label{tab:auth-failures}
+\end{table}
+
+\section{Enterprise identity providers}
+
+Brief, practical, and mostly reassurance.
+
+You almost certainly do not need to write an authorization server. Entra ID,
+Okta, Keycloak, and Auth0 are all OAuth 2.1 capable. The MCP-specific
+requirements are narrow:
+
+\begin{enumerate}[leftmargin=1.6em, itemsep=3pt]
+\item \textbf{Your MCP server publishes protected resource metadata} at
+\texttt{/.well-known/\allowbreak oauth-protected-\allowbreak resource}. This is
+a static JSON document. It is the only piece of OAuth infrastructure you are
+obliged to build.
+\item \textbf{Your IdP supports RFC 8707 resource indicators.} Most do now. If
+yours does not, audience binding has to be enforced by convention, which is
+weaker and worth pushing back on.
+\item \textbf{Your IdP supports CIMD, or you fall back to DCR or
+pre-registration.} All three are legitimate; the priority order is in
+\secref{client-identity}.
+\end{enumerate}
+
+What you should not do is fork your MCP server per identity provider. The
+provider is a URL in a metadata document. If provider-specific code is leaking
+into your request handlers, something has gone wrong upstream of the handlers.
+
+\section{Auth in Meridian}
+
+Meridian's HTTP transport takes an authenticator callable, so the protocol layer
+never learns what a token is:
+
+\begin{py}
+def _handle_post(self, h) -> None:
+    ...
+    auth = None
+    if self.authenticator is not None:
+        auth = self.authenticator(h.headers.get("Authorization"))
+        if auth is None:
+            h.send_response(401)
+            h.send_header(
+                "WWW-Authenticate",
+                'Bearer resource_metadata='
+                f'"http://{self.host}:{self.port}'
+                '/.well-known/oauth-protected-resource"')
+            h.send_header("Content-Length", "0")
+            h.end_headers()
+            return
+\end{py}
+
+The resulting claims land on the request context, and from there they reach the
+two places that need them:
+
+\textbf{Filtering the catalogue.} The specification is precise here, and the
+precision matters. A server's tool list must not vary per \emph{connection}, but
+it may vary by the \emph{authorization presented on the request}. Those sound
+similar and are completely different: credentials are per-request input, so
+filtering on them is stateless, whereas filtering on connection identity is not.
+
+\begin{py}
+def visible_tools(self, ctx: RequestContext) -> list[Tool]:
+    """Override to filter by scope. The set may vary by authorization,
+    never by connection."""
+    return sorted(self._tools.values(), key=lambda t: t.name)
+\end{py}
+
+\textbf{Binding MRTR state to a principal.} This is the one that stops a real
+attack. Meridian seals its \texttt{requestState} with the authenticated subject
+inside, and rejects state presented by anybody else:
+
+\begin{py}
+return input_required(
+    input_requests={"approval": elicit_form(...)},
+    request_state=SEALER.seal(
+        {"accountId": account_id, "exposureUsd": exposure},
+        principal=(ctx.auth or {}).get("sub"),
+        method=ctx.method,
+        params=ctx.params,
+    ),
+)
+\end{py}
+
+Without the principal binding, Bob could replay Alice's half-completed
+high-value approval and inherit it. Chapter~\ref{ch:mrtr} covers the sealing
+scheme in full, and Meridian tests each binding separately:
+
+\begin{py}
+def test_principal_binding_blocks_cross_user_replay(self):
+    token = self.sealer.seal({"txn": "T1"}, principal="alice")
+    self.assertEqual(self.sealer.open(token, principal="alice"),
+                     {"txn": "T1"})
+    with self.assertRaises(McpError):
+        self.sealer.open(token, principal="bob")
+\end{py}
+
+\begin{notebox}{Cache scope and authorization are the same conversation}
+A \texttt{private} cached response may only be reused within the same
+authorization context. A \texttt{public} one may be served to anyone, including
+across tokens, even when it came from an authenticated endpoint.
+
+So \texttt{cacheScope} is an access-control decision wearing performance
+clothing. Meridian keys \emph{every} cache entry by principal, public or not,
+because the cost of a duplicate entry is a few kilobytes and the cost of being
+wrong is a data breach. Chapter~\ref{ch:resources} has the measurements.
+\end{notebox}
+
+\section{What to remember}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item OAuth 2.1 with PKCE, for HTTP only. On stdio, use the environment.
+\item Four machine round trips before any work happens. Cache discovery per
+origin, cache tokens until expiry, refresh before you need to.
+\item Client ID Metadata Documents replace Dynamic Client Registration. The
+client id is an HTTPS URL that resolves to metadata.
+\item Audience binding via RFC 8707 is what stops the confused deputy. Never
+accept or forward a token issued for somebody else.
+\item Validate \texttt{iss} before redeeming a code, with simple string
+comparison and no normalisation, including on error responses.
+\item Challenge with all the scopes an operation needs at once; step up with the
+union, never the difference.
+\item Expired tokens are a recoverable interruption, not a failed task. Bound
+your retries.
+\item Tool visibility may vary by authorization, never by connection.
+\end{itemize}
+
+That closes Part~I. You now know the physics, the architecture, the wire, and
+the credentials. Part~II is what you actually build with them, starting with
+the primitive that does the work.

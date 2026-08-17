@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tools: The Execution Layer &middot; Building Awesome MCP Apps</title>
+<meta name="description" content="Tools: The Execution Layer. What every AI application developer should know about the Model Context Protocol">
+<meta property="og:title" content="Tools: The Execution Layer">
+<meta property="og:description" content="Tools: The Execution Layer. What every AI application developer should know about the Model Context Protocol">
+<style>
+:root{
+  --ink:#15181D; --muted:#5B6472; --rule:#D8DDE4; --wash:#F5F6F8;
+  --paper:#FFFFFF; --accent:#0F5C8C; --accent-soft:#E7F0F6;
+  --warm:#B4531A; --warm-soft:#FBF0E7; --good:#2C6E49; --good-soft:#E9F2EC;
+  --danger:#9B2226; --danger-soft:#FAECEC;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#E7EAEE; --muted:#98A2B0; --rule:#2C333D; --wash:#171B21;
+    --paper:#0F1216; --accent:#63AEDC; --accent-soft:#14232E;
+    --warm:#E08B4F; --warm-soft:#2A1D13; --good:#6FBF8E; --good-soft:#13221A;
+    --danger:#E4796F; --danger-soft:#291516;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--serif);font-size:18px;line-height:1.62;
+  -webkit-text-size-adjust:100%}
+.layout{display:grid;grid-template-columns:288px minmax(0,1fr);
+  max-width:1280px;margin:0 auto;gap:0}
+nav.toc{position:sticky;top:0;height:100vh;overflow-y:auto;padding:26px 20px 60px;
+  border-right:1px solid var(--rule);font-family:var(--sans);font-size:14px}
+nav.toc .brand{display:block;font-weight:700;font-size:16px;color:var(--ink);
+  text-decoration:none;line-height:1.3;margin-bottom:4px}
+nav.toc .tagline{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.45}
+nav.toc .part{margin:18px 0 6px;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);font-weight:700}
+nav.toc a{display:block;padding:4px 8px;margin-left:-8px;border-radius:5px;
+  color:var(--muted);text-decoration:none}
+nav.toc a:hover{background:var(--wash);color:var(--ink)}
+nav.toc a.current{background:var(--accent-soft);color:var(--accent);font-weight:600}
+main{padding:44px 52px 120px;min-width:0;max-width:78ch}
+h1,h2,h3,h4{font-family:var(--sans);line-height:1.25;color:var(--ink)}
+h1{font-size:2.05em;margin:0 0 .55em;letter-spacing:-.015em}
+h2{font-size:1.42em;margin:2em 0 .5em;padding-top:.35em}
+h3{font-size:1.14em;margin:1.7em 0 .4em}
+h4{font-size:1em;margin:1.4em 0 .3em;color:var(--muted)}
+p{margin:0 0 1.05em}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.855em;background:var(--wash);
+  padding:.12em .36em;border-radius:4px;word-break:break-word}
+pre{background:var(--wash);border-left:3px solid var(--rule);
+  border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+  font-size:13.5px;line-height:1.5;margin:1.3em 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+pre.json,pre.http{background:var(--accent-soft);border-left-color:var(--accent)}
+aside.box{border-left:3px solid var(--rule);background:var(--wash);
+  padding:14px 18px;margin:1.5em 0;border-radius:0 6px 6px 0;font-size:.955em}
+aside.box .box-title{font-family:var(--sans);font-weight:700;font-size:12px;
+  letter-spacing:.07em;text-transform:uppercase;margin:0 0 .55em}
+aside.box.legacy{border-left-color:var(--warm);background:var(--warm-soft)}
+aside.box.legacy .box-title{color:var(--warm)}
+aside.box.measured{border-left-color:var(--good);background:var(--good-soft)}
+aside.box.measured .box-title{color:var(--good)}
+aside.box.threat{border-left-color:var(--danger);background:var(--danger-soft)}
+aside.box.threat .box-title{color:var(--danger)}
+aside.box.note .box-title{color:var(--muted)}
+aside.keyidea{border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:14px 18px;margin:1.6em 0;border-radius:0 6px 6px 0;
+  font-family:var(--sans);font-style:italic;font-size:.97em}
+aside.keyidea p:last-child,aside.box p:last-child{margin-bottom:0}
+aside.keyidea pre,aside.keyidea code,aside.keyidea table{font-style:normal}
+aside.epigraph{border:0;margin:0 0 2em;padding:0 0 0 clamp(0px,7%,52px);
+  color:var(--muted);font-size:.97em}
+aside.epigraph p{margin:0 0 .3em}
+main figure{margin:2em 0;text-align:center}
+main figure img{max-width:100%;height:auto;border-radius:6px}
+@media (prefers-color-scheme: dark){
+  main figure img{background:#fff;padding:10px;border-radius:8px}
+}
+figcaption{font-family:var(--sans);font-size:13.5px;color:var(--muted);
+  margin-top:.7em;text-align:left;line-height:1.5}
+.table-wrap{overflow-x:auto;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:14.5px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+thead th{border-bottom:2px solid var(--rule);font-weight:700}
+caption{caption-side:bottom;font-size:13.5px;color:var(--muted);
+  text-align:left;padding-top:.7em;line-height:1.5}
+ul,ol{padding-left:1.35em;margin:0 0 1.05em}
+li{margin-bottom:.32em}
+dl{margin:0 0 1.05em}
+dt{font-weight:700;font-family:var(--sans);font-size:.95em;margin-top:.75em}
+dd{margin:.15em 0 0 1.35em}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
+.pager{display:flex;justify-content:space-between;gap:16px;margin-top:4em;
+  padding-top:1.5em;border-top:1px solid var(--rule);font-family:var(--sans);
+  font-size:14px}
+.pager a{text-decoration:none;max-width:46%}
+.pager .dir{display:block;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted)}
+.masthead{border-bottom:1px solid var(--rule);padding-bottom:1.8em;margin-bottom:2.2em}
+.masthead .kicker{font-family:var(--sans);font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);font-weight:700}
+.lede{font-size:1.12em;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:14px;margin:1.8em 0}
+.card{border:1px solid var(--rule);border-radius:9px;padding:15px 17px;
+  font-family:var(--sans);font-size:14px}
+.card h3{margin:0 0 .35em;font-size:15px}
+.card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+.menu-btn{display:none}
+@media (max-width:940px){
+  body{font-size:17px}
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:0;
+    border-bottom:1px solid var(--rule);max-height:none}
+  nav.toc.collapsed .toc-body{display:none}
+  main{padding:28px 20px 90px}
+  .menu-btn{display:inline-block;font-family:var(--sans);font-size:13px;
+    background:var(--wash);border:1px solid var(--rule);color:var(--ink);
+    border-radius:6px;padding:6px 11px;cursor:pointer;margin-bottom:10px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc"><button class="menu-btn" type="button">Contents</button>
+<div class="toc-body">
+<a class="brand" href="index.html">Building Awesome MCP Apps</a>
+<p class="tagline">What every AI application developer should know about the Model Context Protocol</p>
+<a href="preface.html">Preface</a>
+<a href="how-to-read.html">How to read this book</a>
+<div class="part">Part I. Protocol Fundamentals</div>
+<a href="ch01.html">A Primer on Latency, Tokens, and Context</a>
+<a href="ch02.html">The MCP Architectural Model</a>
+<a href="ch03.html">Building Blocks of the Transport</a>
+<a href="ch04.html">Authorization on the Wire</a>
+<div class="part">Part II. The Primitives</div>
+<a href="ch05.html" class="current">Tools: The Execution Layer</a>
+<a href="ch06.html">Resources: The Context Layer</a>
+<a href="ch07.html">Prompts: Workflow Blueprints</a>
+<a href="ch08.html">Multi Round-Trip Requests</a>
+<a href="ch09.html">Extensions and Tasks</a>
+<a href="ch10.html">MCP Apps: Interactive Interfaces</a>
+<div class="part">Part III. Building MCP Applications</div>
+<a href="ch11.html">Building Servers</a>
+<a href="ch12.html">Building Hosts and Clients</a>
+<a href="ch13.html">The Agent Loop, State, and Memory</a>
+<a href="ch14.html">Multi-Agent Topologies</a>
+<div class="part">Part IV. Performance Engineering</div>
+<a href="ch15.html">Testing and Debugging</a>
+<a href="ch16.html">Measuring MCP Applications</a>
+<a href="ch17.html">Optimizing for Latency, Tokens, and Cost</a>
+<a href="ch18.html">Deployment and Operations</a>
+<div class="part">Part V. Security and Trust</div>
+<a href="ch19.html">Threat Modeling Agentic Applications</a>
+<a href="ch20.html">Access Control, Audit, and MCP in the Enterprise</a>
+<div class="part">Back matter</div>
+<a href="epilogue.html">Epilogue: The Evolving Protocol</a>
+<div class="part">Appendices</div>
+<a href="appendix-a.html">A. Method and Message Reference</a>
+<a href="appendix-b.html">B. Transport Decision Matrix</a>
+<a href="appendix-c.html">C. Performance Checklist</a>
+<a href="appendix-d.html">D. Security Hardening Checklist</a>
+<a href="appendix-e.html">E. The Meridian Companion Repository</a>
+<a href="about.html">About the author</a>
+</div></nav>
+<main>
+<section id="ch:tools" class="level1">
+<h1>Tools: The Execution Layer</h1>
+<aside class="epigraph">
+<p><em>“You’re gonna need a bigger boat.”</em></p>
+<p>Chief Brody, <em>Jaws</em> (1975)</p>
+</aside>
+<p>Brody says it after seeing the thing he has been theorising about, at actual scale, for the first time. Everybody has this moment with tool catalogues. You design six tools, they work beautifully, you ship. Eighteen months later there are forty-one, three of them do nearly the same thing, and the model has started picking the wrong one about a fifth of the time and nobody can say when that started.</p>
+<p>This chapter is about not getting there. Tools are the primitive that does the work, and they are the primitive where design mistakes compound fastest, because their cost is charged on every request forever.</p>
+<section id="mechanics-first" class="level2">
+<h2>Mechanics first</h2>
+<p>Two methods. That is the entire surface.</p>
+<section id="toolslist" class="level3">
+<h3><code>tools/list</code></h3>
+<pre class="json" data-language="json"><code>{
+  &quot;jsonrpc&quot;: &quot;2.0&quot;,
+  &quot;id&quot;: 1,
+  &quot;result&quot;: {
+    &quot;resultType&quot;: &quot;complete&quot;,
+    &quot;tools&quot;: [
+      {
+        &quot;name&quot;: &quot;assess_account_risk&quot;,
+        &quot;title&quot;: &quot;Assess account risk&quot;,
+        &quot;description&quot;: &quot;Score one commercial account for credit risk...&quot;,
+        &quot;inputSchema&quot;: { &quot;type&quot;: &quot;object&quot;, &quot;properties&quot;: { ... } },
+        &quot;outputSchema&quot;: { &quot;type&quot;: &quot;object&quot;, &quot;properties&quot;: { ... } },
+        &quot;annotations&quot;: { &quot;readOnlyHint&quot;: true, &quot;idempotentHint&quot;: true }
+      }
+    ],
+    &quot;nextCursor&quot;: &quot;50&quot;,
+    &quot;ttlMs&quot;: 300000,
+    &quot;cacheScope&quot;: &quot;public&quot;
+  }
+}</code></pre>
+<p>Three fields at the bottom that did not exist in 2025 and matter a great deal. <code>nextCursor</code> means catalogues paginate. <code>ttlMs</code> and <code>cacheScope</code> mean the client can stop asking. Chapter <a href="ch06.html#ch:resources">6</a> covers the caching model; here the relevant fact is that a well-behaved client fetches your catalogue once per TTL rather than once per task.</p>
+<p>There is also a requirement that reads like a footnote and is not:</p>
+<aside class="keyidea">
+<p>Return tools in a deterministic order. The same order, every time, when the underlying set has not changed. Unstable ordering silently destroys the provider’s prompt cache, and nothing in your telemetry will tell you.</p>
+</aside>
+<p>That last part is what makes it nasty. Prompt caching keys on a stable prefix. If your catalogue serialises in a different order on each request, the prefix changes, every cache lookup misses, and you pay full price for prompt processing on every turn. Your server looks fine. Your latency is quietly 30 % worse. Meridian sorts by name and asserts it:</p>
+<pre class="python" data-language="python"><code>def test_tools_list_order_is_stable(self):
+    &quot;&quot;&quot;Unstable ordering silently destroys the provider&#39;s prompt cache.&quot;&quot;&quot;
+    server = tiny_server()
+    for i in range(6):
+        server.add_tool(_noop_tool(f&quot;tool_{i}&quot;))
+    orders = [
+        [t[&quot;name&quot;] for t in server.handle(
+            request(&quot;tools/list&quot;, req_id=i))[&quot;result&quot;][&quot;tools&quot;]]
+        for i in range(5)
+    ]
+    self.assertEqual(len(set(map(tuple, orders))), 1)</code></pre>
+<p>If you build your catalogue by iterating a Python dictionary, a Go map, or a database query with no <code>ORDER BY</code>, you are one refactor away from this bug. Sort explicitly.</p>
+</section>
+<section id="toolscall" class="level3">
+<h3><code>tools/call</code></h3>
+<pre class="json" data-language="json"><code>{
+  &quot;jsonrpc&quot;: &quot;2.0&quot;,
+  &quot;id&quot;: 2,
+  &quot;method&quot;: &quot;tools/call&quot;,
+  &quot;params&quot;: {
+    &quot;name&quot;: &quot;assess_account_risk&quot;,
+    &quot;arguments&quot;: { &quot;accountId&quot;: &quot;ACC-1042&quot;, &quot;exposureUsd&quot;: 250000 }
+  }
+}</code></pre>
+<p>And back:</p>
+<pre class="json" data-language="json"><code>{
+  &quot;jsonrpc&quot;: &quot;2.0&quot;,
+  &quot;id&quot;: 2,
+  &quot;result&quot;: {
+    &quot;resultType&quot;: &quot;complete&quot;,
+    &quot;content&quot;: [{ &quot;type&quot;: &quot;text&quot;, &quot;text&quot;: &quot;{\&quot;score\&quot;:55.4,...}&quot; }],
+    &quot;structuredContent&quot;: { &quot;accountId&quot;: &quot;ACC-1042&quot;, &quot;score&quot;: 55.4,
+                           &quot;band&quot;: &quot;elevated&quot;, &quot;drivers&quot;: [...] },
+    &quot;isError&quot;: false
+  }
+}</code></pre>
+<p>Note that the result carries the same data twice. That is deliberate and recommended: <code>structuredContent</code> for anything that will parse it, <code>content</code> for backwards compatibility and for models that do better with text. Chapter <a href="ch10.html#ch:apps">10</a> shows the third consumer, an MCP App, which reads <code>structuredContent</code> and never puts it in the model’s context at all.</p>
+</section>
+</section>
+<section id="designing-tools-a-model-can-actually-use" class="level2">
+<h2>Designing tools a model can actually use</h2>
+<p>Now the part that matters more than the mechanics.</p>
+<section id="stop-mirroring-your-rest-api" class="level3">
+<h3>Stop mirroring your REST API</h3>
+<p>The single most common failure. You have an API. It has endpoints. Wrapping each endpoint as a tool is mechanical, fast, and completable in an afternoon, which is exactly why so many people do it.</p>
+<p>Meridian shipped this way. You can still run it:</p>
+<pre class="bash" data-language="bash"><code>python3 -m meridian.serve risk --fat</code></pre>
+<p>It exposes <code>get_account</code> and <code>list_account</code>, then <code>create_exposure</code>, then <code>update_covenant</code>, then <code>delete_collateral</code>, and two dozen more in the same shape. Every one is a faithful wrapper around a REST endpoint. Every one works.</p>
+<p>Here is what it costs.</p>
+<figure id="fig:catalogue-cost">
+<img src="figures/catalogue-cost.svg" />
+<figcaption>The same server, two catalogues. Left: what the catalogue costs. Right: what it costs by turn eight, which is the number that should change your mind.</figcaption>
+</figure>
+<aside class="box measured"><p class="box-title">Measured: REST mirror versus task-shaped tools</p>
+<table>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong></strong></td>
+<td style="text-align: right;"><strong>REST mirror</strong></td>
+<td style="text-align: right;"><strong>Task-shaped</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Tools in catalogue</td>
+<td style="text-align: right;">38</td>
+<td style="text-align: right;">10</td>
+</tr>
+<tr>
+<td style="text-align: left;">Tokens per model turn</td>
+<td style="text-align: right;">5<span>,</span>617</td>
+<td style="text-align: right;">1<span>,</span>246</td>
+</tr>
+<tr>
+<td style="text-align: left;">Extra tokens per turn</td>
+<td style="text-align: right;">+4<span>,</span>371</td>
+<td style="text-align: right;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">Extra tokens per task</td>
+<td style="text-align: right;">+8<span>,</span>738</td>
+<td style="text-align: right;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">Wasted input cost per 1,000 tasks</td>
+<td style="text-align: right;">$26.21</td>
+<td style="text-align: right;"></td>
+</tr>
+</tbody>
+</table>
+<p>Meridian, four servers, measured by <code>make bench</code>. The task-shaped catalogue does strictly more useful work.</p>
+</aside>
+<p>Twenty-six dollars per thousand tasks, for nothing. And that is only the money. The real damage is upstream: the model now chooses among 38 similar options instead of 10 distinct ones, and selection accuracy falls, and a wrong choice costs a whole extra loop iteration to detect and recover from.</p>
+<p>Why does the REST shape fail? Because REST is organised around <em>resources and verbs</em>, and a planner reasons in <em>tasks and outcomes</em>. To answer “is this account risky”, a model given a REST mirror must plan: get the account, list its exposures, list its covenants, fetch the rating, then combine. Five round trips, five model turns, five chances to go wrong.</p>
+<p>Given a task-shaped tool it calls <code>assess_account_risk</code> once.</p>
+<aside class="keyidea">
+<p>Design tools for the plan, not for the database. The right question is not “what are my entities”, it is “what does the user want done, and what is the smallest number of calls that does it.”</p>
+</aside>
+</section>
+<section id="the-three-rewrites-that-fix-most-catalogues" class="level3">
+<h3>The three rewrites that fix most catalogues</h3>
+<p><strong>Collapse read-then-combine chains.</strong> Any sequence the model performs identically every time is a tool you have not written yet. If your traces show <code>get_x</code> always followed by <code>get_y</code> then <code>compute_z</code>, ship <code>compute_z_for_x</code>.</p>
+<p><strong>Add a batch variant of anything called in a loop.</strong> Meridian has <code>assess_account_risk</code> for one account and <code>rank_portfolio_risk</code> for many. Without the second, a portfolio review of forty accounts is forty round trips and forty model turns. With it, one. The description points at it explicitly, because the model reads descriptions:</p>
+<pre class="python" data-language="python"><code>@server.tool(
+    &quot;rank_portfolio_risk&quot;,
+    &quot;Rank a set of accounts by risk score in one call. Prefer this over &quot;
+    &quot;calling assess_account_risk repeatedly.&quot;,
+    ...
+)</code></pre>
+<p><strong>Delete tools nobody calls.</strong> You have telemetry. Any tool with no calls in ninety days is costing you tokens on every request in exchange for nothing. Delete it. If somebody objects, the objection is usually about the endpoint existing, not about the tool existing, and those are different things.</p>
+</section>
+<section id="descriptions-are-prompt-engineering" class="level3">
+<h3>Descriptions are prompt engineering</h3>
+<p>The description is not documentation. It is the only thing the model sees when deciding, and it is charged per turn. So it should be short and it should contain the information that distinguishes this tool from its neighbours.</p>
+<p>Bad:</p>
+<pre class="text" data-language="text"><code>Get a account record via the core banking API. Wraps GET /v2/accounts.
+Accepts an optional id, an optional body, and standard pagination
+parameters. Returns the raw account representation as stored by the
+system of record, including audit fields, soft-delete markers, and
+denormalised references to related entities.</code></pre>
+<p>Fifty-one tokens describing the transport and the storage layer, neither of which is a fact the model can act on.</p>
+<p>Good:</p>
+<pre class="text" data-language="text"><code>Score one commercial account for credit risk. Returns a 1-99 score, a
+band, and the weighted factors behind it.</code></pre>
+<p>Twenty-three tokens, all of them about what the model gets back.</p>
+<p>Three rules that survive contact with reality:</p>
+<ol>
+<li><p><strong>Lead with the outcome</strong>, not the mechanism. The model is choosing between outcomes.</p></li>
+<li><p><strong>Name the discriminator</strong> when tools are adjacent. “Prefer this over calling X repeatedly” is worth its tokens.</p></li>
+<li><p><strong>Do not document your transport.</strong> The model cannot use “wraps GET /v2/accounts” and you pay for it forever.</p></li>
+</ol>
+</section>
+</section>
+<section id="schemas" class="level2">
+<h2>Schemas</h2>
+<p>JSON Schema 2020-12 by default, and <code>2026-07-28</code> loosened the restriction so you can use the full dialect. That freedom comes with two obligations.</p>
+<section id="the-ref-rule-which-is-a-security-rule" class="level3">
+<h3>The <code>$ref</code> rule, which is a security rule</h3>
+<aside class="box threat"><p class="box-title">Threat: Never dereference a remote <code>$ref</code></p>
+<p>JSON Schema permits <code>$ref</code> to an absolute URI. A validator that fetches it is a server-side request forgery primitive: a hostile tool definition points <code>$ref</code> at <code>http://169.254.169.254/</code> and your validator obligingly retrieves cloud instance credentials.</p>
+<p>The specification makes this a MUST NOT by default. An opt-in mode may exist, but it must be off by default, and it should enforce a host allowlist, reject loopback and private addresses, apply timeouts and size limits, and log every URI it touched.</p>
+</aside>
+<pre class="python" data-language="python"><code>if &quot;$ref&quot; in schema and str(schema[&quot;$ref&quot;]).startswith((&quot;http://&quot;, &quot;https://&quot;)):
+    raise errors.InvalidParams(f&quot;{where}: remote $ref is not dereferenced&quot;)</code></pre>
+<p>A schema that fails to validate because of an unresolved external <code>$ref</code> must be <em>rejected</em>, not silently treated as permissive. Failing open here means an attacker can disable your validation by pointing at a URL you will not fetch.</p>
+</section>
+<section id="the-composition-rule-which-is-a-denial-of-service-rule" class="level3">
+<h3>The composition rule, which is a denial-of-service rule</h3>
+<p><code>anyOf</code>, <code>oneOf</code>, <code>allOf</code>, <code>if</code>/<code>then</code>, and <code>$defs</code> are expressive and expensive. Nested deeply enough, validation cost explodes combinatorially, and a hostile schema becomes a CPU bomb against whoever validates it.</p>
+<p>So bound it: a maximum depth, a cap on subschemas, or a per-validation time budget. Meridian caps depth at twelve, which no honest tool schema approaches:</p>
+<pre class="python" data-language="python"><code>if depth &gt; 12:
+    raise errors.InvalidParams(f&quot;{where}: schema nesting exceeds the depth limit&quot;)</code></pre>
+</section>
+<section id="output-schemas-earn-their-keep" class="level3">
+<h3>Output schemas earn their keep</h3>
+<p>Optional, and you should use them anyway.</p>
+<p>Without one, a model receives text and has to parse it. Sometimes it parses wrong, which costs a retry, which costs a model turn. With one, the client validates <code>structuredContent</code> before it ever reaches the model, and a malformed response is caught at the boundary instead of confusing the planner two turns later.</p>
+<pre class="python" data-language="python"><code>output_schema={
+    &quot;type&quot;: &quot;object&quot;,
+    &quot;properties&quot;: {
+        &quot;accountId&quot;: {&quot;type&quot;: &quot;string&quot;},
+        &quot;score&quot;: {&quot;type&quot;: &quot;number&quot;},
+        &quot;band&quot;: {&quot;type&quot;: &quot;string&quot;,
+                 &quot;enum&quot;: [&quot;low&quot;, &quot;moderate&quot;, &quot;elevated&quot;, &quot;high&quot;]},
+        &quot;drivers&quot;: {&quot;type&quot;: &quot;array&quot;, &quot;items&quot;: {...}},
+    },
+    &quot;required&quot;: [&quot;accountId&quot;, &quot;score&quot;, &quot;band&quot;, &quot;drivers&quot;],
+}</code></pre>
+<p>That <code>enum</code> on <code>band</code> is doing real work. It tells the model the complete set of possible answers, which means it will not invent <code>"very high"</code> and it will not write branching logic for a fifth case that cannot occur.</p>
+</section>
+<section id="annotations-and-why-they-are-untrusted" class="level3">
+<h3>Annotations, and why they are untrusted</h3>
+<pre class="python" data-language="python"><code>annotations={&quot;readOnlyHint&quot;: True, &quot;idempotentHint&quot;: True}</code></pre>
+<p>Useful hints. A host can auto-approve read-only tools and prompt for the rest, which is exactly what Meridian’s default consent policy does.</p>
+<p>But the specification is blunt: clients must treat annotations as untrusted unless the server is trusted. A compromised server marking <code>delete_everything</code> as <code>readOnlyHint: true</code> would sail through a host that believes annotations.</p>
+<pre class="python" data-language="python"><code>def check(self, qualified_name: str, tool: dict, arguments: dict) -&gt; str:
+    if qualified_name in self.denylist:
+        decision = ConsentDecision.DENY
+    elif self.auto_allow_read_only and \
+            (tool.get(&quot;annotations&quot;) or {}).get(&quot;readOnlyHint&quot;):
+        decision = ConsentDecision.ALLOW
+    ...</code></pre>
+<p>Meridian does auto-allow on <code>readOnlyHint</code>, and that is a defensible default <em>for servers you trust</em>. Chapter <a href="ch19.html#ch:threats">19</a> shows what happens when you extend the same courtesy to a server you should not.</p>
+</section>
+</section>
+<section id="errors-the-distinction-that-decides-whether-a-model-recovers" class="level2">
+<h2>Errors: the distinction that decides whether a model recovers</h2>
+<p>This is the most consequential paragraph in the chapter, so here it is plainly.</p>
+<p>There are two error mechanisms, they are not interchangeable, and mislabelling one as the other either burns tokens or kills tasks.</p>
+<p><strong>Protocol errors</strong> are JSON-RPC errors. They mean the request was structurally wrong: unknown tool, malformed parameters, server on fire. Models are unlikely to recover from these, because the problem is not in the arguments, it is in the shape.</p>
+<pre class="json" data-language="json"><code>{ &quot;jsonrpc&quot;: &quot;2.0&quot;, &quot;id&quot;: 3,
+  &quot;error&quot;: { &quot;code&quot;: -32602, &quot;message&quot;: &quot;Unknown tool: invalid_tool_name&quot; } }</code></pre>
+<p><strong>Tool execution errors</strong> are <em>successful</em> results with <code>isError: true</code>. They mean the call was well-formed and the work failed for a reason the model can understand and act on.</p>
+<pre class="json" data-language="json"><code>{ &quot;jsonrpc&quot;: &quot;2.0&quot;, &quot;id&quot;: 4,
+  &quot;result&quot;: {
+    &quot;resultType&quot;: &quot;complete&quot;,
+    &quot;content&quot;: [{ &quot;type&quot;: &quot;text&quot;,
+      &quot;text&quot;: &quot;Invalid departure date: must be in the future. Today is 2026-08-08.&quot; }],
+    &quot;isError&quot;: true } }</code></pre>
+<p>Read that message. It says what was wrong, and it gives the model what it needs to fix it. That is the whole design goal.</p>
+<table id="tab:error-choice">
+<caption>Which mechanism, and why. The rule of thumb: if a smart colleague could act on the message, it is a tool execution error.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Situation</strong></td>
+<td style="text-align: left;"><strong>Mechanism</strong></td>
+<td style="text-align: left;"><strong>Code</strong></td>
+<td style="text-align: left;"><strong>Because</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Unknown tool name</td>
+<td style="text-align: left;">Protocol</td>
+<td style="text-align: left;"><code>-32602</code></td>
+<td style="text-align: left;">The catalogue is wrong, not the arguments</td>
+</tr>
+<tr>
+<td style="text-align: left;">Missing required argument</td>
+<td style="text-align: left;">Protocol</td>
+<td style="text-align: left;"><code>-32602</code></td>
+<td style="text-align: left;">Schema violation; caught before your code runs</td>
+</tr>
+<tr>
+<td style="text-align: left;">Account id does not exist</td>
+<td style="text-align: left;">Tool</td>
+<td style="text-align: left;"><code>isError</code></td>
+<td style="text-align: left;">The model can try a different id</td>
+</tr>
+<tr>
+<td style="text-align: left;">Date in the past</td>
+<td style="text-align: left;">Tool</td>
+<td style="text-align: left;"><code>isError</code></td>
+<td style="text-align: left;">The model can pick another date</td>
+</tr>
+<tr>
+<td style="text-align: left;">Downstream API timed out</td>
+<td style="text-align: left;">Tool</td>
+<td style="text-align: left;"><code>isError</code></td>
+<td style="text-align: left;">The model can retry or route around</td>
+</tr>
+<tr>
+<td style="text-align: left;">Insufficient permissions</td>
+<td style="text-align: left;">Tool</td>
+<td style="text-align: left;"><code>isError</code></td>
+<td style="text-align: left;">The model can explain, or take another path</td>
+</tr>
+<tr>
+<td style="text-align: left;">Server crashed</td>
+<td style="text-align: left;">Protocol</td>
+<td style="text-align: left;"><code>-32603</code></td>
+<td style="text-align: left;">Nothing the model does will help</td>
+</tr>
+</tbody>
+</table>
+<p>Meridian’s version, and note how much work the message does:</p>
+<pre class="python" data-language="python"><code>account = ACCOUNTS.get(account_id)
+if account is None:
+    # A tool execution error, not a protocol error. The model can read
+    # this, notice it used a stale id, and try a different one.
+    return tool_error(
+        f&quot;No account {account_id}. Account ids look like ACC-1000 &quot;
+        f&quot;through ACC-{1000 + len(ACCOUNTS) - 1}.&quot;
+    )</code></pre>
+<p>It states the failure and the valid range. A model reading that fixes its next call. A model reading “Error: not found” does not, and asks the user, and now a recoverable situation has become a conversation.</p>
+<pre class="python" data-language="python"><code>def test_bad_business_input_is_a_tool_execution_error(self):
+    resp = build_server().handle(request(
+        &quot;tools/call&quot;,
+        {&quot;name&quot;: &quot;assess_account_risk&quot;, &quot;arguments&quot;: {&quot;accountId&quot;: &quot;ACC-9999&quot;}}))
+    self.assertNotIn(&quot;error&quot;, resp)
+    self.assertTrue(resp[&quot;result&quot;][&quot;isError&quot;])
+    # And it must be actionable, not just &quot;invalid&quot;.
+    self.assertIn(&quot;ACC-1000&quot;, resp[&quot;result&quot;][&quot;content&quot;][0][&quot;text&quot;])</code></pre>
+</section>
+<section id="the-interception-loop" class="level2">
+<h2>The interception loop</h2>
+<p>Between the model’s intent and the server’s execution sits the host, and the places it can intervene are the places your security lives.</p>
+<figure id="fig:interception-loop">
+<img src="figures/interception-loop.svg" />
+<figcaption>Every dotted line is a hook, and every hook is a place to say no. A host that forwards intents untouched has not implemented MCP.</figcaption>
+</figure>
+<p>Four outbound hooks and one inbound one:</p>
+<dl>
+<dt>Schema validation</dt>
+<dd>
+<p>Reject malformed arguments before they reach a server. Cheap, and it turns a class of server bug into a client-side error.</p>
+</dd>
+<dt>Consent</dt>
+<dd>
+<p>Show the user the arguments, not just the tool name. “Call <code>send_email</code>?” is not consent. “Send email to <code>whom</code>, saying <code>what</code>?” is.</p>
+</dd>
+<dt>Audit</dt>
+<dd>
+<p>Who, what, when, with which arguments, and what came back. Designed for a regulator, not for your debugger. Chapter <a href="ch20.html#ch:access-control">20</a> covers what that means concretely.</p>
+</dd>
+<dt>Authorization</dt>
+<dd>
+<p>Scope checks and row-level policy, on the server side, where the data is.</p>
+</dd>
+<dt>Result validation</dt>
+<dd>
+<p>The return path. Validate against <code>outputSchema</code>, then treat the content as data. Never as instructions.</p>
+</dd>
+</dl>
+<p>That last one is the one people skip, and it is the one Chapter <a href="ch19.html#ch:threats">19</a> is about.</p>
+</section>
+<section id="parallel-fan-out" class="level2">
+<h2>Parallel fan-out</h2>
+<p>When a model emits three tool calls in one turn, it is telling you those three are independent. Honour that.</p>
+<pre class="python" data-language="python"><code>def call_tools_parallel(self, calls: list[dict]) -&gt; list[dict]:
+    &quot;&quot;&quot;Fan out independent calls.
+
+    The model asked for these together, which is its way of saying none of
+    them depends on the others. Running them in sequence throws that
+    information away and pays the sum of the latencies instead of the max.
+    &quot;&quot;&quot;
+    if len(calls) &lt;= 1:
+        return [self.call_tool(c[&quot;name&quot;], c.get(&quot;arguments&quot;)) for c in calls]
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(calls)) as pool:
+        futures = [pool.submit(self.call_tool, c[&quot;name&quot;], c.get(&quot;arguments&quot;))
+                   for c in calls]
+        ...</code></pre>
+<p>Chapter <a href="ch01.html#ch:primer">1</a> measured this: a consistent 2.8<span class="math inline">×</span> on three calls, holding steady as per-call latency rises from 2 ms to 40 ms. The ceiling is 3<span class="math inline">×</span>, and the gap is thread scheduling plus the slowest of the three servers.</p>
+<p>Two things the host must get right for this to work at all.</p>
+<p><strong>Preserve ordering.</strong> Results must come back in the order the calls were issued, whatever order they complete in. Meridian iterates futures in submission order rather than as-completed, for exactly this reason.</p>
+<p><strong>Never fail the batch on one failure.</strong> One tool erroring should produce one error result, not an exception that discards the other two successful calls you already paid for.</p>
+<aside class="box note"><p class="box-title">You cannot fan out what the model serialised</p>
+<p>If your tool design forces <code>get_x</code> then <code>get_y</code> then <code>combine</code>, the model <em>cannot</em> parallelise, because each step depends on the last. Parallel fan-out is available only to catalogues whose tools are independent, which is another way of saying tool design and latency are the same problem.</p>
+</aside>
+</section>
+<section id="meridians-catalogue-and-why-it-is-ten-tools" class="level2">
+<h2>Meridian’s catalogue, and why it is ten tools</h2>
+<table id="tab:meridian-tools">
+<caption>Ten tools across four servers. Each is a task somebody wants done, and none is an entity with CRUD hung off it.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Server</strong></td>
+<td style="text-align: left;"><strong>Tool</strong></td>
+<td style="text-align: left;"><strong>Why it exists</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">risk</td>
+<td style="text-align: left;"><code>assess_account_risk</code></td>
+<td style="text-align: left;">The single-account question, one call</td>
+</tr>
+<tr>
+<td style="text-align: left;">risk</td>
+<td style="text-align: left;"><code>rank_portfolio_risk</code></td>
+<td style="text-align: left;">So a 40-account review is 1 trip, not 40</td>
+</tr>
+<tr>
+<td style="text-align: left;">risk</td>
+<td style="text-align: left;"><code>underwrite_loan</code></td>
+<td style="text-align: left;">Long-running, returns a task (<a href="ch09.html#ch:tasks">Chapter 9</a>)</td>
+</tr>
+<tr>
+<td style="text-align: left;">compliance</td>
+<td style="text-align: left;"><code>review_transaction</code></td>
+<td style="text-align: left;">Needs a named officer (<a href="ch08.html#ch:mrtr">Chapter 8</a>)</td>
+</tr>
+<tr>
+<td style="text-align: left;">compliance</td>
+<td style="text-align: left;"><code>search_guidance</code></td>
+<td style="text-align: left;">Reference text. Untrusted (<a href="ch19.html#ch:threats">Chapter 19</a>)</td>
+</tr>
+<tr>
+<td style="text-align: left;">compliance</td>
+<td style="text-align: left;"><code>export_audit_log</code></td>
+<td style="text-align: left;">For the regulator, not the debugger</td>
+</tr>
+<tr>
+<td style="text-align: left;">fraud</td>
+<td style="text-align: left;"><code>screen_account</code></td>
+<td style="text-align: left;">Fast, read-only, safe to run in parallel</td>
+</tr>
+<tr>
+<td style="text-align: left;">fraud</td>
+<td style="text-align: left;"><code>explain_signal</code></td>
+<td style="text-align: left;">So the model can explain rather than guess</td>
+</tr>
+<tr>
+<td style="text-align: left;">marketdata</td>
+<td style="text-align: left;"><code>get_reference_curve</code></td>
+<td style="text-align: left;">Public, cacheable, called constantly</td>
+</tr>
+<tr>
+<td style="text-align: left;">marketdata</td>
+<td style="text-align: left;"><code>price_facility</code></td>
+<td style="text-align: left;">The combine step, done server-side</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>price_facility</code> row deserves a note, because it is the pattern generalised. Pricing needs a risk score, a tenor, and a sector spread. You <em>could</em> expose <code>get_curve</code>, <code>get_sector_spread</code>, and <code>get_credit_spread</code> and let the model do arithmetic. Three round trips, three model turns, and a model doing floating-point maths in its head.</p>
+<p>Instead the server does the combining and returns the answer. One call. And the arithmetic is done by a computer, which is generally better at it.</p>
+</section>
+<section id="what-to-remember" class="level2">
+<h2>What to remember</h2>
+<ul>
+<li><p>Two methods total. The design work is all in what you put in them.</p></li>
+<li><p>Deterministic ordering, or you silently lose the provider’s prompt cache.</p></li>
+<li><p>Task-shaped, not REST-shaped. Meridian’s REST mirror cost 4,371 extra tokens per turn and $26 per thousand tasks in pure waste.</p></li>
+<li><p>Descriptions lead with the outcome, name the discriminator, and never mention your transport.</p></li>
+<li><p>Never dereference remote <code>$ref</code>s. Bound schema depth.</p></li>
+<li><p>Output schemas eliminate parse-retry loops. Use <code>enum</code> generously.</p></li>
+<li><p>Protocol errors are for malformed requests. Tool execution errors are for things the model can fix, and the message should tell it how.</p></li>
+<li><p>Fan out what the model batched, keep the ordering, and do not let one failure discard the batch.</p></li>
+</ul>
+<p>Next: resources, which is where the caching model lives and where the token budget is most often wasted.</p>
+</section>
+</section>
+<div class="pager">
+<a href="ch04.html"><span class="dir">Previous</span>Authorization on the Wire</a>
+<a href="ch06.html" style="text-align:right"><span class="dir">Next</span>Resources: The Context Layer</a>
+</div>
+</main>
+</div>
+<script>
+(function(){
+  var nav = document.querySelector('nav.toc');
+  var btn = document.querySelector('.menu-btn');
+  if(btn && nav){
+    if(window.innerWidth <= 940) nav.classList.add('collapsed');
+    btn.addEventListener('click', function(){ nav.classList.toggle('collapsed'); });
+  }
+  // Wrap tables so wide ones scroll rather than overflowing the page.
+  document.querySelectorAll('main table').forEach(function(t){
+    if(t.parentElement.classList.contains('table-wrap')) return;
+    var w = document.createElement('div');
+    w.className = 'table-wrap';
+    t.parentNode.insertBefore(w, t);
+    w.appendChild(t);
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MCP Apps: Interactive Interfaces &middot; Building Awesome MCP Apps</title>
+<meta name="description" content="MCP Apps: Interactive Interfaces. What every AI application developer should know about the Model Context Protocol">
+<meta property="og:title" content="MCP Apps: Interactive Interfaces">
+<meta property="og:description" content="MCP Apps: Interactive Interfaces. What every AI application developer should know about the Model Context Protocol">
+<style>
+:root{
+  --ink:#15181D; --muted:#5B6472; --rule:#D8DDE4; --wash:#F5F6F8;
+  --paper:#FFFFFF; --accent:#0F5C8C; --accent-soft:#E7F0F6;
+  --warm:#B4531A; --warm-soft:#FBF0E7; --good:#2C6E49; --good-soft:#E9F2EC;
+  --danger:#9B2226; --danger-soft:#FAECEC;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#E7EAEE; --muted:#98A2B0; --rule:#2C333D; --wash:#171B21;
+    --paper:#0F1216; --accent:#63AEDC; --accent-soft:#14232E;
+    --warm:#E08B4F; --warm-soft:#2A1D13; --good:#6FBF8E; --good-soft:#13221A;
+    --danger:#E4796F; --danger-soft:#291516;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--serif);font-size:18px;line-height:1.62;
+  -webkit-text-size-adjust:100%}
+.layout{display:grid;grid-template-columns:288px minmax(0,1fr);
+  max-width:1280px;margin:0 auto;gap:0}
+nav.toc{position:sticky;top:0;height:100vh;overflow-y:auto;padding:26px 20px 60px;
+  border-right:1px solid var(--rule);font-family:var(--sans);font-size:14px}
+nav.toc .brand{display:block;font-weight:700;font-size:16px;color:var(--ink);
+  text-decoration:none;line-height:1.3;margin-bottom:4px}
+nav.toc .tagline{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.45}
+nav.toc .part{margin:18px 0 6px;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);font-weight:700}
+nav.toc a{display:block;padding:4px 8px;margin-left:-8px;border-radius:5px;
+  color:var(--muted);text-decoration:none}
+nav.toc a:hover{background:var(--wash);color:var(--ink)}
+nav.toc a.current{background:var(--accent-soft);color:var(--accent);font-weight:600}
+main{padding:44px 52px 120px;min-width:0;max-width:78ch}
+h1,h2,h3,h4{font-family:var(--sans);line-height:1.25;color:var(--ink)}
+h1{font-size:2.05em;margin:0 0 .55em;letter-spacing:-.015em}
+h2{font-size:1.42em;margin:2em 0 .5em;padding-top:.35em}
+h3{font-size:1.14em;margin:1.7em 0 .4em}
+h4{font-size:1em;margin:1.4em 0 .3em;color:var(--muted)}
+p{margin:0 0 1.05em}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.855em;background:var(--wash);
+  padding:.12em .36em;border-radius:4px;word-break:break-word}
+pre{background:var(--wash);border-left:3px solid var(--rule);
+  border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+  font-size:13.5px;line-height:1.5;margin:1.3em 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+pre.json,pre.http{background:var(--accent-soft);border-left-color:var(--accent)}
+aside.box{border-left:3px solid var(--rule);background:var(--wash);
+  padding:14px 18px;margin:1.5em 0;border-radius:0 6px 6px 0;font-size:.955em}
+aside.box .box-title{font-family:var(--sans);font-weight:700;font-size:12px;
+  letter-spacing:.07em;text-transform:uppercase;margin:0 0 .55em}
+aside.box.legacy{border-left-color:var(--warm);background:var(--warm-soft)}
+aside.box.legacy .box-title{color:var(--warm)}
+aside.box.measured{border-left-color:var(--good);background:var(--good-soft)}
+aside.box.measured .box-title{color:var(--good)}
+aside.box.threat{border-left-color:var(--danger);background:var(--danger-soft)}
+aside.box.threat .box-title{color:var(--danger)}
+aside.box.note .box-title{color:var(--muted)}
+aside.keyidea{border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:14px 18px;margin:1.6em 0;border-radius:0 6px 6px 0;
+  font-family:var(--sans);font-style:italic;font-size:.97em}
+aside.keyidea p:last-child,aside.box p:last-child{margin-bottom:0}
+aside.keyidea pre,aside.keyidea code,aside.keyidea table{font-style:normal}
+aside.epigraph{border:0;margin:0 0 2em;padding:0 0 0 clamp(0px,7%,52px);
+  color:var(--muted);font-size:.97em}
+aside.epigraph p{margin:0 0 .3em}
+main figure{margin:2em 0;text-align:center}
+main figure img{max-width:100%;height:auto;border-radius:6px}
+@media (prefers-color-scheme: dark){
+  main figure img{background:#fff;padding:10px;border-radius:8px}
+}
+figcaption{font-family:var(--sans);font-size:13.5px;color:var(--muted);
+  margin-top:.7em;text-align:left;line-height:1.5}
+.table-wrap{overflow-x:auto;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:14.5px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+thead th{border-bottom:2px solid var(--rule);font-weight:700}
+caption{caption-side:bottom;font-size:13.5px;color:var(--muted);
+  text-align:left;padding-top:.7em;line-height:1.5}
+ul,ol{padding-left:1.35em;margin:0 0 1.05em}
+li{margin-bottom:.32em}
+dl{margin:0 0 1.05em}
+dt{font-weight:700;font-family:var(--sans);font-size:.95em;margin-top:.75em}
+dd{margin:.15em 0 0 1.35em}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
+.pager{display:flex;justify-content:space-between;gap:16px;margin-top:4em;
+  padding-top:1.5em;border-top:1px solid var(--rule);font-family:var(--sans);
+  font-size:14px}
+.pager a{text-decoration:none;max-width:46%}
+.pager .dir{display:block;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted)}
+.masthead{border-bottom:1px solid var(--rule);padding-bottom:1.8em;margin-bottom:2.2em}
+.masthead .kicker{font-family:var(--sans);font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);font-weight:700}
+.lede{font-size:1.12em;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:14px;margin:1.8em 0}
+.card{border:1px solid var(--rule);border-radius:9px;padding:15px 17px;
+  font-family:var(--sans);font-size:14px}
+.card h3{margin:0 0 .35em;font-size:15px}
+.card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+.menu-btn{display:none}
+@media (max-width:940px){
+  body{font-size:17px}
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:0;
+    border-bottom:1px solid var(--rule);max-height:none}
+  nav.toc.collapsed .toc-body{display:none}
+  main{padding:28px 20px 90px}
+  .menu-btn{display:inline-block;font-family:var(--sans);font-size:13px;
+    background:var(--wash);border:1px solid var(--rule);color:var(--ink);
+    border-radius:6px;padding:6px 11px;cursor:pointer;margin-bottom:10px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc"><button class="menu-btn" type="button">Contents</button>
+<div class="toc-body">
+<a class="brand" href="index.html">Building Awesome MCP Apps</a>
+<p class="tagline">What every AI application developer should know about the Model Context Protocol</p>
+<a href="preface.html">Preface</a>
+<a href="how-to-read.html">How to read this book</a>
+<div class="part">Part I. Protocol Fundamentals</div>
+<a href="ch01.html">A Primer on Latency, Tokens, and Context</a>
+<a href="ch02.html">The MCP Architectural Model</a>
+<a href="ch03.html">Building Blocks of the Transport</a>
+<a href="ch04.html">Authorization on the Wire</a>
+<div class="part">Part II. The Primitives</div>
+<a href="ch05.html">Tools: The Execution Layer</a>
+<a href="ch06.html">Resources: The Context Layer</a>
+<a href="ch07.html">Prompts: Workflow Blueprints</a>
+<a href="ch08.html">Multi Round-Trip Requests</a>
+<a href="ch09.html">Extensions and Tasks</a>
+<a href="ch10.html" class="current">MCP Apps: Interactive Interfaces</a>
+<div class="part">Part III. Building MCP Applications</div>
+<a href="ch11.html">Building Servers</a>
+<a href="ch12.html">Building Hosts and Clients</a>
+<a href="ch13.html">The Agent Loop, State, and Memory</a>
+<a href="ch14.html">Multi-Agent Topologies</a>
+<div class="part">Part IV. Performance Engineering</div>
+<a href="ch15.html">Testing and Debugging</a>
+<a href="ch16.html">Measuring MCP Applications</a>
+<a href="ch17.html">Optimizing for Latency, Tokens, and Cost</a>
+<a href="ch18.html">Deployment and Operations</a>
+<div class="part">Part V. Security and Trust</div>
+<a href="ch19.html">Threat Modeling Agentic Applications</a>
+<a href="ch20.html">Access Control, Audit, and MCP in the Enterprise</a>
+<div class="part">Back matter</div>
+<a href="epilogue.html">Epilogue: The Evolving Protocol</a>
+<div class="part">Appendices</div>
+<a href="appendix-a.html">A. Method and Message Reference</a>
+<a href="appendix-b.html">B. Transport Decision Matrix</a>
+<a href="appendix-c.html">C. Performance Checklist</a>
+<a href="appendix-d.html">D. Security Hardening Checklist</a>
+<a href="appendix-e.html">E. The Meridian Companion Repository</a>
+<a href="about.html">About the author</a>
+</div></nav>
+<main>
+<section id="ch:apps" class="level1">
+<h1>MCP Apps: Interactive Interfaces</h1>
+<aside class="epigraph">
+<p><em>“Pay no attention to that man behind the curtain.”</em></p>
+<p>The Wizard, <em>The Wizard of Oz</em> (1939)</p>
+</aside>
+<p>An MCP App is a curtain. The user sees a button; the server decides what the button does and what the button says it does. Those are two separate things under one party’s control, which is a sentence worth reading twice.</p>
+<p>That tension runs through this whole chapter. Interactive interfaces are genuinely the right answer for some tool results and genuinely dangerous, and both facts come from the same source: the HTML arrived from somebody else’s server. So: when an app beats a paragraph, and what the host has to do to make rendering one safe.</p>
+<section id="the-problem" class="level2">
+<h2>The problem</h2>
+<p>Tool results are text. Sometimes text is wrong.</p>
+<p>A user asks to see risk across a portfolio. You could return a list of forty accounts with scores, and the model could summarise it, and the user could ask follow-up questions one at a time, each costing a full loop iteration and around 440 milliseconds. Or you could render a sortable table where they click a column header and get their answer in 50 milliseconds with no model turn at all.</p>
+<p>The second one is better, and it is better for a reason worth stating precisely: <strong>interactive exploration does not consume the context budget</strong>. Every click in a rendered table is a question that never became a prompt.</p>
+</section>
+<section id="how-it-works" class="level2">
+<h2>How it works</h2>
+<p>MCP Apps is the first official extension, identified as <code>io.modelcontextprotocol/ui</code>. Five moving parts.</p>
+<p><strong>1. A tool declares a UI</strong> in its metadata:</p>
+<pre class="python" data-language="python"><code>@server.tool(
+    &quot;assess_account_risk&quot;,
+    &quot;Score one commercial account for credit risk...&quot;,
+    { ...inputSchema... },
+    output_schema={ ... },
+    annotations={&quot;readOnlyHint&quot;: True, &quot;idempotentHint&quot;: True},
+    ui_resource_uri=&quot;ui://meridian/risk-dashboard&quot;,
+)
+def assess_account_risk(ctx: RequestContext):
+    ...</code></pre>
+<p>which serialises into the tool definition as:</p>
+<pre class="json" data-language="json"><code>{
+  &quot;name&quot;: &quot;assess_account_risk&quot;,
+  &quot;description&quot;: &quot;...&quot;,
+  &quot;inputSchema&quot;: { ... },
+  &quot;_meta&quot;: { &quot;ui&quot;: { &quot;resourceUri&quot;: &quot;ui://meridian/risk-dashboard&quot; } }
+}</code></pre>
+<p><strong>2. The template lives at a <code>ui://</code> resource</strong>, served like any other resource with a MIME type that says what it is:</p>
+<pre class="python" data-language="python"><code>@server.resource(
+    &quot;ui://meridian/risk-dashboard&quot;,
+    &quot;Risk dashboard&quot;,
+    description=&quot;MCP App template for interactive drill-down.&quot;,
+    mime_type=&quot;text/html;profile=mcp-app&quot;,
+    ttl_ms=86_400_000,
+    cache_scope=&quot;public&quot;,
+)
+def dashboard(ctx: RequestContext, uri: str):
+    return DASHBOARD_HTML</code></pre>
+<p><strong>3. The host renders it in a sandboxed iframe</strong>, with a Content Security Policy built from origins the server declared. The default is no network at all.</p>
+<p><strong>4. The app talks to the host over <code>postMessage</code></strong>, in a JSON-RPC dialect. Some methods are shared with core MCP (<code>tools/call</code>), some are new and prefixed <code>ui/</code>.</p>
+<p><strong>5. <code>structuredContent</code> feeds the app</strong> rather than the model. The data the app renders never has to enter the context window.</p>
+<section id="predeclaration-is-the-performance-story" class="level3">
+<h3>Predeclaration is the performance story</h3>
+<p>The template URI is in the tool <em>definition</em>, which the host fetched during <code>tools/list</code>, which happened long before the tool was called.</p>
+<p>That gives the host three things it could not otherwise have:</p>
+<dl>
+<dt>Prefetch</dt>
+<dd>
+<p>Fetch and parse the template during idle time, so the first render is instant rather than a fetch plus a parse plus a paint.</p>
+</dd>
+<dt>Cache</dt>
+<dd>
+<p>Meridian’s template carries a 24-hour TTL and <code>cacheScope: public</code>. It is identical for every user, so a shared gateway can serve it, and a returning user never fetches it at all.</p>
+</dd>
+<dt>Security review</dt>
+<dd>
+<p>Read the HTML, check the declared CSP origins, and decide whether to render it <em>before</em> any tool runs. A host that fetches templates lazily is deciding whether to trust code at the worst possible moment.</p>
+</dd>
+</dl>
+<p>That third one is the real argument. Predeclaration is not primarily a latency optimisation, it is what makes review possible at all.</p>
+</section>
+</section>
+<section id="the-security-contract" class="level2">
+<h2>The security contract</h2>
+<p>Now the part that should make you sit up. A server is sending you HTML, and you are going to execute it.</p>
+<figure id="fig:apps-security">
+<img src="figures/apps-security.svg" />
+<figcaption>What the sandbox blocks, and the one channel it leaves open. The box at the bottom is the rule everything else depends on.</figcaption>
+</figure>
+<section id="what-the-sandbox-guarantees" class="level3">
+<h3>What the sandbox guarantees</h3>
+<p>The iframe cannot reach the parent DOM, cannot read the host’s cookies or local storage, cannot navigate the parent page, and cannot execute in the parent context. Standard browser sandboxing, doing what it was designed for.</p>
+<p>Network access is denied by default and granted only to origins the server declared in <code>_meta.ui.csp</code>. An app that wants to load a charting library from a CDN must say so in advance, in a field a human can read during review.</p>
+</section>
+<section id="the-rule-that-everything-else-rests-on" class="level3">
+<h3>The rule that everything else rests on</h3>
+<aside class="keyidea">
+<p>A tool call initiated from inside the app traverses the host’s normal consent and audit path. Exactly the same path as a call the model asked for. No shortcut, no fast lane, no exception for being inside the host already.</p>
+</aside>
+<p>This is the one people are tempted to break, because it is annoying. The user clicked a button in a UI they can see; asking them to confirm feels redundant.</p>
+<p>It is not redundant. The button was rendered by HTML that arrived from a server, and the server may be compromised, and the label on the button is under the server’s control while the action behind it is also under the server’s control. A button that says “Refresh” can call <code>transfer_funds</code>. The host’s consent gate is the only thing that shows the user what is actually about to happen.</p>
+<p>Meridian’s dashboard makes the round trip explicitly, with a comment for whoever reads it next:</p>
+<pre class="javascript" data-language="javascript"><code>document.getElementById(&#39;refresh&#39;).addEventListener(&#39;click&#39;, async () =&gt; {
+  // A tool call from the app travels the host&#39;s normal consent and audit
+  // path. The iframe gets no shortcut just because it is inside the host.
+  const r = await rpc(&#39;tools/call&#39;,
+    { name: &#39;assess_account_risk&#39;, arguments: { accountId } });
+  if (r &amp;&amp; r.structuredContent) render(r.structuredContent);
+});</code></pre>
+<aside class="box threat"><p class="box-title">Threat: The app attack surface, in full</p>
+<p><strong>Server-supplied HTML</strong> is code you did not write, executing in your users’ browsers. Review the template, or at minimum pin and diff it.</p>
+<p><strong>CSP declaration abuse.</strong> A server declaring <code>connect-src: https://evil.example</code> has requested an exfiltration channel, in writing. Read the declaration before you honour it.</p>
+<p><strong><code>postMessage</code> abuse.</strong> The bridge is the only channel, which makes it the only thing to harden. Validate the origin of every message, and validate the shape of every payload. An app that can send arbitrary JSON-RPC to the host can call any tool.</p>
+<p><strong>UI-initiated calls bypassing consent.</strong> Covered above, and it is the one that turns all the others from bad into catastrophic.</p>
+</aside>
+<p>Chapter <a href="ch19.html#ch:threats">19</a> treats this properly, including what an audit log has to record to make an incident reconstructible.</p>
+</section>
+</section>
+<section id="structuredcontent-and-the-context-budget" class="level2">
+<h2><code>structuredContent</code> and the context budget</h2>
+<p>Here is the thing that makes Apps interesting to a performance book.</p>
+<p>A tool result has two payloads. <code>content</code> is for the model. <code>structuredContent</code> is for programs. An app reads the second one, and the first one can be small.</p>
+<pre class="json" data-language="json"><code>{
+  &quot;content&quot;: [
+    { &quot;type&quot;: &quot;text&quot;, &quot;text&quot;: &quot;ACC-1042 scored 55.4 (elevated).&quot; }
+  ],
+  &quot;structuredContent&quot;: {
+    &quot;accountId&quot;: &quot;ACC-1042&quot;,
+    &quot;score&quot;: 55.4,
+    &quot;band&quot;: &quot;elevated&quot;,
+    &quot;drivers&quot;: [
+      { &quot;factor&quot;: &quot;leverage&quot;, &quot;contribution&quot;: 24.7 },
+      { &quot;factor&quot;: &quot;tenure&quot;, &quot;contribution&quot;: -10.8 },
+      { &quot;factor&quot;: &quot;priorDefaults&quot;, &quot;contribution&quot;: 0.0 },
+      { &quot;factor&quot;: &quot;scale&quot;, &quot;contribution&quot;: -0.5 }
+    ]
+  }
+}</code></pre>
+<p>The model reads eleven words. The app renders the full driver breakdown. Neither is short-changed, and the context window absorbs the smaller of the two.</p>
+<p>Scale that up and the argument gets loud. A forty-account portfolio table is maybe 6,000 tokens of JSON if it goes to the model. Delivered as <code>structuredContent</code> to an app, with a one-line text summary for the model, it is about 20.</p>
+<aside class="box note"><p class="box-title">A naming trap</p>
+<p><code>structuredContent</code> has nothing to do with “structured outputs” in the LLM sense, where a model is constrained to emit schema-conforming JSON.</p>
+<p>This is server-produced result data. Same word, unrelated concept. The specification calls it out explicitly, which tells you how often people conflate them.</p>
+</aside>
+</section>
+<section id="when-an-app-beats-text-and-when-it-does-not" class="level2">
+<h2>When an app beats text, and when it does not</h2>
+<p>The honest table, because the failure mode here is building a dashboard for a question with a one-word answer.</p>
+<table id="tab:when-apps">
+<caption>The right-hand column is longer than people expect. Most tool results should stay text.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>An app earns its place</strong></td>
+<td style="text-align: left;"><strong>Text is better</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">The user will ask follow-ups that are really filters (“show me only the C-tier ones”)</td>
+<td style="text-align: left;">The answer is a number or a sentence</td>
+</tr>
+<tr>
+<td style="text-align: left;">The data has more dimensions than a sentence can carry (a map, a heatmap, a diff)</td>
+<td style="text-align: left;">The result feeds the next tool call rather than a human</td>
+</tr>
+<tr>
+<td style="text-align: left;">Configuration with many interdependent options, where a form beats twelve turns of dialogue</td>
+<td style="text-align: left;">The user is on a screen reader or a terminal</td>
+</tr>
+<tr>
+<td style="text-align: left;">Real-time monitoring, where the alternative is asking “what is it now” repeatedly</td>
+<td style="text-align: left;">The interaction is one-shot and the app would be seen once</td>
+</tr>
+<tr>
+<td style="text-align: left;">Multi-step triage: examine, act, next, with state that persists across items</td>
+<td style="text-align: left;">You would be reimplementing a table that renders fine as Markdown</td>
+</tr>
+</tbody>
+</table>
+<p>The test I use: <em>would the user’s next three questions be answered by clicking, or by typing?</em> Clicking means an app. Typing means the model is doing the work, and a UI is just something else to maintain.</p>
+</section>
+<section id="building-one" class="level2">
+<h2>Building one</h2>
+<p>Meridian’s dashboard is deliberately vanilla: no framework, no build step, one file. The bridge is about fifteen lines.</p>
+<pre class="javascript" data-language="javascript"><code>// Everything the app knows arrives through postMessage. It has no network of
+// its own: the host builds a CSP from the server&#39;s declared domains, and the
+// default is no network at all.
+const rpc = (method, params) =&gt; new Promise(resolve =&gt; {
+  const id = Math.random().toString(36).slice(2);
+  const onMessage = (e) =&gt; {
+    if (e.data &amp;&amp; e.data.id === id) {
+      window.removeEventListener(&#39;message&#39;, onMessage);
+      resolve(e.data.result);
+    }
+  };
+  window.addEventListener(&#39;message&#39;, onMessage);
+  parent.postMessage({ jsonrpc: &#39;2.0&#39;, id, method, params }, &#39;*&#39;);
+});</code></pre>
+<p>The handshake and the render path:</p>
+<pre class="javascript" data-language="javascript"><code>window.addEventListener(&#39;message&#39;, (e) =&gt; {
+  if (e.data &amp;&amp; e.data.method === &#39;ui/render&#39;)
+    render(e.data.params.structuredContent);
+});
+
+parent.postMessage({ jsonrpc: &#39;2.0&#39;, id: &#39;init&#39;, method: &#39;ui/initialize&#39;,
+                     params: { protocolVersion: &#39;2026-01-26&#39; } }, &#39;*&#39;);</code></pre>
+<p>Note that the app announces <em>its</em> protocol version, <code>2026-01-26</code>, which is the Apps extension’s own revision rather than core MCP’s. Extensions version independently, as Chapter <a href="ch09.html#ch:tasks">9</a> described, and this is what that looks like in practice.</p>
+<aside class="box note"><p class="box-title">On <code>targetOrigin: ’*’</code></p>
+<p>Meridian passes <code>’*’</code> because the host’s origin is not known to a template that may be rendered by any host.</p>
+<p>In production, do better where you can. The host should pass its origin during <code>ui/initialize</code> and the app should use it thereafter. And the host must validate the origin of every inbound message regardless, because that side of the check is the one that actually protects anybody.</p>
+</aside>
+<p>Frameworks are entirely optional. The official examples ship starters for React, Vue, Svelte, Preact, Solid, and vanilla JavaScript, and the <code>App</code> class in <code>@modelcontextprotocol/ext-apps</code> is a convenience wrapper rather than a requirement. It is postMessage and JSON-RPC underneath, which means the whole web platform is available and none of it is mandatory.</p>
+</section>
+<section id="ux-patterns-worth-copying" class="level2">
+<h2>UX patterns worth copying</h2>
+<p><strong>Render immediately, refine on arrival.</strong> The host can prefetch the template and even stream tool inputs into it before the result exists. Show skeleton state, then fill it. Perceived latency is the latency.</p>
+<p><strong>Keep the app and the conversation in sync.</strong> A user who filters to C-tier accounts in the app and then asks “why are these risky” expects the model to know what “these” means. The app should push a context update; the host should merge it. Without that, the app is a separate application that happens to be drawn in the same window.</p>
+<p><strong>Save state on teardown.</strong> Apps get closed. If a user was three steps into triage, losing that is worse than never having had it.</p>
+<p><strong>Degrade to text.</strong> Not every host renders apps. Your tool must still return useful <code>content</code>, and it must be useful on its own rather than a placeholder saying “see the dashboard”. Meridian’s tools all return complete text results whether or not anything renders them.</p>
+</section>
+<section id="measuring-an-app" class="level2">
+<h2>Measuring an app</h2>
+<p>Three numbers worth watching, and only the first is obvious.</p>
+<p><strong>Time to first render.</strong> Template fetch, plus parse, plus paint. With prefetch and a warm cache the fetch is zero and this is dominated by paint. Cold, it is a full resource read on top.</p>
+<p><strong>Tokens saved.</strong> Compare the <code>content</code> you send with the <code>structuredContent</code> you would have had to send if the model needed the detail. That difference, times the number of turns after the call, is what the app bought you.</p>
+<p><strong>Interactions per model turn.</strong> The real one. If users click eight times between model turns, those are eight questions that cost nothing. If they click once and then type, the app is not carrying its weight.</p>
+<aside class="box measured"><p class="box-title">Measured: Meridian’s dashboard template</p>
+<table>
+<tbody>
+<tr>
+<td style="text-align: left;">Template size</td>
+<td style="text-align: right;">2.6 KB</td>
+</tr>
+<tr>
+<td style="text-align: left;">Cache TTL</td>
+<td style="text-align: right;">24 hours</td>
+</tr>
+<tr>
+<td style="text-align: left;">Cache scope</td>
+<td style="text-align: right;"><code>public</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Fetches per user per day (warm)</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>content</code> tokens sent to the model</td>
+<td style="text-align: right;">~11</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>structuredContent</code> rendered by the app</td>
+<td style="text-align: right;">full driver breakdown</td>
+</tr>
+</tbody>
+</table>
+<p>Template size from <code>meridian/servers/risk.py</code>; TTL and scope from its resource declaration. The point of the table is the last two rows.</p>
+</aside>
+</section>
+<section id="what-to-remember" class="level2">
+<h2>What to remember</h2>
+<ul>
+<li><p>Apps is an extension, <code>io.modelcontextprotocol/ui</code>, negotiated like any other.</p></li>
+<li><p>Tools declare a template via <code>_meta.ui.resourceUri</code>; templates live at <code>ui://</code> resources.</p></li>
+<li><p>Predeclaration lets the host prefetch, cache, and <em>review</em> before any tool runs. Review is the real benefit.</p></li>
+<li><p>Sandboxed iframe. No parent DOM, no cookies, no network unless the server declared origins.</p></li>
+<li><p>Every UI-initiated tool call goes through the host’s normal consent and audit path. This rule is what makes the rest safe.</p></li>
+<li><p><code>structuredContent</code> feeds the app, <code>content</code> feeds the model, and that split is how an app saves context.</p></li>
+<li><p>Build an app when the next three questions are clicks. Otherwise return text.</p></li>
+<li><p>Always degrade gracefully. Not every host renders apps, and your text result must stand alone.</p></li>
+</ul>
+<p>That closes Part II. You have the whole capability surface now: tools, resources, prompts, multi round-trip requests, extensions with Tasks, and Apps. Part III builds something with them.</p>
+</section>
+</section>
+<div class="pager">
+<a href="ch09.html"><span class="dir">Previous</span>Extensions and Tasks</a>
+<a href="ch11.html" style="text-align:right"><span class="dir">Next</span>Building Servers</a>
+</div>
+</main>
+</div>
+<script>
+(function(){
+  var nav = document.querySelector('nav.toc');
+  var btn = document.querySelector('.menu-btn');
+  if(btn && nav){
+    if(window.innerWidth <= 940) nav.classList.add('collapsed');
+    btn.addEventListener('click', function(){ nav.classList.toggle('collapsed'); });
+  }
+  // Wrap tables so wide ones scroll rather than overflowing the page.
+  document.querySelectorAll('main table').forEach(function(t){
+    if(t.parentElement.classList.contains('table-wrap')) return;
+    var w = document.createElement('div');
+    w.className = 'table-wrap';
+    t.parentNode.insertBefore(w, t);
+    w.appendChild(t);
+  });
+})();
+</script>
+</body>
+</html>

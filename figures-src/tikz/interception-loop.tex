@@ -1,0 +1,50 @@
+% Chapter 5. Where the hooks go. Every one of these is a place you can say no.
+\documentclass[tikz,border=6pt]{standalone}
+\input{_style}
+\begin{document}
+\begin{tikzpicture}[x=1cm, y=1cm]
+
+  \node[boxw, minimum width=25mm] (model) at (0,0) {model};
+  \node[boxa, minimum width=25mm] (host)  at (4.2,0) {host};
+  \node[box,  minimum width=25mm] (client) at (8.4,0) {client};
+  \node[boxg, minimum width=25mm] (server) at (12.6,0) {server};
+
+  % outbound
+  \draw[flow] (model) -- node[tag, above] {intent} (host);
+  \draw[flow] (host)  -- node[tag, above] {routed call} (client);
+  \draw[flow] (client) -- node[tag, above] {tools/call} (server);
+
+  % return
+  \draw[flowback] (server) -- ++(0,-1.5) -- node[tag, below] {result} ($(model)+(0,-1.5)$) -- (model);
+
+  % --- the hook points ---------------------------------------------------
+  \newcommand{\hook}[3]{%
+    \node[boxa, draw=danger, fill=dangersoft, minimum width=27mm,
+          align=center, font=\sffamily\scriptsize, anchor=north]
+      (#1) at (#2,1.55) {#3};
+  }
+
+  \hook{h1}{2.1}{\textbf{schema validation}\\reject malformed args}
+  \hook{h2}{4.2}{\textbf{consent gate}\\show the user the args}
+  \hook{h3}{6.3}{\textbf{audit}\\who, what, when, why}
+  \hook{h4}{10.5}{\textbf{authorization}\\scopes, row-level policy}
+
+  \draw[draw=danger, line width=0.7pt, densely dotted] (h1.south) -- (2.1,0.35);
+  \draw[draw=danger, line width=0.7pt, densely dotted] (h2.south) -- (4.2,0.4);
+  \draw[draw=danger, line width=0.7pt, densely dotted] (h3.south) -- (6.3,0.35);
+  \draw[draw=danger, line width=0.7pt, densely dotted] (h4.south) -- (10.5,0.35);
+
+  % --- the return-path hook ----------------------------------------------
+  \node[boxa, draw=danger, fill=dangersoft, minimum width=34mm, align=center,
+        font=\sffamily\scriptsize] (h5) at (6.3,-2.7)
+    {\textbf{result is untrusted input}\\validate against outputSchema,\\
+     then treat as data, never instructions};
+  \draw[draw=danger, line width=0.7pt, densely dotted] (h5.north) -- (6.3,-1.5);
+
+  \node[note, anchor=west, align=left, text=muted] at (-1.6,-4.1)
+    {Everything above the line is the host refusing to be a pipe. A host that
+     forwards intents untouched has not implemented\\MCP, it has implemented
+     remote code execution with extra steps.};
+
+\end{tikzpicture}
+\end{document}

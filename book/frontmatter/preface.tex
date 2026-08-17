@@ -1,0 +1,179 @@
+\chapter*{Preface}
+\addcontentsline{toc}{chapter}{Preface}
+\markboth{Preface}{Preface}
+
+Here is the moment this book was born.
+
+I was watching a demo. Somebody had wired an AI assistant into four internal
+systems, and it worked. Actual work got done, live, in front of people who had
+been promised this for two years. The room was delighted. Then somebody in the
+back asked how long it took, and the presenter said, cheerfully, ``about forty
+seconds,'' and the room stayed delighted, and I sat there thinking: forty
+seconds? For that? The four systems it called were all sub-hundred-millisecond
+services. I had seen their dashboards. Ninety-nine percent of that forty
+seconds went somewhere, and nobody in the room, including the person who built
+it, could tell you where.
+
+That is the state of the art. We have built a genuinely new kind of software,
+and we are shipping it with roughly the diagnostic sophistication of a 1996 CGI
+script. We know it works. We do not know why it is slow, what it costs, or
+which of the eleven things we could change would matter. We guess. Then we
+rewrite the server in a faster language and save three milliseconds off a forty
+second task, and we feel good about it, because at least rewriting things in
+faster languages is a problem we know how to have.
+
+\bookfig[0.82]{xkcd-roundtrips}{The optimisation everybody does, and the one
+that works. Chapter~\ref{ch:primer} explains why the gap is this large, and
+Chapter~\ref{ch:optimizing} spends thirty pages exploiting it.}{preface-roundtrips}
+
+\section*{What this book is}
+
+This is a protocol book that is secretly a performance book. Or possibly a
+performance book that is secretly a protocol book. The two turn out to be the
+same subject, and that is the whole thesis.
+
+The model here is Ilya Grigorik's \emph{High Performance Browser Networking},
+which did something I have never stopped admiring. It taught web developers TCP.
+Not trivia about TCP. Actual TCP: slow start, congestion windows, the three-way
+handshake, why your first byte arrives when it arrives. And it justified every
+page of that by cashing it out into things you could do on Monday morning.
+Nobody had to be persuaded that the protocol layer mattered, because every
+chapter ended with a measurement that only made sense if you understood the
+layer underneath.
+
+I want to do that for the Model Context Protocol. Not because MCP is beautiful,
+though parts of it are, but because you cannot build a good agentic application
+without knowing what the protocol does on the wire. The abstractions leak
+immediately and constantly. A tool description is not free; you pay for it on
+every single request, forever. An extra round trip is not a small cost; it is
+usually the largest single item on the bill. A cache hint you ignored is a
+hundred milliseconds you spent for nothing. None of this is visible from
+inside a framework, and all of it is obvious once you have watched the bytes.
+
+So: three parts physics, three parts protocol mechanics, and a lot of numbers.
+
+\section*{Who it is for}
+
+You have shipped something. Maybe it is a chat assistant with tools bolted on,
+maybe it is an autonomous pipeline that runs at three in the morning, maybe it
+is a server that other people's agents call. It works, mostly. You have a
+nagging sense that you are holding it wrong.
+
+You do not need to know MCP already. Chapter~\ref{ch:architecture} builds it up
+from nothing. You do need to be comfortable reading code, thinking about
+latency, and being told that a thing you are currently doing is expensive.
+
+If you are looking for a tutorial that gets you to a working server in ten
+minutes, this is not it, and the official documentation does that job well.
+This book is for the part afterwards, when it works and you need it to be
+\emph{good}.
+
+\section*{The version problem, and what I did about it}
+
+Every book about a young protocol has the same terrifying paragraph in the
+preface, where the author admits the thing might change and asks for your
+patience. Here is mine, except I think the situation is better than usual, and
+for a specific reason.
+
+This book is pinned to revision \texttt{2026-07-28}. That revision is the
+largest change since MCP launched. It deleted the initialization handshake. It
+deleted protocol-level sessions. It deleted the standalone SSE endpoint,
+stream resumability, and server-initiated requests. It deprecated Sampling,
+Roots, and Logging. If you learned MCP in 2025, a meaningful fraction of what
+you know is now wrong, and I will point out exactly which fraction as we go.
+
+But the same revision also adopted a formal feature lifecycle: Active,
+Deprecated, Removed, with a minimum twelve-month window between the middle one
+and the last one. That is the first version of MCP that comes with a promise
+about how it will break. It is not a promise that it will not break. It is
+better than that. It is a promise that it will break \emph{slowly and in
+public}, which is the only kind of promise a protocol can honestly make and the
+only kind that lets you plan.
+
+So the deprecated features are in this book, boxed and labelled, because you
+have to maintain systems that use them. They are never presented as something
+to adopt. When you see one of these:
+
+\begin{legacybox}{Sampling}
+The 2025 design let a server ask the client to run a completion on its behalf.
+It is Deprecated as of \texttt{2026-07-28} and eligible for removal no earlier
+than 2027-07-28. Chapter~\ref{ch:mrtr} covers what it was for, why it lost, and
+what to do with the servers that still speak it.
+\end{legacybox}
+
+\noindent you are reading about the past, on purpose, so you can recognise it in
+the wild.
+
+\section*{Meridian, and why the numbers are real}
+
+Technical books have a bad habit. They say things like ``this reduces latency
+significantly'' and then move on, and you are left with a claim you cannot
+check and a number you cannot use.
+
+I did not want to write that book, so this one comes with a program.
+
+Meridian is a financial analytics assistant: four MCP servers, one host, an
+agent loop, a load-test harness, and a measurement rig. It ships in the
+repository. It has no third-party dependencies, which means it also happens to
+be a complete implementation of \texttt{2026-07-28} in about two thousand lines
+of Python, and every listing in this book is lifted from it. When
+Chapter~\ref{ch:tools} claims a bloated tool catalogue costs you 4,371 extra
+tokens on every model turn, that number came out of
+\texttt{meridian/bench/results.json}, and you can regenerate it with
+\texttt{make bench} and watch it change when you edit the catalogue.
+
+Two honest caveats, stated here and repeated wherever they matter.
+
+First, model inference is simulated. A book cannot ship a reproducible large
+language model, so Meridian uses a stub with a stated latency distribution.
+Everything downstream of inference (serialisation, transport, server execution,
+caching, round-trip counts) is measured for real.
+
+Second, the transport numbers are loopback numbers. Localhost has no physics
+worth speaking of. That is deliberate: it isolates protocol overhead so you can
+see it, and then Chapter~\ref{ch:measuring} shows you how to add your own
+network back in. A book that mixed the two would be measuring my office
+wi-fi and calling it your architecture.
+
+\begin{measurebox}{What a box like this means}
+Numbers in boxes like this one came from a real run of the harness on the
+machine described in Chapter~\ref{ch:primer}. If a number is modelled rather
+than measured, the box says so explicitly.
+\end{measurebox}
+
+\section*{A note on how this is written}
+
+Long. Opinionated. Occasionally funny, when the joke earns its place.
+
+I have tried very hard to avoid the register that technical writing drifts into
+when nobody is watching, the one where every paragraph restates the previous
+paragraph in slightly different words and nothing is ever asserted plainly. If
+I think something is a bad idea, I say it is a bad idea and then show you the
+measurement. If I am guessing, I say I am guessing.
+
+Each chapter opens with a line of film dialogue. This is not decoration. It is
+a compression trick: the right quote does about a paragraph of work in eleven
+words, and it tells you what the chapter is actually arguing before the
+argument starts.
+
+Also, there is not a single em dash in this book. This started as a constraint
+somebody imposed on me and became a genuine discipline. Em dashes let you
+staple two thoughts together without deciding how they relate. Take them away
+and you have to pick: is this a list, a consequence, an aside, or two
+sentences? Usually it was two sentences. The prose got better. Make of that
+what you will.
+
+\section*{Thank you}
+
+To the MCP maintainers and the SEP authors, whose design discussions are public
+and unusually candid, and who deprecated three of their own features in one
+release rather than defend them. That is rarer than it should be.
+
+To everybody who has shipped an agent that was mysteriously slow and then let
+me look at the traces.
+
+\vspace{14pt}
+\noindent\emph{Krimler}\\
+\emph{July 2026}
+
+\cleardoublepage

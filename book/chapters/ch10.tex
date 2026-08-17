@@ -1,0 +1,387 @@
+\chapter{MCP Apps: Interactive Interfaces}
+\label{ch:apps}
+
+\epigraph{``Pay no attention to that man behind the curtain.''}{The Wizard,
+\emph{The Wizard of Oz} (1939)}
+
+An MCP App is a curtain. The user sees a button; the server decides what the
+button does and what the button says it does. Those are two separate things
+under one party's control, which is a sentence worth reading twice.
+
+That tension runs through this whole chapter. Interactive interfaces are
+genuinely the right answer for some tool results and genuinely dangerous, and
+both facts come from the same source: the HTML arrived from somebody else's
+server. So: when an app beats a paragraph, and what the host has to do to make
+rendering one safe.
+
+\section{The problem}
+
+Tool results are text. Sometimes text is wrong.
+
+A user asks to see risk across a portfolio. You could return a list of forty
+accounts with scores, and the model could summarise it, and the user could ask
+follow-up questions one at a time, each costing a full loop iteration and around
+440 milliseconds. Or you could render a sortable table where they click a column
+header and get their answer in 50 milliseconds with no model turn at all.
+
+The second one is better, and it is better for a reason worth stating precisely:
+\textbf{interactive exploration does not consume the context budget}. Every
+click in a rendered table is a question that never became a prompt.
+
+\section{How it works}
+
+MCP Apps is the first official extension, identified as
+\texttt{io.modelcontextprotocol/ui}. Five moving parts.
+
+\textbf{1. A tool declares a UI} in its metadata:
+
+\begin{py}
+@server.tool(
+    "assess_account_risk",
+    "Score one commercial account for credit risk...",
+    { ...inputSchema... },
+    output_schema={ ... },
+    annotations={"readOnlyHint": True, "idempotentHint": True},
+    ui_resource_uri="ui://meridian/risk-dashboard",
+)
+def assess_account_risk(ctx: RequestContext):
+    ...
+\end{py}
+
+which serialises into the tool definition as:
+
+\begin{wire}
+{
+  "name": "assess_account_risk",
+  "description": "...",
+  "inputSchema": { ... },
+  "_meta": { "ui": { "resourceUri": "ui://meridian/risk-dashboard" } }
+}
+\end{wire}
+
+\textbf{2. The template lives at a \texttt{ui://} resource}, served like any
+other resource with a MIME type that says what it is:
+
+\begin{py}
+@server.resource(
+    "ui://meridian/risk-dashboard",
+    "Risk dashboard",
+    description="MCP App template for interactive drill-down.",
+    mime_type="text/html;profile=mcp-app",
+    ttl_ms=86_400_000,
+    cache_scope="public",
+)
+def dashboard(ctx: RequestContext, uri: str):
+    return DASHBOARD_HTML
+\end{py}
+
+\textbf{3. The host renders it in a sandboxed iframe}, with a Content Security
+Policy built from origins the server declared. The default is no network at all.
+
+\textbf{4. The app talks to the host over \texttt{postMessage}}, in a JSON-RPC
+dialect. Some methods are shared with core MCP (\texttt{tools/call}), some are
+new and prefixed \texttt{ui/}.
+
+\textbf{5. \texttt{structuredContent} feeds the app} rather than the model. The
+data the app renders never has to enter the context window.
+
+\subsection{Predeclaration is the performance story}
+
+The template URI is in the tool \emph{definition}, which the host fetched during
+\texttt{tools/list}, which happened long before the tool was called.
+
+That gives the host three things it could not otherwise have:
+
+\begin{description}[leftmargin=1.4em, style=nextline, itemsep=3pt]
+\item[Prefetch] Fetch and parse the template during idle time, so the first
+render is instant rather than a fetch plus a parse plus a paint.
+\item[Cache] Meridian's template carries a 24-hour TTL and
+\texttt{cacheScope: public}. It is identical for every user, so a shared gateway
+can serve it, and a returning user never fetches it at all.
+\item[Security review] Read the HTML, check the declared CSP origins, and decide
+whether to render it \emph{before} any tool runs. A host that fetches templates
+lazily is deciding whether to trust code at the worst possible moment.
+\end{description}
+
+That third one is the real argument. Predeclaration is not primarily a latency
+optimisation, it is what makes review possible at all.
+
+\section{The security contract}
+
+Now the part that should make you sit up. A server is sending you HTML, and you
+are going to execute it.
+
+\bookfig[0.98]{apps-security}{What the sandbox blocks, and the one channel it
+leaves open. The box at the bottom is the rule everything else depends
+on.}{apps-security}
+
+\subsection{What the sandbox guarantees}
+
+The iframe cannot reach the parent DOM, cannot read the host's cookies or local
+storage, cannot navigate the parent page, and cannot execute in the parent
+context. Standard browser sandboxing, doing what it was designed for.
+
+Network access is denied by default and granted only to origins the server
+declared in \texttt{\_meta.ui.csp}. An app that wants to load a charting library
+from a CDN must say so in advance, in a field a human can read during review.
+
+\subsection{The rule that everything else rests on}
+
+\keyidea{A tool call initiated from inside the app traverses the host's normal
+consent and audit path. Exactly the same path as a call the model asked for. No
+shortcut, no fast lane, no exception for being inside the host already.}
+
+This is the one people are tempted to break, because it is annoying. The user
+clicked a button in a UI they can see; asking them to confirm feels redundant.
+
+It is not redundant. The button was rendered by HTML that arrived from a server,
+and the server may be compromised, and the label on the button is under the
+server's control while the action behind it is also under the server's control.
+A button that says ``Refresh'' can call \texttt{transfer\_funds}. The host's
+consent gate is the only thing that shows the user what is actually about to
+happen.
+
+Meridian's dashboard makes the round trip explicitly, with a comment for whoever
+reads it next:
+
+\begin{ts}
+document.getElementById('refresh').addEventListener('click', async () => {
+  // A tool call from the app travels the host's normal consent and audit
+  // path. The iframe gets no shortcut just because it is inside the host.
+  const r = await rpc('tools/call',
+    { name: 'assess_account_risk', arguments: { accountId } });
+  if (r && r.structuredContent) render(r.structuredContent);
+});
+\end{ts}
+
+\begin{dangerbox}{The app attack surface, in full}
+\textbf{Server-supplied HTML} is code you did not write, executing in your
+users' browsers. Review the template, or at minimum pin and diff it.
+
+\textbf{CSP declaration abuse.} A server declaring
+\texttt{connect-src: https://evil.example} has requested an exfiltration
+channel, in writing. Read the declaration before you honour it.
+
+\textbf{\texttt{postMessage} abuse.} The bridge is the only channel, which makes
+it the only thing to harden. Validate the origin of every message, and validate
+the shape of every payload. An app that can send arbitrary JSON-RPC to the host
+can call any tool.
+
+\textbf{UI-initiated calls bypassing consent.} Covered above, and it is the one
+that turns all the others from bad into catastrophic.
+\end{dangerbox}
+
+Chapter~\ref{ch:threats} treats this properly, including what an audit log has
+to record to make an incident reconstructible.
+
+\section{\texttt{structuredContent} and the context budget}
+
+Here is the thing that makes Apps interesting to a performance book.
+
+A tool result has two payloads. \texttt{content} is for the model.
+\texttt{structuredContent} is for programs. An app reads the second one, and the
+first one can be small.
+
+\begin{wire}
+{
+  "content": [
+    { "type": "text", "text": "ACC-1042 scored 55.4 (elevated)." }
+  ],
+  "structuredContent": {
+    "accountId": "ACC-1042",
+    "score": 55.4,
+    "band": "elevated",
+    "drivers": [
+      { "factor": "leverage", "contribution": 24.7 },
+      { "factor": "tenure", "contribution": -10.8 },
+      { "factor": "priorDefaults", "contribution": 0.0 },
+      { "factor": "scale", "contribution": -0.5 }
+    ]
+  }
+}
+\end{wire}
+
+The model reads eleven words. The app renders the full driver breakdown. Neither
+is short-changed, and the context window absorbs the smaller of the two.
+
+Scale that up and the argument gets loud. A forty-account portfolio table is
+maybe 6,000 tokens of JSON if it goes to the model. Delivered as
+\texttt{structuredContent} to an app, with a one-line text summary for the model,
+it is about 20.
+
+\begin{notebox}{A naming trap}
+\texttt{structuredContent} has nothing to do with ``structured outputs'' in the
+LLM sense, where a model is constrained to emit schema-conforming JSON.
+
+This is server-produced result data. Same word, unrelated concept. The
+specification calls it out explicitly, which tells you how often people conflate
+them.
+\end{notebox}
+
+\section{When an app beats text, and when it does not}
+
+The honest table, because the failure mode here is building a dashboard for a
+question with a one-word answer.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}XX@{}}
+\toprule
+\thead{An app earns its place} & \thead{Text is better} \\
+\midrule
+The user will ask follow-ups that are really filters (``show me only the C-tier ones'')
+  & The answer is a number or a sentence \\
+The data has more dimensions than a sentence can carry (a map, a heatmap, a diff)
+  & The result feeds the next tool call rather than a human \\
+Configuration with many interdependent options, where a form beats twelve turns of dialogue
+  & The user is on a screen reader or a terminal \\
+Real-time monitoring, where the alternative is asking ``what is it now'' repeatedly
+  & The interaction is one-shot and the app would be seen once \\
+Multi-step triage: examine, act, next, with state that persists across items
+  & You would be reimplementing a table that renders fine as Markdown \\
+\bottomrule
+\end{tabularx}
+\caption{The right-hand column is longer than people expect. Most tool results
+should stay text.}
+\label{tab:when-apps}
+\end{table}
+
+The test I use: \emph{would the user's next three questions be answered by
+clicking, or by typing?} Clicking means an app. Typing means the model is doing
+the work, and a UI is just something else to maintain.
+
+\section{Building one}
+
+Meridian's dashboard is deliberately vanilla: no framework, no build step, one
+file. The bridge is about fifteen lines.
+
+\begin{ts}
+// Everything the app knows arrives through postMessage. It has no network of
+// its own: the host builds a CSP from the server's declared domains, and the
+// default is no network at all.
+const rpc = (method, params) => new Promise(resolve => {
+  const id = Math.random().toString(36).slice(2);
+  const onMessage = (e) => {
+    if (e.data && e.data.id === id) {
+      window.removeEventListener('message', onMessage);
+      resolve(e.data.result);
+    }
+  };
+  window.addEventListener('message', onMessage);
+  parent.postMessage({ jsonrpc: '2.0', id, method, params }, '*');
+});
+\end{ts}
+
+The handshake and the render path:
+
+\begin{ts}
+window.addEventListener('message', (e) => {
+  if (e.data && e.data.method === 'ui/render')
+    render(e.data.params.structuredContent);
+});
+
+parent.postMessage({ jsonrpc: '2.0', id: 'init', method: 'ui/initialize',
+                     params: { protocolVersion: '2026-01-26' } }, '*');
+\end{ts}
+
+Note that the app announces \emph{its} protocol version, \texttt{2026-01-26},
+which is the Apps extension's own revision rather than core MCP's. Extensions
+version independently, as Chapter~\ref{ch:tasks} described, and this is what
+that looks like in practice.
+
+\begin{notebox}{On \texttt{targetOrigin: '*'}}
+Meridian passes \texttt{'*'} because the host's origin is not known to a
+template that may be rendered by any host.
+
+In production, do better where you can. The host should pass its origin during
+\texttt{ui/initialize} and the app should use it thereafter. And the host must
+validate the origin of every inbound message regardless, because that side of
+the check is the one that actually protects anybody.
+\end{notebox}
+
+Frameworks are entirely optional. The official examples ship starters for React,
+Vue, Svelte, Preact, Solid, and vanilla JavaScript, and the \texttt{App} class
+in \texttt{@modelcontextprotocol/ext-apps} is a convenience wrapper rather than a
+requirement. It is postMessage and JSON-RPC underneath, which means the whole
+web platform is available and none of it is mandatory.
+
+\section{UX patterns worth copying}
+
+\textbf{Render immediately, refine on arrival.} The host can prefetch the
+template and even stream tool inputs into it before the result exists. Show
+skeleton state, then fill it. Perceived latency is the latency.
+
+\textbf{Keep the app and the conversation in sync.} A user who filters to C-tier
+accounts in the app and then asks ``why are these risky'' expects the model to
+know what ``these'' means. The app should push a context update; the host should
+merge it. Without that, the app is a separate application that happens to be
+drawn in the same window.
+
+\textbf{Save state on teardown.} Apps get closed. If a user was three steps into
+triage, losing that is worse than never having had it.
+
+\textbf{Degrade to text.} Not every host renders apps. Your tool must still
+return useful \texttt{content}, and it must be useful on its own rather than a
+placeholder saying ``see the dashboard''. Meridian's tools all return complete
+text results whether or not anything renders them.
+
+\section{Measuring an app}
+
+Three numbers worth watching, and only the first is obvious.
+
+\textbf{Time to first render.} Template fetch, plus parse, plus paint. With
+prefetch and a warm cache the fetch is zero and this is dominated by paint. Cold,
+it is a full resource read on top.
+
+\textbf{Tokens saved.} Compare the \texttt{content} you send with the
+\texttt{structuredContent} you would have had to send if the model needed the
+detail. That difference, times the number of turns after the call, is what the
+app bought you.
+
+\textbf{Interactions per model turn.} The real one. If users click eight times
+between model turns, those are eight questions that cost nothing. If they click
+once and then type, the app is not carrying its weight.
+
+\begin{measurebox}{Meridian's dashboard template}
+\begin{tabular}{@{}lr@{}}
+\toprule
+Template size                    & 2.6\,KB \\
+Cache TTL                        & 24 hours \\
+Cache scope                      & \texttt{public} \\
+Fetches per user per day (warm)  & 0 \\
+\texttt{content} tokens sent to the model & \textasciitilde{}11 \\
+\texttt{structuredContent} rendered by the app & full driver breakdown \\
+\bottomrule
+\end{tabular}
+
+\vspace{6pt}
+\footnotesize
+Template size from \texttt{meridian/servers/risk.py}; TTL and scope from its
+resource declaration. The point of the table is the last two rows.
+\end{measurebox}
+
+\section{What to remember}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item Apps is an extension, \texttt{io.modelcontextprotocol/ui}, negotiated like
+any other.
+\item Tools declare a template via \texttt{\_meta.ui.resourceUri}; templates live
+at \texttt{ui://} resources.
+\item Predeclaration lets the host prefetch, cache, and \emph{review} before any
+tool runs. Review is the real benefit.
+\item Sandboxed iframe. No parent DOM, no cookies, no network unless the server
+declared origins.
+\item Every UI-initiated tool call goes through the host's normal consent and
+audit path. This rule is what makes the rest safe.
+\item \texttt{structuredContent} feeds the app, \texttt{content} feeds the
+model, and that split is how an app saves context.
+\item Build an app when the next three questions are clicks. Otherwise return
+text.
+\item Always degrade gracefully. Not every host renders apps, and your text
+result must stand alone.
+\end{itemize}
+
+That closes Part~II. You have the whole capability surface now: tools,
+resources, prompts, multi round-trip requests, extensions with Tasks, and Apps.
+Part~III builds something with them.

@@ -1,0 +1,106 @@
+\chapter*{How to read this book}
+\addcontentsline{toc}{chapter}{How to read this book}
+\markboth{How to read this book}{How to read this book}
+
+The book is five parts and an epilogue, and they build. Part~I is load-bearing
+for everything after it. The rest can be raided.
+
+\begin{description}[leftmargin=0pt, style=nextline, itemsep=8pt]
+
+\item[Part I, Protocol Fundamentals (Chapters 1 to 4)]
+The physics, then the wire. Chapter~\ref{ch:primer} sets up the three budgets
+every agentic application spends: latency, context, and cost. Every later
+chapter cashes out against those three. Chapters~\ref{ch:architecture}
+to~\ref{ch:authorization} are the stateless core, both transports down to the
+bytes, and OAuth as MCP actually uses it. Do not skip Chapter~\ref{ch:primer}.
+It is short and the rest of the book assumes it.
+
+\item[Part II, The Primitives (Chapters 5 to 10)]
+Tools, resources, prompts, multi round-trip requests, the extensions framework
+with Tasks, and MCP Apps. Every chapter has the same shape: how it works on the
+wire, what it costs, and when to use it. These are reasonably independent, so
+read the ones you need.
+
+\item[Part III, Building MCP Applications (Chapters 11 to 14)]
+The hands-on arc. Servers, hosts, the agent loop, and multi-agent topologies.
+If you learn by building, start here and jump backwards when something does not
+make sense.
+
+\item[Part IV, Performance Engineering (Chapters 15 to 18)]
+Test it, measure it, optimise it, run it. This is the part the book exists for.
+Chapter~\ref{ch:optimizing} is the one to photocopy and pin up.
+
+\item[Part V, Security and Trust (Chapters 19 and 20)]
+Threat modelling and access control. Read Chapter~\ref{ch:threats} before you
+expose anything to the public internet, not after.
+
+\end{description}
+
+\section*{Three routes through}
+
+\textbf{You are building a server.} Chapters~\ref{ch:primer},
+\ref{ch:architecture}, \ref{ch:transport}, \ref{ch:tools}, \ref{ch:resources},
+\ref{ch:building-servers}, \ref{ch:testing}, then \ref{ch:threats}. Then
+Chapter~\ref{ch:optimizing} once it works.
+
+\textbf{You are building a host or a client.} Chapters~\ref{ch:primer},
+\ref{ch:architecture}, \ref{ch:transport}, \ref{ch:mrtr},
+\ref{ch:building-hosts}, \ref{ch:agent-loop}, then all of Part~IV. The host is
+the trust boundary, so Chapter~\ref{ch:access-control} matters more to you than
+to anyone else.
+
+\textbf{Something is slow and you need it fixed by Friday.}
+Chapter~\ref{ch:primer} for the budgets, Chapter~\ref{ch:measuring} to find out
+where the time goes, Chapter~\ref{ch:optimizing} to get it back.
+Appendix~\ref{ch:perf-checklist} is the one-page version if it needs fixing by
+Wednesday.
+
+\section*{The furniture}
+
+Four kinds of box appear throughout, and they mean specific things.
+
+\begin{legacybox}{What a legacy box looks like}
+A feature that is Deprecated under the lifecycle policy, or a pattern from an
+earlier revision. It is here so you can recognise and maintain it. It is never
+a recommendation.
+\end{legacybox}
+
+\begin{measurebox}{What a measurement box looks like}
+A number from an actual run of the Meridian harness. If part of it is modelled
+rather than measured, the box says which part.
+\end{measurebox}
+
+\begin{dangerbox}{What a threat box looks like}
+An attack that works. These appear from Chapter~\ref{ch:architecture} onwards,
+not just in Part~V, because security is a design input and not a final coat of
+paint.
+\end{dangerbox}
+
+\keyidea{And a line like this is the one-sentence version of the argument you
+just read. If you remember nothing else from a section, remember these.}
+
+Code listings come in three flavours. Wire dumps on a blue ground are literal
+JSON-RPC, exactly as it appears on the connection. HTTP exchanges show real
+headers, including the ones \texttt{2026-07-28} made mandatory. Everything else
+is Python or TypeScript, extracted from the Meridian repository, which means it
+compiles and its tests pass.
+
+\section*{The companion repository}
+
+\begin{center}
+\texttt{https://github.com/krimler/Building-Awesome-MCP-Apps}
+\end{center}
+
+\noindent Clone it before Chapter~\ref{ch:primer} if you want to follow along.
+You need Python 3.11 or later and nothing else at all.
+
+\begin{sh}
+git clone https://github.com/krimler/Building-Awesome-MCP-Apps
+cd Building-Awesome-MCP-Apps
+make test     # 134 tests, about two seconds
+make bench    # regenerates every number printed in this book
+\end{sh}
+
+\noindent Appendix~\ref{ch:companion} is the guided tour.
+
+\cleardoublepage

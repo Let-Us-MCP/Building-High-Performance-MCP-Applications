@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Optimizing for Latency, Tokens, and Cost &middot; Building Awesome MCP Apps</title>
+<meta name="description" content="Optimizing for Latency, Tokens, and Cost. What every AI application developer should know about the Model Context Protocol">
+<meta property="og:title" content="Optimizing for Latency, Tokens, and Cost">
+<meta property="og:description" content="Optimizing for Latency, Tokens, and Cost. What every AI application developer should know about the Model Context Protocol">
+<style>
+:root{
+  --ink:#15181D; --muted:#5B6472; --rule:#D8DDE4; --wash:#F5F6F8;
+  --paper:#FFFFFF; --accent:#0F5C8C; --accent-soft:#E7F0F6;
+  --warm:#B4531A; --warm-soft:#FBF0E7; --good:#2C6E49; --good-soft:#E9F2EC;
+  --danger:#9B2226; --danger-soft:#FAECEC;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#E7EAEE; --muted:#98A2B0; --rule:#2C333D; --wash:#171B21;
+    --paper:#0F1216; --accent:#63AEDC; --accent-soft:#14232E;
+    --warm:#E08B4F; --warm-soft:#2A1D13; --good:#6FBF8E; --good-soft:#13221A;
+    --danger:#E4796F; --danger-soft:#291516;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--serif);font-size:18px;line-height:1.62;
+  -webkit-text-size-adjust:100%}
+.layout{display:grid;grid-template-columns:288px minmax(0,1fr);
+  max-width:1280px;margin:0 auto;gap:0}
+nav.toc{position:sticky;top:0;height:100vh;overflow-y:auto;padding:26px 20px 60px;
+  border-right:1px solid var(--rule);font-family:var(--sans);font-size:14px}
+nav.toc .brand{display:block;font-weight:700;font-size:16px;color:var(--ink);
+  text-decoration:none;line-height:1.3;margin-bottom:4px}
+nav.toc .tagline{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.45}
+nav.toc .part{margin:18px 0 6px;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);font-weight:700}
+nav.toc a{display:block;padding:4px 8px;margin-left:-8px;border-radius:5px;
+  color:var(--muted);text-decoration:none}
+nav.toc a:hover{background:var(--wash);color:var(--ink)}
+nav.toc a.current{background:var(--accent-soft);color:var(--accent);font-weight:600}
+main{padding:44px 52px 120px;min-width:0;max-width:78ch}
+h1,h2,h3,h4{font-family:var(--sans);line-height:1.25;color:var(--ink)}
+h1{font-size:2.05em;margin:0 0 .55em;letter-spacing:-.015em}
+h2{font-size:1.42em;margin:2em 0 .5em;padding-top:.35em}
+h3{font-size:1.14em;margin:1.7em 0 .4em}
+h4{font-size:1em;margin:1.4em 0 .3em;color:var(--muted)}
+p{margin:0 0 1.05em}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.855em;background:var(--wash);
+  padding:.12em .36em;border-radius:4px;word-break:break-word}
+pre{background:var(--wash);border-left:3px solid var(--rule);
+  border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+  font-size:13.5px;line-height:1.5;margin:1.3em 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+pre.json,pre.http{background:var(--accent-soft);border-left-color:var(--accent)}
+aside.box{border-left:3px solid var(--rule);background:var(--wash);
+  padding:14px 18px;margin:1.5em 0;border-radius:0 6px 6px 0;font-size:.955em}
+aside.box .box-title{font-family:var(--sans);font-weight:700;font-size:12px;
+  letter-spacing:.07em;text-transform:uppercase;margin:0 0 .55em}
+aside.box.legacy{border-left-color:var(--warm);background:var(--warm-soft)}
+aside.box.legacy .box-title{color:var(--warm)}
+aside.box.measured{border-left-color:var(--good);background:var(--good-soft)}
+aside.box.measured .box-title{color:var(--good)}
+aside.box.threat{border-left-color:var(--danger);background:var(--danger-soft)}
+aside.box.threat .box-title{color:var(--danger)}
+aside.box.note .box-title{color:var(--muted)}
+aside.keyidea{border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:14px 18px;margin:1.6em 0;border-radius:0 6px 6px 0;
+  font-family:var(--sans);font-style:italic;font-size:.97em}
+aside.keyidea p:last-child,aside.box p:last-child{margin-bottom:0}
+aside.keyidea pre,aside.keyidea code,aside.keyidea table{font-style:normal}
+aside.epigraph{border:0;margin:0 0 2em;padding:0 0 0 clamp(0px,7%,52px);
+  color:var(--muted);font-size:.97em}
+aside.epigraph p{margin:0 0 .3em}
+main figure{margin:2em 0;text-align:center}
+main figure img{max-width:100%;height:auto;border-radius:6px}
+@media (prefers-color-scheme: dark){
+  main figure img{background:#fff;padding:10px;border-radius:8px}
+}
+figcaption{font-family:var(--sans);font-size:13.5px;color:var(--muted);
+  margin-top:.7em;text-align:left;line-height:1.5}
+.table-wrap{overflow-x:auto;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:14.5px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+thead th{border-bottom:2px solid var(--rule);font-weight:700}
+caption{caption-side:bottom;font-size:13.5px;color:var(--muted);
+  text-align:left;padding-top:.7em;line-height:1.5}
+ul,ol{padding-left:1.35em;margin:0 0 1.05em}
+li{margin-bottom:.32em}
+dl{margin:0 0 1.05em}
+dt{font-weight:700;font-family:var(--sans);font-size:.95em;margin-top:.75em}
+dd{margin:.15em 0 0 1.35em}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
+.pager{display:flex;justify-content:space-between;gap:16px;margin-top:4em;
+  padding-top:1.5em;border-top:1px solid var(--rule);font-family:var(--sans);
+  font-size:14px}
+.pager a{text-decoration:none;max-width:46%}
+.pager .dir{display:block;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted)}
+.masthead{border-bottom:1px solid var(--rule);padding-bottom:1.8em;margin-bottom:2.2em}
+.masthead .kicker{font-family:var(--sans);font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);font-weight:700}
+.lede{font-size:1.12em;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:14px;margin:1.8em 0}
+.card{border:1px solid var(--rule);border-radius:9px;padding:15px 17px;
+  font-family:var(--sans);font-size:14px}
+.card h3{margin:0 0 .35em;font-size:15px}
+.card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+.menu-btn{display:none}
+@media (max-width:940px){
+  body{font-size:17px}
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:0;
+    border-bottom:1px solid var(--rule);max-height:none}
+  nav.toc.collapsed .toc-body{display:none}
+  main{padding:28px 20px 90px}
+  .menu-btn{display:inline-block;font-family:var(--sans);font-size:13px;
+    background:var(--wash);border:1px solid var(--rule);color:var(--ink);
+    border-radius:6px;padding:6px 11px;cursor:pointer;margin-bottom:10px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc"><button class="menu-btn" type="button">Contents</button>
+<div class="toc-body">
+<a class="brand" href="index.html">Building Awesome MCP Apps</a>
+<p class="tagline">What every AI application developer should know about the Model Context Protocol</p>
+<a href="preface.html">Preface</a>
+<a href="how-to-read.html">How to read this book</a>
+<div class="part">Part I. Protocol Fundamentals</div>
+<a href="ch01.html">A Primer on Latency, Tokens, and Context</a>
+<a href="ch02.html">The MCP Architectural Model</a>
+<a href="ch03.html">Building Blocks of the Transport</a>
+<a href="ch04.html">Authorization on the Wire</a>
+<div class="part">Part II. The Primitives</div>
+<a href="ch05.html">Tools: The Execution Layer</a>
+<a href="ch06.html">Resources: The Context Layer</a>
+<a href="ch07.html">Prompts: Workflow Blueprints</a>
+<a href="ch08.html">Multi Round-Trip Requests</a>
+<a href="ch09.html">Extensions and Tasks</a>
+<a href="ch10.html">MCP Apps: Interactive Interfaces</a>
+<div class="part">Part III. Building MCP Applications</div>
+<a href="ch11.html">Building Servers</a>
+<a href="ch12.html">Building Hosts and Clients</a>
+<a href="ch13.html">The Agent Loop, State, and Memory</a>
+<a href="ch14.html">Multi-Agent Topologies</a>
+<div class="part">Part IV. Performance Engineering</div>
+<a href="ch15.html">Testing and Debugging</a>
+<a href="ch16.html">Measuring MCP Applications</a>
+<a href="ch17.html" class="current">Optimizing for Latency, Tokens, and Cost</a>
+<a href="ch18.html">Deployment and Operations</a>
+<div class="part">Part V. Security and Trust</div>
+<a href="ch19.html">Threat Modeling Agentic Applications</a>
+<a href="ch20.html">Access Control, Audit, and MCP in the Enterprise</a>
+<div class="part">Back matter</div>
+<a href="epilogue.html">Epilogue: The Evolving Protocol</a>
+<div class="part">Appendices</div>
+<a href="appendix-a.html">A. Method and Message Reference</a>
+<a href="appendix-b.html">B. Transport Decision Matrix</a>
+<a href="appendix-c.html">C. Performance Checklist</a>
+<a href="appendix-d.html">D. Security Hardening Checklist</a>
+<a href="appendix-e.html">E. The Meridian Companion Repository</a>
+<a href="about.html">About the author</a>
+</div></nav>
+<main>
+<section id="ch:optimizing" class="level1">
+<h1>Optimizing for Latency, Tokens, and Cost</h1>
+<aside class="epigraph">
+<p><em>“Every second I’m in this room, I’m getting worse.”</em></p>
+<p>Frankie Dunn, <em>Million Dollar Baby</em> (2004)</p>
+</aside>
+<p>This is the chapter the rest of the book has been setting up. Everything from here is a technique, a measurement, and an honest note about when it does not help.</p>
+<p>One ground rule before we start, and it is the whole discipline: <strong>every change gets attributed</strong>. Not “we did six things and it got faster”. Six numbers, one per change, including the ones that turned out to be worth nothing. Chapter <a href="ch16.html#ch:measuring">16</a> gave you the instrument; this chapter uses it.</p>
+<section id="the-meridian-optimisation-pass" class="level2">
+<h2>The Meridian optimisation pass</h2>
+<p>Same task throughout: score an account for credit risk, screen it for fraud, and fetch the reference curve. Four servers, 12 ms simulated per-call latency.</p>
+<figure id="fig:optimization">
+<img src="figures/optimization.svg" />
+<figcaption>Four changes, measured cumulatively. Note that the two panels improve at different steps, which is the point of measuring them separately.</figcaption>
+</figure>
+<aside class="box measured"><p class="box-title">Measured: The full pass, attributed</p>
+<table>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Change</strong></td>
+<td style="text-align: right;"><strong>Iterations</strong></td>
+<td style="text-align: right;"><strong>Wall</strong></td>
+<td style="text-align: right;"><strong>Tokens</strong></td>
+<td style="text-align: right;"><strong>Cost</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Baseline (38 tools, one call per turn)</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">1<span>,</span>753 ms</td>
+<td style="text-align: right;">22<span>,</span>846</td>
+<td style="text-align: right;">$0.0690</td>
+</tr>
+<tr>
+<td style="text-align: left;">Trim the catalogue to 10 tools</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">1<span>,</span>751 ms</td>
+<td style="text-align: right;">5<span>,</span>370</td>
+<td style="text-align: right;">$0.0166</td>
+</tr>
+<tr>
+<td style="text-align: left;">Batch independent calls into one turn</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">1<span>,</span>067 ms</td>
+<td style="text-align: right;">2<span>,</span>692</td>
+<td style="text-align: right;">$0.0086</td>
+</tr>
+<tr>
+<td style="text-align: left;">Fan out that batch in parallel</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">1<span>,</span>014 ms</td>
+<td style="text-align: right;">2<span>,</span>692</td>
+<td style="text-align: right;">$0.0086</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Total</strong></td>
+<td style="text-align: right;"><strong>4 <span class="math inline">→</span> 2</strong></td>
+<td style="text-align: right;"><strong>-42.2 %</strong></td>
+<td style="text-align: right;"><strong>-88.2 %</strong></td>
+<td style="text-align: right;"><strong>-87.6 %</strong></td>
+</tr>
+</tbody>
+</table>
+</aside>
+<p>Read that table row by row, because each row teaches something different.</p>
+<p><strong>Trimming the catalogue saved 76 % of tokens and zero milliseconds.</strong> The catalogue is not on the critical path for latency; it is on the critical path for cost. Two budgets, two levers, and confusing them is how people spend a sprint on the wrong one.</p>
+<p><strong>Batching saved both, and by the most.</strong> Four iterations became two, which halved the model turns, which is where 96 % of the wall clock lives. This is the round-trip lesson from Chapter <a href="ch01.html#ch:primer">1</a>, cashed out.</p>
+<p><strong>Parallel fan-out saved 53 ms of a 1,067 ms task.</strong> Real, worth having, and five percent. At 12 ms per call there is not much to win; at 40 ms there is three times more.</p>
+<aside class="keyidea">
+<p>Optimise iterations first, catalogue second, transport third. That is the order of magnitude order, and it is stable across every system I have measured.</p>
+</aside>
+</section>
+<section id="cut-round-trips" class="level2">
+<h2>Cut round trips</h2>
+<p>The category that returns the most, always.</p>
+<section id="front-load-mrtr-inputs" class="level3">
+<h3>Front-load MRTR inputs</h3>
+<p>An elicitation costs about 375 ms, of which 35 is transport and 340 is the model turn it forces (Chapter <a href="ch08.html#ch:mrtr">8</a>). So the cheapest elicitation is the one that never happens.</p>
+<pre class="python" data-language="python"><code>&quot;exposureUsd&quot;: {
+    &quot;type&quot;: &quot;number&quot;, &quot;minimum&quot;: 0,
+    &quot;description&quot;: &quot;Proposed exposure. Above 5,000,000 an &quot;
+                   &quot;approver is required before scoring.&quot;,
+},</code></pre>
+<p>That description is an optimisation. The model reads it, sees the threshold, and can collect the approver from the user <em>before</em> calling, in a turn it was going to spend anyway. When it works, the round trip disappears entirely.</p>
+<p>Better still, take the approver as an optional argument, so a model that already knows it can supply it and skip the interrupt.</p>
+</section>
+<section id="batch-arguments" class="level3">
+<h3>Batch arguments</h3>
+<p><code>rank_portfolio_risk</code> exists for exactly one reason:</p>
+<aside class="box measured"><p class="box-title">Measured: Portfolio review, 40 accounts</p>
+<table>
+<tbody>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: right;"><strong>Per-account tool</strong></td>
+<td style="text-align: right;"><strong>Batch tool</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Round trips</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr>
+<td style="text-align: left;">Model turns</td>
+<td style="text-align: right;">41</td>
+<td style="text-align: right;">2</td>
+</tr>
+<tr>
+<td style="text-align: left;">Estimated wall clock</td>
+<td style="text-align: right;">~18 s</td>
+<td style="text-align: right;">~0.9 s</td>
+</tr>
+</tbody>
+</table>
+<p>Wall clock extrapolated from the measured 440 ms mean model turn. The round-trip counts are exact.</p>
+</aside>
+<p>Twenty times faster, from one extra tool. And the server-side description points the model at it:</p>
+<pre class="python" data-language="python"><code>&quot;Rank a set of accounts by risk score in one call. Prefer this over &quot;
+&quot;calling assess_account_risk repeatedly.&quot;</code></pre>
+</section>
+<section id="let-the-model-batch-then-fan-out" class="level3">
+<h3>Let the model batch, then fan out</h3>
+<p>Two separate things that people conflate.</p>
+<p><em>Batching</em> is the model emitting three tool calls in one turn instead of three turns. That saves model turns, which is the expensive part.</p>
+<p><em>Fan-out</em> is the host executing those three concurrently. That saves transport time, which is the cheap part.</p>
+<p>The measurement above shows the split precisely: batching took 1,751 ms to 1,067 ms, and fan-out took 1,067 to 1,014. Batching is thirteen times more valuable, and it is the one that depends on your <em>tool design</em> rather than on your host code.</p>
+</section>
+<section id="prefetch-app-templates" class="level3">
+<h3>Prefetch App templates</h3>
+<p>Predeclared <code>ui://</code> templates can be fetched during idle time (Chapter <a href="ch10.html#ch:apps">10</a>). Meridian’s is 2.6 KB with a 24-hour public TTL, so after the first fetch it is free forever. Cold, it is a resource read in the critical path of the first render.</p>
+</section>
+</section>
+<section id="cache-at-every-layer" class="level2">
+<h2>Cache at every layer</h2>
+<section id="honour-ttlms" class="level3">
+<h3>Honour <code>ttlMs</code></h3>
+<p>The single cheapest win in the book, and the measurement is stark:</p>
+<aside class="box measured"><p class="box-title">Measured: Per-task setup, 20 consecutive tasks, four servers</p>
+<table>
+<tbody>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: right;"><strong>Re-fetch every task</strong></td>
+<td style="text-align: right;"><strong>Honour <code>ttlMs</code></strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Requests issued (total)</td>
+<td style="text-align: right;">164</td>
+<td style="text-align: right;">8</td>
+</tr>
+<tr>
+<td style="text-align: left;">Setup time per task</td>
+<td style="text-align: right;">274.1 ms</td>
+<td style="text-align: right;">2.5 ms</td>
+</tr>
+</tbody>
+</table>
+<p>The naive host re-runs <code>server/discover</code> and <code>tools/list</code> against all four servers before every task. The honouring host does it once.</p>
+</aside>
+<p>Twenty times fewer requests, and a hundred times less setup latency, from respecting a field the server already sends you. If you implement one thing from this chapter, implement this.</p>
+<p>And the resource-read side, from Chapter <a href="ch06.html#ch:resources">6</a>: 577 of 600 reads avoided, 96.2 % hit rate, 6.82<span class="math inline">×</span> faster.</p>
+</section>
+<section id="use-cachescope-public-where-it-is-true" class="level3">
+<h3>Use <code>cacheScope: public</code> where it is true</h3>
+<p>A <code>public</code> result can be served by a shared gateway to every user. For Meridian’s market-data server, which returns identical data to everybody, that turns N clients’ worth of load into one fetch.</p>
+<p>For anything personalised, it is a data breach. Chapter <a href="ch06.html#ch:resources">6</a> has the reasoning; the rule is that <code>public</code> is a claim about the <em>content</em>, not about the endpoint’s authentication.</p>
+</section>
+<section id="stable-ordering-for-the-providers-prompt-cache" class="level3">
+<h3>Stable ordering, for the provider’s prompt cache</h3>
+<p>Deterministic <code>tools/list</code> ordering is a specification SHOULD, and the reason is prompt caching. Providers cache on a stable prefix. Reorder your catalogue and every request misses.</p>
+<pre class="python" data-language="python"><code>def test_tools_list_order_is_stable(self):
+    &quot;&quot;&quot;Unstable ordering silently destroys the provider&#39;s prompt cache.&quot;&quot;&quot;</code></pre>
+<p>The word “silently” is the problem. Nothing errors. Your server looks healthy. You just pay full prompt-processing price on every turn forever.</p>
+<p>The same discipline applies to your host’s merged catalogue (<code>sorted(self.bindings)</code>) and to your system prompt, which should not contain a timestamp.</p>
+</section>
+<section id="invalidate-on-notification" class="level3">
+<h3>Invalidate on notification</h3>
+<p>TTL and <code>listChanged</code> together let you run long TTLs safely. Without the notification you must choose between staleness and refetching; with it you can have a five-minute TTL and still see changes in milliseconds.</p>
+</section>
+</section>
+<section id="stream-everything" class="level2">
+<h2>Stream everything</h2>
+<p>Perceived latency is the latency. The Meridian baseline is 1,366 ms and 96 % of it is model inference you cannot speed up, so the remaining lever is making the wait legible.</p>
+<ul>
+<li><p><strong>Token streaming.</strong> Time to first token is 340 ms of a 440 ms turn. Stream, and the user waits 340 ms instead of 440.</p></li>
+<li><p><strong>Progress notifications.</strong> Free UX from any server that emits them. Forward them.</p></li>
+<li><p><strong>Partial results.</strong> Chapter <a href="ch13.html#ch:agent-loop">13</a> argued for this; the measurement here is why. Iteration 0 finishes at 447 ms of a 1,366 ms task, so showing its result buys the user two thirds of the wait back.</p></li>
+<li><p><strong><code>X-Accel-Buffering: no</code></strong> on every SSE response, or a proxy will buffer your carefully streamed events into one lump at the end.</p></li>
+</ul>
+</section>
+<section id="transport-tuning" class="level2">
+<h2>Transport tuning</h2>
+<p>The smallest category, included because it is cheap and because people ask.</p>
+<section id="reuse-connections" class="level3">
+<h3>Reuse connections</h3>
+<pre class="python" data-language="python"><code>def _connection(self):
+    &quot;&quot;&quot;Reuse the connection. HTTP/1.1 keep-alive is the cheapest win in the
+    whole transport and costs one line of bookkeeping.&quot;&quot;&quot;
+    if self._conn is not None:
+        self.reused_connections += 1
+        return self._conn
+    ...</code></pre>
+<pre class="python" data-language="python"><code>def test_connection_is_reused(self):
+    transport = StreamableHttpClient(self.url)
+    client = Client(transport, server_label=&quot;wire&quot;)
+    for _ in range(5):
+        client.call_tool(&quot;echo&quot;, {&quot;text&quot;: &quot;x&quot;})
+    self.assertEqual(transport.new_connections, 1)
+    self.assertGreaterEqual(transport.reused_connections, 4)</code></pre>
+<p>On loopback this saves almost nothing. Over TLS to another region it saves a TCP handshake plus a TLS handshake per call, which is two extra round trips, which at 68 ms each is 136 ms you were about to pay repeatedly.</p>
+</section>
+<section id="warm-pools-for-stdio" class="level3">
+<h3>Warm pools for stdio</h3>
+<aside class="box measured"><p class="box-title">Measured: stdio cold start</p>
+<table>
+<tbody>
+<tr>
+<td style="text-align: left;">Spawn to first usable response</td>
+<td style="text-align: right;">44.6 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;">Warm call</td>
+<td style="text-align: right;">0.060 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;">Calls to amortise one spawn</td>
+<td style="text-align: right;">~750</td>
+</tr>
+</tbody>
+</table>
+</aside>
+<p>Spawn-per-call is indefensible for anything but a one-shot CLI. Keep a pool, size it to your concurrency, and recycle processes on a schedule rather than per request.</p>
+</section>
+<section id="let-the-gateway-route-on-headers" class="level3">
+<h3>Let the gateway route on headers</h3>
+<p><code>Mcp-Method</code> and <code>Mcp-Name</code> exist so intermediaries need not parse bodies. Use them: send <code>tools/list</code> to a cache tier and <code>tools/call</code> to a compute tier, rate-limit per method, apply strict WAF policy to the two tools that matter and relaxed policy to the rest.</p>
+<p>And validate them, always, because two sources of truth that can disagree is a request-smuggling primitive (Chapter <a href="ch03.html#ch:transport">3</a>).</p>
+</section>
+</section>
+<section id="spend-tokens-deliberately" class="level2">
+<h2>Spend tokens deliberately</h2>
+<section id="right-size-the-catalogue" class="level3">
+<h3>Right-size the catalogue</h3>
+<p>The biggest single token lever, measured twice now:</p>
+<aside class="box measured"><p class="box-title">Measured: Catalogue cost</p>
+<table>
+<tbody>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: right;"><strong>REST mirror</strong></td>
+<td style="text-align: right;"><strong>Task-shaped</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Tools</td>
+<td style="text-align: right;">38</td>
+<td style="text-align: right;">10</td>
+</tr>
+<tr>
+<td style="text-align: left;">Tokens per turn</td>
+<td style="text-align: right;">5<span>,</span>617</td>
+<td style="text-align: right;">1<span>,</span>246</td>
+</tr>
+<tr>
+<td style="text-align: left;">Tokens per task (4 turns)</td>
+<td style="text-align: right;">22<span>,</span>846</td>
+<td style="text-align: right;">5<span>,</span>370</td>
+</tr>
+<tr>
+<td style="text-align: left;">Cost per task</td>
+<td style="text-align: right;">$0.0690</td>
+<td style="text-align: right;">$0.0166</td>
+</tr>
+</tbody>
+</table>
+</aside>
+<p>Four techniques, in order of how much they usually return:</p>
+<ol>
+<li><p><strong>Delete unused tools.</strong> Check your telemetry. Anything with no calls in 90 days is pure cost.</p></li>
+<li><p><strong>Merge near-duplicates.</strong> Three tools that differ by one flag should be one tool with a parameter.</p></li>
+<li><p><strong>Compress descriptions.</strong> Lead with the outcome, drop the transport trivia. Chapter <a href="ch05.html#ch:tools">5</a> has the before and after.</p></li>
+<li><p><strong>Filter per task.</strong> Send the tools plausibly relevant to this request. Costs a retrieval step, and it is the only technique that scales past a few dozen tools.</p></li>
+</ol>
+</section>
+<section id="structured-outputs-eliminate-parse-retry-loops" class="level3">
+<h3>Structured outputs eliminate parse-retry loops</h3>
+<p>Chapter <a href="ch05.html#ch:tools">5</a> made the correctness argument. The performance argument is the retry: a misparse costs a full model turn, roughly 440 ms and 1,300 input tokens, and client-side validation against an <code>outputSchema</code> catches the malformed response at the boundary instead.</p>
+<p>An <code>enum</code> is worth extra attention. Telling the model that <code>band</code> is one of four values stops it inventing a fifth and stops it writing defensive handling for cases that cannot occur.</p>
+</section>
+<section id="truncate-tool-results-before-they-enter-context" class="level3">
+<h3>Truncate tool results before they enter context</h3>
+<pre class="python" data-language="python"><code>return text if len(text) &lt;= limit else text[:limit] + &quot;...[truncated]&quot;</code></pre>
+<p>Blunt, and better than unbounded. Chapter <a href="ch13.html#ch:agent-loop">13</a> has the more sophisticated options; the important thing is that a bound exists, because a single 40 KB tool result poisons every subsequent turn of the task.</p>
+</section>
+<section id="tune-task-polling" class="level3">
+<h3>Tune task polling</h3>
+<p>For the Tasks extension, cadence is a direct token and request cost. Honour <code>pollIntervalMs</code>, back off for long jobs, and add jitter so a thousand clients that started together do not stay together.</p>
+</section>
+</section>
+<section id="route-models" class="level2">
+<h2>Route models</h2>
+<p>Not every turn needs your best model.</p>
+<table id="tab:routing">
+<caption>In a long task the middle rows are the majority of turns, which is what makes routing worth the complexity.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Turn</strong></td>
+<td style="text-align: left;"><strong>Cognitive load</strong></td>
+<td style="text-align: left;"><strong>Model</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Initial planning</td>
+<td style="text-align: left;">High. Real reasoning</td>
+<td style="text-align: left;">Large</td>
+</tr>
+<tr>
+<td style="text-align: left;">Tool selection from 3 options</td>
+<td style="text-align: left;">Low. Classification</td>
+<td style="text-align: left;">Small</td>
+</tr>
+<tr>
+<td style="text-align: left;">Reading a structured result</td>
+<td style="text-align: left;">Low. Extraction</td>
+<td style="text-align: left;">Small</td>
+</tr>
+<tr>
+<td style="text-align: left;">Deciding whether to stop</td>
+<td style="text-align: left;">Medium. Judgement</td>
+<td style="text-align: left;">Large</td>
+</tr>
+<tr>
+<td style="text-align: left;">Summarising for context</td>
+<td style="text-align: left;">Low. Compression</td>
+<td style="text-align: left;">Small</td>
+</tr>
+<tr>
+<td style="text-align: left;">Final synthesis</td>
+<td style="text-align: left;">High. Composition</td>
+<td style="text-align: left;">Large</td>
+</tr>
+</tbody>
+</table>
+<p>Two warnings, both learned expensively.</p>
+<p><strong>Measure the frontier, do not reason about it.</strong> Run your eval suite at each mix. It is common to move most turns to a small model and lose nothing measurable. It is also common to lose 15 points of task success, and which one you are in is not predictable from first principles.</p>
+<p><strong>A cheap wrong answer is not cheap.</strong> A small model that picks the wrong tool costs a full recovery cycle: another model turn, another tool call, another model turn. That is more expensive than the large model would have been.</p>
+</section>
+<section id="the-order-to-do-things-in" class="level2">
+<h2>The order to do things in</h2>
+<table id="tab:optimisation-order">
+<caption>Roughly descending value per unit effort. Row nine is from the preface, and it is there to be looked at again.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>#</strong></td>
+<td style="text-align: left;"><strong>Change</strong></td>
+<td style="text-align: left;"><strong>Typical return</strong></td>
+<td style="text-align: left;"><strong>Effort</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">Honour <code>ttlMs</code></td>
+<td style="text-align: left;">20<span class="math inline">×</span> fewer setup requests</td>
+<td style="text-align: left;">one afternoon</td>
+</tr>
+<tr>
+<td style="text-align: left;">2</td>
+<td style="text-align: left;">Trim the catalogue</td>
+<td style="text-align: left;">76 % of tokens</td>
+<td style="text-align: left;">one conversation</td>
+</tr>
+<tr>
+<td style="text-align: left;">3</td>
+<td style="text-align: left;">Add batch variants of looped tools</td>
+<td style="text-align: left;">20<span class="math inline">×</span> on portfolio tasks</td>
+<td style="text-align: left;">one tool</td>
+</tr>
+<tr>
+<td style="text-align: left;">4</td>
+<td style="text-align: left;">Batch and fan out</td>
+<td style="text-align: left;">40 % of wall clock</td>
+<td style="text-align: left;">host change</td>
+</tr>
+<tr>
+<td style="text-align: left;">5</td>
+<td style="text-align: left;">Deterministic ordering</td>
+<td style="text-align: left;">prompt-cache hits</td>
+<td style="text-align: left;">one <code>sorted()</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">6</td>
+<td style="text-align: left;">Stream tokens and progress</td>
+<td style="text-align: left;">perceived latency</td>
+<td style="text-align: left;">UI work</td>
+</tr>
+<tr>
+<td style="text-align: left;">7</td>
+<td style="text-align: left;">Connection reuse, warm pools</td>
+<td style="text-align: left;">2 RTT per call</td>
+<td style="text-align: left;">config</td>
+</tr>
+<tr>
+<td style="text-align: left;">8</td>
+<td style="text-align: left;">Route models</td>
+<td style="text-align: left;">30 to 60 % of cost</td>
+<td style="text-align: left;">eval work</td>
+</tr>
+<tr>
+<td style="text-align: left;">9</td>
+<td style="text-align: left;">Rewrite the server in a fast language</td>
+<td style="text-align: left;">3 ms</td>
+<td style="text-align: left;">three weeks</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="what-did-not-help" class="level2">
+<h2>What did not help</h2>
+<p>The section every performance chapter should have and almost none do.</p>
+<p><strong>Trimming the catalogue did not reduce latency.</strong> Zero milliseconds, twice measured. Tokens and time are different budgets.</p>
+<p><strong>Caching did not speed up the loop itself.</strong> Meridian fetches its catalogue before the loop starts, so the loop never touches the cache. Caching helped the setup path enormously and the loop not at all. If you had measured only the loop, you would have concluded caching was useless.</p>
+<p><strong>Parallel fan-out returned 5 % at 12 ms per call.</strong> Real, worth keeping, and not the story. At 40 ms it is worth three times more, which is a reminder that the value of an optimisation depends on the environment you measured it in.</p>
+<p><strong>The <code>_meta</code> envelope’s 160 % byte overhead is irrelevant.</strong> It looks alarming and it is 197 bytes on a request whose unit of work is hundreds of milliseconds of inference. Do not optimise it. I have watched somebody try.</p>
+<aside class="keyidea">
+<p>Publish the changes that did not work. They are how you stop the next person spending a sprint on the thing you already measured.</p>
+</aside>
+</section>
+<section id="meridian-before-and-after" class="level2">
+<h2>Meridian, before and after</h2>
+<aside class="box measured"><p class="box-title">Measured: The complete pass</p>
+<table>
+<tbody>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: right;"><strong>Before</strong></td>
+<td style="text-align: right;"><strong>After</strong></td>
+<td style="text-align: right;"><strong>Change</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Loop iterations</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">-50 %</td>
+</tr>
+<tr>
+<td style="text-align: left;">Wall clock</td>
+<td style="text-align: right;">1<span>,</span>753 ms</td>
+<td style="text-align: right;">1<span>,</span>014 ms</td>
+<td style="text-align: right;">-42.2 %</td>
+</tr>
+<tr>
+<td style="text-align: left;">Transport time</td>
+<td style="text-align: right;">104.5 ms</td>
+<td style="text-align: right;">36.8 ms</td>
+<td style="text-align: right;">-64.8 %</td>
+</tr>
+<tr>
+<td style="text-align: left;">Tokens per task</td>
+<td style="text-align: right;">22<span>,</span>846</td>
+<td style="text-align: right;">2<span>,</span>692</td>
+<td style="text-align: right;">-88.2 %</td>
+</tr>
+<tr>
+<td style="text-align: left;">Cost per task</td>
+<td style="text-align: right;">$0.0690</td>
+<td style="text-align: right;">$0.0086</td>
+<td style="text-align: right;">-87.6 %</td>
+</tr>
+<tr>
+<td style="text-align: left;">Setup requests (20 tasks)</td>
+<td style="text-align: right;">164</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">-95.1 %</td>
+</tr>
+<tr>
+<td style="text-align: left;">Cost per 1,000 tasks</td>
+<td style="text-align: right;">$69.01</td>
+<td style="text-align: right;">$8.56</td>
+<td style="text-align: right;"><strong>-$60.45</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Regenerate with <code>make bench</code>. Every row is attributed to a specific change in the table at the top of this chapter.</p>
+</aside>
+<p>No new hardware. No faster language. Four changes, each measured, each attributable, and the largest of them was deleting tools.</p>
+</section>
+<section id="what-to-remember" class="level2">
+<h2>What to remember</h2>
+<ul>
+<li><p>Attribute every change. Six numbers, not one story.</p></li>
+<li><p>Iterations first, catalogue second, transport third.</p></li>
+<li><p>Batching saves model turns; fan-out saves transport. Batching is worth roughly thirteen times more.</p></li>
+<li><p>Honouring <code>ttlMs</code> cut setup requests by 95 %. Do this first.</p></li>
+<li><p>Deterministic ordering protects the provider’s prompt cache, and losing it is silent.</p></li>
+<li><p>Front-load MRTR inputs. The cheapest elicitation is the one that never happens.</p></li>
+<li><p>Structured outputs remove parse-retry loops; enums remove invented values.</p></li>
+<li><p>Route glue turns to small models, and verify with evals rather than intuition.</p></li>
+<li><p>A cheap wrong answer costs a full recovery cycle.</p></li>
+<li><p>Publish what did not work.</p></li>
+</ul>
+<p>Next: running it, once it is fast.</p>
+</section>
+</section>
+<div class="pager">
+<a href="ch16.html"><span class="dir">Previous</span>Measuring MCP Applications</a>
+<a href="ch18.html" style="text-align:right"><span class="dir">Next</span>Deployment and Operations</a>
+</div>
+</main>
+</div>
+<script>
+(function(){
+  var nav = document.querySelector('nav.toc');
+  var btn = document.querySelector('.menu-btn');
+  if(btn && nav){
+    if(window.innerWidth <= 940) nav.classList.add('collapsed');
+    btn.addEventListener('click', function(){ nav.classList.toggle('collapsed'); });
+  }
+  // Wrap tables so wide ones scroll rather than overflowing the page.
+  document.querySelectorAll('main table').forEach(function(t){
+    if(t.parentElement.classList.contains('table-wrap')) return;
+    var w = document.createElement('div');
+    w.className = 'table-wrap';
+    t.parentNode.insertBefore(w, t);
+    w.appendChild(t);
+  });
+})();
+</script>
+</body>
+</html>

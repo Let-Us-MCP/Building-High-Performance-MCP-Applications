@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Access Control, Audit, and MCP in the Enterprise &middot; Building Awesome MCP Apps</title>
+<meta name="description" content="Access Control, Audit, and MCP in the Enterprise. What every AI application developer should know about the Model Context Protocol">
+<meta property="og:title" content="Access Control, Audit, and MCP in the Enterprise">
+<meta property="og:description" content="Access Control, Audit, and MCP in the Enterprise. What every AI application developer should know about the Model Context Protocol">
+<style>
+:root{
+  --ink:#15181D; --muted:#5B6472; --rule:#D8DDE4; --wash:#F5F6F8;
+  --paper:#FFFFFF; --accent:#0F5C8C; --accent-soft:#E7F0F6;
+  --warm:#B4531A; --warm-soft:#FBF0E7; --good:#2C6E49; --good-soft:#E9F2EC;
+  --danger:#9B2226; --danger-soft:#FAECEC;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#E7EAEE; --muted:#98A2B0; --rule:#2C333D; --wash:#171B21;
+    --paper:#0F1216; --accent:#63AEDC; --accent-soft:#14232E;
+    --warm:#E08B4F; --warm-soft:#2A1D13; --good:#6FBF8E; --good-soft:#13221A;
+    --danger:#E4796F; --danger-soft:#291516;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--serif);font-size:18px;line-height:1.62;
+  -webkit-text-size-adjust:100%}
+.layout{display:grid;grid-template-columns:288px minmax(0,1fr);
+  max-width:1280px;margin:0 auto;gap:0}
+nav.toc{position:sticky;top:0;height:100vh;overflow-y:auto;padding:26px 20px 60px;
+  border-right:1px solid var(--rule);font-family:var(--sans);font-size:14px}
+nav.toc .brand{display:block;font-weight:700;font-size:16px;color:var(--ink);
+  text-decoration:none;line-height:1.3;margin-bottom:4px}
+nav.toc .tagline{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.45}
+nav.toc .part{margin:18px 0 6px;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);font-weight:700}
+nav.toc a{display:block;padding:4px 8px;margin-left:-8px;border-radius:5px;
+  color:var(--muted);text-decoration:none}
+nav.toc a:hover{background:var(--wash);color:var(--ink)}
+nav.toc a.current{background:var(--accent-soft);color:var(--accent);font-weight:600}
+main{padding:44px 52px 120px;min-width:0;max-width:78ch}
+h1,h2,h3,h4{font-family:var(--sans);line-height:1.25;color:var(--ink)}
+h1{font-size:2.05em;margin:0 0 .55em;letter-spacing:-.015em}
+h2{font-size:1.42em;margin:2em 0 .5em;padding-top:.35em}
+h3{font-size:1.14em;margin:1.7em 0 .4em}
+h4{font-size:1em;margin:1.4em 0 .3em;color:var(--muted)}
+p{margin:0 0 1.05em}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.855em;background:var(--wash);
+  padding:.12em .36em;border-radius:4px;word-break:break-word}
+pre{background:var(--wash);border-left:3px solid var(--rule);
+  border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+  font-size:13.5px;line-height:1.5;margin:1.3em 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+pre.json,pre.http{background:var(--accent-soft);border-left-color:var(--accent)}
+aside.box{border-left:3px solid var(--rule);background:var(--wash);
+  padding:14px 18px;margin:1.5em 0;border-radius:0 6px 6px 0;font-size:.955em}
+aside.box .box-title{font-family:var(--sans);font-weight:700;font-size:12px;
+  letter-spacing:.07em;text-transform:uppercase;margin:0 0 .55em}
+aside.box.legacy{border-left-color:var(--warm);background:var(--warm-soft)}
+aside.box.legacy .box-title{color:var(--warm)}
+aside.box.measured{border-left-color:var(--good);background:var(--good-soft)}
+aside.box.measured .box-title{color:var(--good)}
+aside.box.threat{border-left-color:var(--danger);background:var(--danger-soft)}
+aside.box.threat .box-title{color:var(--danger)}
+aside.box.note .box-title{color:var(--muted)}
+aside.keyidea{border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:14px 18px;margin:1.6em 0;border-radius:0 6px 6px 0;
+  font-family:var(--sans);font-style:italic;font-size:.97em}
+aside.keyidea p:last-child,aside.box p:last-child{margin-bottom:0}
+aside.keyidea pre,aside.keyidea code,aside.keyidea table{font-style:normal}
+aside.epigraph{border:0;margin:0 0 2em;padding:0 0 0 clamp(0px,7%,52px);
+  color:var(--muted);font-size:.97em}
+aside.epigraph p{margin:0 0 .3em}
+main figure{margin:2em 0;text-align:center}
+main figure img{max-width:100%;height:auto;border-radius:6px}
+@media (prefers-color-scheme: dark){
+  main figure img{background:#fff;padding:10px;border-radius:8px}
+}
+figcaption{font-family:var(--sans);font-size:13.5px;color:var(--muted);
+  margin-top:.7em;text-align:left;line-height:1.5}
+.table-wrap{overflow-x:auto;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:14.5px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+thead th{border-bottom:2px solid var(--rule);font-weight:700}
+caption{caption-side:bottom;font-size:13.5px;color:var(--muted);
+  text-align:left;padding-top:.7em;line-height:1.5}
+ul,ol{padding-left:1.35em;margin:0 0 1.05em}
+li{margin-bottom:.32em}
+dl{margin:0 0 1.05em}
+dt{font-weight:700;font-family:var(--sans);font-size:.95em;margin-top:.75em}
+dd{margin:.15em 0 0 1.35em}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
+.pager{display:flex;justify-content:space-between;gap:16px;margin-top:4em;
+  padding-top:1.5em;border-top:1px solid var(--rule);font-family:var(--sans);
+  font-size:14px}
+.pager a{text-decoration:none;max-width:46%}
+.pager .dir{display:block;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted)}
+.masthead{border-bottom:1px solid var(--rule);padding-bottom:1.8em;margin-bottom:2.2em}
+.masthead .kicker{font-family:var(--sans);font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);font-weight:700}
+.lede{font-size:1.12em;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:14px;margin:1.8em 0}
+.card{border:1px solid var(--rule);border-radius:9px;padding:15px 17px;
+  font-family:var(--sans);font-size:14px}
+.card h3{margin:0 0 .35em;font-size:15px}
+.card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+.menu-btn{display:none}
+@media (max-width:940px){
+  body{font-size:17px}
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:0;
+    border-bottom:1px solid var(--rule);max-height:none}
+  nav.toc.collapsed .toc-body{display:none}
+  main{padding:28px 20px 90px}
+  .menu-btn{display:inline-block;font-family:var(--sans);font-size:13px;
+    background:var(--wash);border:1px solid var(--rule);color:var(--ink);
+    border-radius:6px;padding:6px 11px;cursor:pointer;margin-bottom:10px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc"><button class="menu-btn" type="button">Contents</button>
+<div class="toc-body">
+<a class="brand" href="index.html">Building Awesome MCP Apps</a>
+<p class="tagline">What every AI application developer should know about the Model Context Protocol</p>
+<a href="preface.html">Preface</a>
+<a href="how-to-read.html">How to read this book</a>
+<div class="part">Part I. Protocol Fundamentals</div>
+<a href="ch01.html">A Primer on Latency, Tokens, and Context</a>
+<a href="ch02.html">The MCP Architectural Model</a>
+<a href="ch03.html">Building Blocks of the Transport</a>
+<a href="ch04.html">Authorization on the Wire</a>
+<div class="part">Part II. The Primitives</div>
+<a href="ch05.html">Tools: The Execution Layer</a>
+<a href="ch06.html">Resources: The Context Layer</a>
+<a href="ch07.html">Prompts: Workflow Blueprints</a>
+<a href="ch08.html">Multi Round-Trip Requests</a>
+<a href="ch09.html">Extensions and Tasks</a>
+<a href="ch10.html">MCP Apps: Interactive Interfaces</a>
+<div class="part">Part III. Building MCP Applications</div>
+<a href="ch11.html">Building Servers</a>
+<a href="ch12.html">Building Hosts and Clients</a>
+<a href="ch13.html">The Agent Loop, State, and Memory</a>
+<a href="ch14.html">Multi-Agent Topologies</a>
+<div class="part">Part IV. Performance Engineering</div>
+<a href="ch15.html">Testing and Debugging</a>
+<a href="ch16.html">Measuring MCP Applications</a>
+<a href="ch17.html">Optimizing for Latency, Tokens, and Cost</a>
+<a href="ch18.html">Deployment and Operations</a>
+<div class="part">Part V. Security and Trust</div>
+<a href="ch19.html">Threat Modeling Agentic Applications</a>
+<a href="ch20.html" class="current">Access Control, Audit, and MCP in the Enterprise</a>
+<div class="part">Back matter</div>
+<a href="epilogue.html">Epilogue: The Evolving Protocol</a>
+<div class="part">Appendices</div>
+<a href="appendix-a.html">A. Method and Message Reference</a>
+<a href="appendix-b.html">B. Transport Decision Matrix</a>
+<a href="appendix-c.html">C. Performance Checklist</a>
+<a href="appendix-d.html">D. Security Hardening Checklist</a>
+<a href="appendix-e.html">E. The Meridian Companion Repository</a>
+<a href="about.html">About the author</a>
+</div></nav>
+<main>
+<section id="ch:access-control" class="level1">
+<h1>Access Control, Audit, and MCP in the Enterprise</h1>
+<aside class="epigraph">
+<p><em>“Follow the money.”</em></p>
+<p>Deep Throat, <em>All the President’s Men</em> (1976)</p>
+</aside>
+<p>The line is about tracing accountability through a system that was designed to diffuse it. Which is the audit problem exactly. In an agentic application the chain runs user, model, host, client, server, data, and every link is a place where responsibility can go missing if nobody wrote it down.</p>
+<p>This chapter is about writing it down, and about the access controls that make the record worth having.</p>
+<section id="scoped-authorization-in-practice" class="level2">
+<h2>Scoped authorization, in practice</h2>
+<p>Chapter <a href="ch04.html#ch:authorization">4</a> did the wire mechanics. Here is what to do with them.</p>
+<p>Three granularities, and you probably need all three.</p>
+<section id="per-tool" class="level3">
+<h3>Per-tool</h3>
+<p>The coarsest and the easiest. A scope per tool, or per group of tools.</p>
+<pre class="python" data-language="python"><code>REQUIRED_SCOPE = {
+    &quot;assess_account_risk&quot;: &quot;risk:read&quot;,
+    &quot;rank_portfolio_risk&quot;: &quot;risk:read&quot;,
+    &quot;underwrite_loan&quot;:     &quot;risk:write&quot;,
+    &quot;review_transaction&quot;:  &quot;compliance:write&quot;,
+    &quot;export_audit_log&quot;:    &quot;audit:read&quot;,
+}
+
+class ScopedRiskServer(Server):
+    def visible_tools(self, ctx):
+        scopes = set((ctx.auth or {}).get(&quot;scopes&quot;, []))
+        return [t for t in super().visible_tools(ctx)
+                if not REQUIRED_SCOPE.get(t.name)
+                or REQUIRED_SCOPE[t.name] in scopes]</code></pre>
+<p>Two properties worth noting.</p>
+<p>The filtering happens in <code>visible_tools</code>, so an unauthorized tool is <em>invisible</em> rather than present-and-forbidden. The model never sees it, never plans around it, and never wastes a turn discovering it cannot call it.</p>
+<p>And <code>super()</code> sorts first, so the filtered list stays deterministic and the prompt-cache property from Chapter <a href="ch05.html#ch:tools">5</a> survives.</p>
+<aside class="box threat"><p class="box-title">Threat: Invisible is not the same as protected</p>
+<p>Filtering the catalogue is a usability feature. It is not access control.</p>
+<p>A caller can invoke <code>tools/call</code> for a tool that was never listed. So the handler must check authorization too. If your only check is in <code>visible_tools</code>, you have built a menu, not a lock.</p>
+</aside>
+</section>
+<section id="per-resource" class="level3">
+<h3>Per-resource</h3>
+<pre class="python" data-language="python"><code>@server.template(&quot;meridian://accounts/{account_id}/summary&quot;, ...)
+def account_summary(ctx: RequestContext, uri: str, params: dict):
+    account_id = params[&quot;account_id&quot;]
+    if not can_read_account(ctx.auth, account_id):
+        # Same error as &quot;does not exist&quot;. Distinguishing them tells an
+        # attacker which account ids are real.
+        raise ResourceNotFound(uri)
+    ...</code></pre>
+<p>That comment is the point. Returning “forbidden” for accounts that exist and “not found” for those that do not turns your error responses into an enumeration oracle. Return the same thing for both.</p>
+</section>
+<section id="per-request-which-is-row-level-security" class="level3">
+<h3>Per-request, which is row-level security</h3>
+<p>The finest grain, and the one that actually matters for multi-tenant systems.</p>
+<pre class="python" data-language="python"><code>def rank_portfolio_risk(ctx: RequestContext):
+    ids = ctx.arguments.get(&quot;accountIds&quot;) or []
+    # Intersect what was asked for with what this principal may see, before
+    # touching the data. The model can request anything; the server decides.
+    permitted = accounts_visible_to(ctx.auth)
+    ids = [a for a in ids if a in permitted]
+    ...</code></pre>
+<aside class="keyidea">
+<p>The model can ask for anything. It has read attacker-influenced text and it is not an authorization component. Every access decision belongs on the server, against the credential on the request, and never against an argument the model supplied.</p>
+</aside>
+</section>
+</section>
+<section id="context-isolation-between-tenants" class="level2">
+<h2>Context isolation between tenants</h2>
+<p>The architecture gives you some of this. The rest you build.</p>
+<table id="tab:isolation-paths">
+<caption>Six paths. The first is the one that fails silently and at scale.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Leak path</strong></td>
+<td style="text-align: left;"><strong>Control</strong></td>
+<td style="text-align: left;"><strong>Where</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Shared cache entry</td>
+<td style="text-align: left;">Fold auth context into every cache key</td>
+<td style="text-align: left;">host</td>
+</tr>
+<tr>
+<td style="text-align: left;">Shared task store</td>
+<td style="text-align: left;">Authorize <code>tasks/get</code> per caller</td>
+<td style="text-align: left;">server</td>
+</tr>
+<tr>
+<td style="text-align: left;">MRTR state replay</td>
+<td style="text-align: left;">Bind <code>requestState</code> to the principal</td>
+<td style="text-align: left;">server</td>
+</tr>
+<tr>
+<td style="text-align: left;">Handle guessing</td>
+<td style="text-align: left;">Opaque handles, authorized on every use</td>
+<td style="text-align: left;">server</td>
+</tr>
+<tr>
+<td style="text-align: left;">Enumerable URIs</td>
+<td style="text-align: left;">Non-sequential ids; identical not-found errors</td>
+<td style="text-align: left;">server</td>
+</tr>
+<tr>
+<td style="text-align: left;">Error message detail</td>
+<td style="text-align: left;">Say less to callers, log more internally</td>
+<td style="text-align: left;">server</td>
+</tr>
+</tbody>
+</table>
+<p>Meridian’s cache is deliberately conservative:</p>
+<pre class="python" data-language="python"><code>def cache_key(server, method, params, auth_context):
+    &quot;&quot;&quot;Method plus the params that affect the answer, plus who is asking.
+
+    `auth_context` is folded in unconditionally rather than only for `private`
+    entries. Doing it the other way round means a single mislabelled response
+    leaks across users, and the cost of being wrong is far higher than the cost
+    of a few duplicate entries.
+    &quot;&quot;&quot;</code></pre>
+<p>That trades some gateway-level sharing of public resources for making a mislabelling bug harmless. For a financial system it is obviously the right trade. Make the choice deliberately rather than inheriting it.</p>
+<pre class="python" data-language="python"><code>def test_private_entries_are_keyed_by_auth_context(self):
+    cache = ResultCache()
+    result = {&quot;resultType&quot;: &quot;complete&quot;,
+              &quot;contents&quot;: [{&quot;uri&quot;: &quot;u&quot;, &quot;text&quot;: &quot;alice&quot;}],
+              &quot;ttlMs&quot;: 60000, &quot;cacheScope&quot;: &quot;private&quot;}
+    cache.put(&quot;s&quot;, &quot;resources/read&quot;, {&quot;uri&quot;: &quot;u&quot;}, result, auth_context=&quot;alice&quot;)
+    self.assertIsNotNone(cache.get(&quot;s&quot;, &quot;resources/read&quot;, {&quot;uri&quot;: &quot;u&quot;}, &quot;alice&quot;))
+    self.assertIsNone(cache.get(&quot;s&quot;, &quot;resources/read&quot;, {&quot;uri&quot;: &quot;u&quot;}, &quot;bob&quot;))</code></pre>
+</section>
+<section id="human-in-the-loop-as-a-control" class="level2">
+<h2>Human in the loop as a control</h2>
+<p>Chapter <a href="ch08.html#ch:mrtr">8</a> covered the mechanism. Here it is as a security boundary, and the distinction that makes it one.</p>
+<p>Meridian requires a named officer for any flagged transaction. Not a checkbox. A name, which goes in the audit log, attached to a decision.</p>
+<pre class="python" data-language="python"><code>&quot;officer&quot;: {&quot;type&quot;: &quot;string&quot;, &quot;title&quot;: &quot;Officer&quot;, &quot;minLength&quot;: 2},
+&quot;decision&quot;: {
+    &quot;type&quot;: &quot;string&quot;, &quot;title&quot;: &quot;Decision&quot;,
+    &quot;enum&quot;: [&quot;clear&quot;, &quot;escalate&quot;, &quot;hold&quot;],
+    &quot;default&quot;: &quot;escalate&quot;,
+},
+&quot;note&quot;: {&quot;type&quot;: &quot;string&quot;, &quot;title&quot;: &quot;Note&quot;, &quot;maxLength&quot;: 500},</code></pre>
+<p>Four design decisions in that schema:</p>
+<p><strong>The officer is named.</strong> An approval without an approver is a log entry nobody owns.</p>
+<p><strong>The decision is an enum.</strong> Three outcomes, no free text, so the audit log is queryable.</p>
+<p><strong>The default is <code>escalate</code>, not <code>clear</code>.</strong> A user who clicks through without reading escalates. Defaults are policy, and this one fails safe.</p>
+<p><strong>There is a note field.</strong> Because “why” is what the reviewer will want in eighteen months, and the only moment anyone knows it is now.</p>
+<section id="where-the-gate-belongs" class="level3">
+<h3>Where the gate belongs</h3>
+<table id="tab:gate-placement">
+<caption>Server-side gates are the stronger ones, because they hold regardless of which host is calling.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Gate at</strong></td>
+<td style="text-align: left;"><strong>Good for</strong></td>
+<td style="text-align: left;"><strong>Weakness</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Host consent prompt</td>
+<td style="text-align: left;">Anything with side effects</td>
+<td style="text-align: left;">The user learns to click</td>
+</tr>
+<tr>
+<td style="text-align: left;">Server MRTR elicitation</td>
+<td style="text-align: left;">Domain rules the host cannot know</td>
+<td style="text-align: left;">Costs a round trip</td>
+</tr>
+<tr>
+<td style="text-align: left;">Both</td>
+<td style="text-align: left;">High-value operations</td>
+<td style="text-align: left;">Two prompts unless coordinated</td>
+</tr>
+</tbody>
+</table>
+<p>That last point matters more than it looks. A host-side gate protects users of <em>your</em> host. A server-side gate protects everyone, including a user running a host you have never seen, which in an MCP ecosystem is most of them.</p>
+<aside class="keyidea">
+<p>Put approval gates for domain-critical operations on the server, not in the host. The server is the only component that every caller shares.</p>
+</aside>
+</section>
+</section>
+<section id="audit-designed-for-the-regulator" class="level2">
+<h2>Audit, designed for the regulator</h2>
+<p>Most audit logs are debugger output with a compliance label. Here is what changes when you write one for somebody who will read it under pressure, years later.</p>
+<pre class="python" data-language="python"><code>def _audit(ctx: RequestContext, tool: str, subject: str, payload: dict) -&gt; None:
+    &quot;&quot;&quot;Append-only, structured, and written for a regulator rather than a
+    debugger.&quot;&quot;&quot;
+    AUDIT_LOG.append({
+        &quot;tool&quot;: tool,
+        &quot;subject&quot;: subject,
+        &quot;principal&quot;: (ctx.auth or {}).get(&quot;sub&quot;, &quot;anonymous&quot;),
+        &quot;client&quot;: ctx.client_info.name if ctx.client_info else &quot;unknown&quot;,
+        &quot;protocolVersion&quot;: ctx.protocol_version,
+        &quot;traceparent&quot;: ctx.traceparent,
+        &quot;outcome&quot;: payload.get(&quot;outcome&quot;),
+        &quot;officer&quot;: payload.get(&quot;officer&quot;),
+    })</code></pre>
+<section id="what-a-record-must-contain" class="level3">
+<h3>What a record must contain</h3>
+<table id="tab:audit-fields">
+<caption>Eight fields. <code>traceparent</code> is the one that turns a list of events into a reconstructable story.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Field</strong></td>
+<td style="text-align: left;"><strong>Answers</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>principal</code></td>
+<td style="text-align: left;">Who, authoritatively, from the token</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tool</code>, <code>subject</code></td>
+<td style="text-align: left;">What, and to which object</td>
+</tr>
+<tr>
+<td style="text-align: left;">timestamp</td>
+<td style="text-align: left;">When</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>traceparent</code></td>
+<td style="text-align: left;">What else was part of the same request</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>outcome</code></td>
+<td style="text-align: left;">What happened</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>officer</code></td>
+<td style="text-align: left;">Who authorised it, when a human did</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>client</code></td>
+<td style="text-align: left;">Which software, for display only</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>protocolVersion</code></td>
+<td style="text-align: left;">Which contract was in force</td>
+</tr>
+</tbody>
+</table>
+<p>Two notes on the last two rows.</p>
+<p><code>client</code> is self-reported and unverified. Log it, because it is useful for support. Never make a decision with it, and never present it in a report as though it were established fact.</p>
+<p><code>protocolVersion</code> matters because behaviour changes between revisions. In 2028 somebody will ask why a 2026 request behaved a particular way, and the answer will be “because it was <code>2026-07-28</code>”.</p>
+</section>
+<section id="what-chapter-19-proved-was-missing" class="level3">
+<h3>What Chapter <a href="ch19.html#ch:threats">19</a> proved was missing</h3>
+<p>The pen test caught the fan-out and could not explain it. The log recorded every action and nothing about the <em>input</em> that caused them.</p>
+<pre class="python" data-language="python"><code>AUDIT_LOG.append({
+    ...
+    # What entered the model&#39;s context, and where it came from. Without this,
+    # an injection is invisible in the record: you see the actions and not the
+    # sentence that produced them.
+    &quot;inputDigest&quot;: hashlib.sha256(result_text.encode()).hexdigest()[:32],
+    &quot;inputSource&quot;: f&quot;{server_label}.{tool_name}&quot;,
+    &quot;inputBytes&quot;: len(result_text),
+})</code></pre>
+<p>Hashes rather than content, for a reason: the content may be private, and retaining it turns your audit log into a second copy of the data you were protecting. A hash plus a source plus a length is enough to prove that a particular result preceded a particular behaviour, which is what an incident review needs.</p>
+</section>
+<section id="properties-not-just-fields" class="level3">
+<h3>Properties, not just fields</h3>
+<ul>
+<li><p><strong>Append-only.</strong> If it can be edited it is a database, not an audit log.</p></li>
+<li><p><strong>Written before the action.</strong> Meridian audits before executing, so the record exists even when the call times out.</p></li>
+<li><p><strong>Independently queryable.</strong> By principal, by subject, by trace, by time.</p></li>
+<li><p><strong>Retained past the incident.</strong> Compromises are found late. A 30-day retention is a 30-day investigation limit.</p></li>
+<li><p><strong>Not the same store as your application data.</strong> An attacker who reaches your database should not thereby reach the record of what they did.</p></li>
+</ul>
+</section>
+</section>
+<section id="wrapping-legacy-systems" class="level2">
+<h2>Wrapping legacy systems</h2>
+<p>The practical enterprise problem. There is a mainframe. There is a SOAP service somebody wrote in 2009. There is an API with 340 endpoints.</p>
+<section id="anti-corruption-layer" class="level3">
+<h3>Anti-corruption layer</h3>
+<p>Do not expose the legacy model. Chapter <a href="ch05.html#ch:tools">5</a> measured what happens: the REST mirror cost 4,371 extra tokens per turn and $26 per thousand tasks in pure waste.</p>
+<table id="tab:anti-corruption">
+<caption>The translation is the work. A thin wrapper over a legacy API produces a legacy-shaped MCP server, which is the worst of both.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Legacy shape</strong></td>
+<td style="text-align: left;"><strong>MCP shape</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>GET /accounts/{id}</code> plus four more calls</td>
+<td style="text-align: left;"><code>assess_account_risk</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>POST /jobs</code> then poll <code>/jobs/{id}</code></td>
+<td style="text-align: left;">one tool returning a task</td>
+</tr>
+<tr>
+<td style="text-align: left;">SOAP envelope with 40 optional fields</td>
+<td style="text-align: left;">a schema with the six that matter</td>
+</tr>
+<tr>
+<td style="text-align: left;">Error codes in a 200 response body</td>
+<td style="text-align: left;">tool execution errors with actionable text</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="strangler-fig" class="level3">
+<h3>Strangler fig</h3>
+<p>Migrating from bespoke function calling, without a rewrite:</p>
+<ol>
+<li><p>Stand up an MCP server beside the existing integration. Both work.</p></li>
+<li><p>Move one workflow. Measure it: round trips, tokens, cost, success rate.</p></li>
+<li><p>Move the rest, one at a time, each with a measurement.</p></li>
+<li><p>Delete the old integration when nothing calls it.</p></li>
+</ol>
+<p>Step two is the one to insist on. If the first migrated workflow is not measurably better, the problem is your tool design and moving forty more will multiply it.</p>
+</section>
+</section>
+<section id="registries-and-change-management" class="level2">
+<h2>Registries and change management</h2>
+<p>At enterprise scale, a private registry, and the governance questions it answers:</p>
+<table id="tab:registry">
+<caption>A registry is a governance artefact that happens to also do discovery.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Question</strong></td>
+<td style="text-align: left;"><strong>Answered by</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Which servers exist?</td>
+<td style="text-align: left;">The registry</td>
+</tr>
+<tr>
+<td style="text-align: left;">Who owns this one?</td>
+<td style="text-align: left;">A required ownership field</td>
+</tr>
+<tr>
+<td style="text-align: left;">What data does it touch?</td>
+<td style="text-align: left;">A data-classification field</td>
+</tr>
+<tr>
+<td style="text-align: left;">Has the App template been reviewed?</td>
+<td style="text-align: left;">An approval record with a hash</td>
+</tr>
+<tr>
+<td style="text-align: left;">What changed last Tuesday?</td>
+<td style="text-align: left;">A version history</td>
+</tr>
+<tr>
+<td style="text-align: left;">Which hosts may connect?</td>
+<td style="text-align: left;">An allowlist</td>
+</tr>
+</tbody>
+</table>
+<p>Two policies worth adopting.</p>
+<p><strong>Approve tool definitions, not just servers.</strong> Pin the hash of what you approved. Chapter <a href="ch19.html#ch:threats">19</a> explained why: without pinning, <code>listChanged</code> is a rug-pull mechanism.</p>
+<p><strong>Give your own surface a deprecation window.</strong> The specification promises you twelve months. Your internal consumers deserve the same, and the discipline is identical: mark it Deprecated, publish the migration, wait, then remove.</p>
+</section>
+<section id="measuring-success" class="level2">
+<h2>Measuring success</h2>
+<p>The KPIs that survive contact with a steering committee.</p>
+<table id="tab:kpis">
+<caption>The last two are the ones nobody tracks. Both predict whether the system survives contact with real users.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>KPI</strong></td>
+<td style="text-align: left;"><strong>Definition</strong></td>
+<td style="text-align: left;"><strong>Source</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Task success rate</td>
+<td style="text-align: left;">Completed without human rescue</td>
+<td style="text-align: left;">evals</td>
+</tr>
+<tr>
+<td style="text-align: left;">p95 task latency</td>
+<td style="text-align: left;">What impatient users experience</td>
+<td style="text-align: left;">traces</td>
+</tr>
+<tr>
+<td style="text-align: left;">Cost per task</td>
+<td style="text-align: left;">Total model spend divided by tasks</td>
+<td style="text-align: left;">accounting</td>
+</tr>
+<tr>
+<td style="text-align: left;">Context coherence</td>
+<td style="text-align: left;">Tasks completing within the token budget</td>
+<td style="text-align: left;">loop stats</td>
+</tr>
+<tr>
+<td style="text-align: left;">Integration cost</td>
+<td style="text-align: left;">Days to connect a new system</td>
+<td style="text-align: left;">project tracking</td>
+</tr>
+<tr>
+<td style="text-align: left;">Consent friction</td>
+<td style="text-align: left;">Prompts per task, and approval rate</td>
+<td style="text-align: left;">host audit</td>
+</tr>
+</tbody>
+</table>
+<p>Integration cost is the one that justifies MCP existing. Before, connecting a new system meant an integration per host. After, it means one server. If that number is not falling, the protocol is not paying for itself and somebody should ask why.</p>
+<p>Consent friction is the leading indicator of a security control that is about to stop working. If users approve 99.8 % of prompts, they are not reading them, and your human-in-the-loop is a human-shaped rubber stamp.</p>
+</section>
+<section id="meridian-final-state" class="level2">
+<h2>Meridian, final state</h2>
+<pre class="text" data-language="text"><code>[ users ]
+                            |
+                   [ host: consent, audit,
+                     namespacing, budgets ]
+                            |
+                   [ supervisor agent ]
+                            |
+        +-------------------+-------------------+
+        |                   |                   |
+  [ risk agent ]    [ compliance agent ]  [ fraud agent ]
+        |                   |                   |
+  [ risk server ]   [ compliance server ] [ fraud server ]
+        |                   |                   |
+        +-------------------+-------------------+
+                            |
+                   [ marketdata server ]
+                     public, gateway-cached</code></pre>
+<aside class="box measured"><p class="box-title">Measured: The complete measured system</p>
+<table>
+<tbody>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: right;"><strong>Chapter 1</strong></td>
+<td style="text-align: right;"><strong>Chapter 20</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Loop iterations</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">2</td>
+</tr>
+<tr>
+<td style="text-align: left;">Wall clock</td>
+<td style="text-align: right;">1<span>,</span>753 ms</td>
+<td style="text-align: right;">1<span>,</span>014 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;">Tokens per task</td>
+<td style="text-align: right;">22<span>,</span>846</td>
+<td style="text-align: right;">2<span>,</span>692</td>
+</tr>
+<tr>
+<td style="text-align: left;">Cost per task</td>
+<td style="text-align: right;">$0.0690</td>
+<td style="text-align: right;">$0.0086</td>
+</tr>
+<tr>
+<td style="text-align: left;">Setup requests (20 tasks)</td>
+<td style="text-align: right;">164</td>
+<td style="text-align: right;">8</td>
+</tr>
+<tr>
+<td style="text-align: left;">Cache hit rate</td>
+<td style="text-align: right;">0 %</td>
+<td style="text-align: right;">96.2 %</td>
+</tr>
+<tr>
+<td style="text-align: left;">Tests</td>
+<td colspan="2" style="text-align: right;">134, all passing</td>
+</tr>
+<tr>
+<td style="text-align: left;">Third-party runtime dependencies</td>
+<td colspan="2" style="text-align: right;">0</td>
+</tr>
+</tbody>
+</table>
+<p>Regenerate every row with <code>make bench</code> and <code>make test</code>.</p>
+</aside>
+<p>Every number is reproducible on your own machine, and every one of them came from a technique in this book rather than from faster hardware.</p>
+</section>
+<section id="what-to-remember" class="level2">
+<h2>What to remember</h2>
+<ul>
+<li><p>Filter the catalogue by scope for usability, and check authorization in the handler for safety. The first is a menu, the second is a lock.</p></li>
+<li><p>Identical errors for forbidden and nonexistent, or your errors enumerate your data.</p></li>
+<li><p>Every access decision uses the credential on the request, never an argument the model supplied.</p></li>
+<li><p>Fold the auth context into every cache key, public or private.</p></li>
+<li><p>Put approval gates on the server. It is the only component every caller shares.</p></li>
+<li><p>Defaults are policy. Default to <code>escalate</code>.</p></li>
+<li><p>Audit for the regulator: principal, subject, trace, outcome, approver, and a digest of what entered the model’s context.</p></li>
+<li><p>Hash inputs rather than storing them, or your audit log becomes a second copy of the data.</p></li>
+<li><p>Wrap legacy systems with a translation, never a mirror.</p></li>
+<li><p>Track integration cost and consent friction. Nobody else will.</p></li>
+</ul>
+<p>That is the book. What remains is where it goes next.</p>
+</section>
+</section>
+<div class="pager">
+<a href="ch19.html"><span class="dir">Previous</span>Threat Modeling Agentic Applications</a>
+<a href="epilogue.html" style="text-align:right"><span class="dir">Next</span>Epilogue: The Evolving Protocol</a>
+</div>
+</main>
+</div>
+<script>
+(function(){
+  var nav = document.querySelector('nav.toc');
+  var btn = document.querySelector('.menu-btn');
+  if(btn && nav){
+    if(window.innerWidth <= 940) nav.classList.add('collapsed');
+    btn.addEventListener('click', function(){ nav.classList.toggle('collapsed'); });
+  }
+  // Wrap tables so wide ones scroll rather than overflowing the page.
+  document.querySelectorAll('main table').forEach(function(t){
+    if(t.parentElement.classList.contains('table-wrap')) return;
+    var w = document.createElement('div');
+    w.className = 'table-wrap';
+    t.parentNode.insertBefore(w, t);
+    w.appendChild(t);
+  });
+})();
+</script>
+</body>
+</html>

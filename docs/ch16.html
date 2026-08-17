@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Measuring MCP Applications &middot; Building Awesome MCP Apps</title>
+<meta name="description" content="Measuring MCP Applications. What every AI application developer should know about the Model Context Protocol">
+<meta property="og:title" content="Measuring MCP Applications">
+<meta property="og:description" content="Measuring MCP Applications. What every AI application developer should know about the Model Context Protocol">
+<style>
+:root{
+  --ink:#15181D; --muted:#5B6472; --rule:#D8DDE4; --wash:#F5F6F8;
+  --paper:#FFFFFF; --accent:#0F5C8C; --accent-soft:#E7F0F6;
+  --warm:#B4531A; --warm-soft:#FBF0E7; --good:#2C6E49; --good-soft:#E9F2EC;
+  --danger:#9B2226; --danger-soft:#FAECEC;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#E7EAEE; --muted:#98A2B0; --rule:#2C333D; --wash:#171B21;
+    --paper:#0F1216; --accent:#63AEDC; --accent-soft:#14232E;
+    --warm:#E08B4F; --warm-soft:#2A1D13; --good:#6FBF8E; --good-soft:#13221A;
+    --danger:#E4796F; --danger-soft:#291516;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--serif);font-size:18px;line-height:1.62;
+  -webkit-text-size-adjust:100%}
+.layout{display:grid;grid-template-columns:288px minmax(0,1fr);
+  max-width:1280px;margin:0 auto;gap:0}
+nav.toc{position:sticky;top:0;height:100vh;overflow-y:auto;padding:26px 20px 60px;
+  border-right:1px solid var(--rule);font-family:var(--sans);font-size:14px}
+nav.toc .brand{display:block;font-weight:700;font-size:16px;color:var(--ink);
+  text-decoration:none;line-height:1.3;margin-bottom:4px}
+nav.toc .tagline{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.45}
+nav.toc .part{margin:18px 0 6px;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);font-weight:700}
+nav.toc a{display:block;padding:4px 8px;margin-left:-8px;border-radius:5px;
+  color:var(--muted);text-decoration:none}
+nav.toc a:hover{background:var(--wash);color:var(--ink)}
+nav.toc a.current{background:var(--accent-soft);color:var(--accent);font-weight:600}
+main{padding:44px 52px 120px;min-width:0;max-width:78ch}
+h1,h2,h3,h4{font-family:var(--sans);line-height:1.25;color:var(--ink)}
+h1{font-size:2.05em;margin:0 0 .55em;letter-spacing:-.015em}
+h2{font-size:1.42em;margin:2em 0 .5em;padding-top:.35em}
+h3{font-size:1.14em;margin:1.7em 0 .4em}
+h4{font-size:1em;margin:1.4em 0 .3em;color:var(--muted)}
+p{margin:0 0 1.05em}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.855em;background:var(--wash);
+  padding:.12em .36em;border-radius:4px;word-break:break-word}
+pre{background:var(--wash);border-left:3px solid var(--rule);
+  border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+  font-size:13.5px;line-height:1.5;margin:1.3em 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+pre.json,pre.http{background:var(--accent-soft);border-left-color:var(--accent)}
+aside.box{border-left:3px solid var(--rule);background:var(--wash);
+  padding:14px 18px;margin:1.5em 0;border-radius:0 6px 6px 0;font-size:.955em}
+aside.box .box-title{font-family:var(--sans);font-weight:700;font-size:12px;
+  letter-spacing:.07em;text-transform:uppercase;margin:0 0 .55em}
+aside.box.legacy{border-left-color:var(--warm);background:var(--warm-soft)}
+aside.box.legacy .box-title{color:var(--warm)}
+aside.box.measured{border-left-color:var(--good);background:var(--good-soft)}
+aside.box.measured .box-title{color:var(--good)}
+aside.box.threat{border-left-color:var(--danger);background:var(--danger-soft)}
+aside.box.threat .box-title{color:var(--danger)}
+aside.box.note .box-title{color:var(--muted)}
+aside.keyidea{border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:14px 18px;margin:1.6em 0;border-radius:0 6px 6px 0;
+  font-family:var(--sans);font-style:italic;font-size:.97em}
+aside.keyidea p:last-child,aside.box p:last-child{margin-bottom:0}
+aside.keyidea pre,aside.keyidea code,aside.keyidea table{font-style:normal}
+aside.epigraph{border:0;margin:0 0 2em;padding:0 0 0 clamp(0px,7%,52px);
+  color:var(--muted);font-size:.97em}
+aside.epigraph p{margin:0 0 .3em}
+main figure{margin:2em 0;text-align:center}
+main figure img{max-width:100%;height:auto;border-radius:6px}
+@media (prefers-color-scheme: dark){
+  main figure img{background:#fff;padding:10px;border-radius:8px}
+}
+figcaption{font-family:var(--sans);font-size:13.5px;color:var(--muted);
+  margin-top:.7em;text-align:left;line-height:1.5}
+.table-wrap{overflow-x:auto;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:14.5px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+thead th{border-bottom:2px solid var(--rule);font-weight:700}
+caption{caption-side:bottom;font-size:13.5px;color:var(--muted);
+  text-align:left;padding-top:.7em;line-height:1.5}
+ul,ol{padding-left:1.35em;margin:0 0 1.05em}
+li{margin-bottom:.32em}
+dl{margin:0 0 1.05em}
+dt{font-weight:700;font-family:var(--sans);font-size:.95em;margin-top:.75em}
+dd{margin:.15em 0 0 1.35em}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
+.pager{display:flex;justify-content:space-between;gap:16px;margin-top:4em;
+  padding-top:1.5em;border-top:1px solid var(--rule);font-family:var(--sans);
+  font-size:14px}
+.pager a{text-decoration:none;max-width:46%}
+.pager .dir{display:block;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted)}
+.masthead{border-bottom:1px solid var(--rule);padding-bottom:1.8em;margin-bottom:2.2em}
+.masthead .kicker{font-family:var(--sans);font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);font-weight:700}
+.lede{font-size:1.12em;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:14px;margin:1.8em 0}
+.card{border:1px solid var(--rule);border-radius:9px;padding:15px 17px;
+  font-family:var(--sans);font-size:14px}
+.card h3{margin:0 0 .35em;font-size:15px}
+.card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+.menu-btn{display:none}
+@media (max-width:940px){
+  body{font-size:17px}
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:0;
+    border-bottom:1px solid var(--rule);max-height:none}
+  nav.toc.collapsed .toc-body{display:none}
+  main{padding:28px 20px 90px}
+  .menu-btn{display:inline-block;font-family:var(--sans);font-size:13px;
+    background:var(--wash);border:1px solid var(--rule);color:var(--ink);
+    border-radius:6px;padding:6px 11px;cursor:pointer;margin-bottom:10px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc"><button class="menu-btn" type="button">Contents</button>
+<div class="toc-body">
+<a class="brand" href="index.html">Building Awesome MCP Apps</a>
+<p class="tagline">What every AI application developer should know about the Model Context Protocol</p>
+<a href="preface.html">Preface</a>
+<a href="how-to-read.html">How to read this book</a>
+<div class="part">Part I. Protocol Fundamentals</div>
+<a href="ch01.html">A Primer on Latency, Tokens, and Context</a>
+<a href="ch02.html">The MCP Architectural Model</a>
+<a href="ch03.html">Building Blocks of the Transport</a>
+<a href="ch04.html">Authorization on the Wire</a>
+<div class="part">Part II. The Primitives</div>
+<a href="ch05.html">Tools: The Execution Layer</a>
+<a href="ch06.html">Resources: The Context Layer</a>
+<a href="ch07.html">Prompts: Workflow Blueprints</a>
+<a href="ch08.html">Multi Round-Trip Requests</a>
+<a href="ch09.html">Extensions and Tasks</a>
+<a href="ch10.html">MCP Apps: Interactive Interfaces</a>
+<div class="part">Part III. Building MCP Applications</div>
+<a href="ch11.html">Building Servers</a>
+<a href="ch12.html">Building Hosts and Clients</a>
+<a href="ch13.html">The Agent Loop, State, and Memory</a>
+<a href="ch14.html">Multi-Agent Topologies</a>
+<div class="part">Part IV. Performance Engineering</div>
+<a href="ch15.html">Testing and Debugging</a>
+<a href="ch16.html" class="current">Measuring MCP Applications</a>
+<a href="ch17.html">Optimizing for Latency, Tokens, and Cost</a>
+<a href="ch18.html">Deployment and Operations</a>
+<div class="part">Part V. Security and Trust</div>
+<a href="ch19.html">Threat Modeling Agentic Applications</a>
+<a href="ch20.html">Access Control, Audit, and MCP in the Enterprise</a>
+<div class="part">Back matter</div>
+<a href="epilogue.html">Epilogue: The Evolving Protocol</a>
+<div class="part">Appendices</div>
+<a href="appendix-a.html">A. Method and Message Reference</a>
+<a href="appendix-b.html">B. Transport Decision Matrix</a>
+<a href="appendix-c.html">C. Performance Checklist</a>
+<a href="appendix-d.html">D. Security Hardening Checklist</a>
+<a href="appendix-e.html">E. The Meridian Companion Repository</a>
+<a href="about.html">About the author</a>
+</div></nav>
+<main>
+<section id="ch:measuring" class="level1">
+<h1>Measuring MCP Applications</h1>
+<aside class="epigraph">
+<p><em>“It’s about getting things down to one number.”</em></p>
+<p>Peter Brand, <em>Moneyball</em> (2011)</p>
+</aside>
+<p>Brand’s point was not that one number is enough. It was that an argument conducted in adjectives cannot be settled, and an argument conducted in numbers can. Everyone in that room had been scouting on instinct for thirty years and each of them was certain.</p>
+<p>This is the chapter the book was written for. Everything before it was mechanism. Everything after it is optimisation, and optimisation without measurement is superstition with a build pipeline.</p>
+<section id="the-metrics-that-matter" class="level2">
+<h2>The metrics that matter</h2>
+<p>Nine. Not twenty, because a dashboard nobody reads is a dashboard that does not exist.</p>
+<table id="tab:metrics">
+<caption>Nine numbers. If you can only have three, take iterations per task, cost per task, and cache hit rate.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Metric</strong></td>
+<td style="text-align: left;"><strong>Why</strong></td>
+<td style="text-align: left;"><strong>Meridian</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Time to first token</td>
+<td style="text-align: left;">What the user feels as “is it working”</td>
+<td style="text-align: left;">340 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;">Loop iterations per task</td>
+<td style="text-align: left;">The unit that actually costs money</td>
+<td style="text-align: left;">3</td>
+</tr>
+<tr>
+<td style="text-align: left;">Round trips per task</td>
+<td style="text-align: left;">Tool calls plus MRTR retries</td>
+<td style="text-align: left;">3</td>
+</tr>
+<tr>
+<td style="text-align: left;">Loop latency, decomposed</td>
+<td style="text-align: left;">Model, transport, execution, consent</td>
+<td style="text-align: left;">see below</td>
+</tr>
+<tr>
+<td style="text-align: left;">Tool-selection accuracy</td>
+<td style="text-align: left;">Catalogue health</td>
+<td style="text-align: left;">eval-only</td>
+</tr>
+<tr>
+<td style="text-align: left;">Call success rate</td>
+<td style="text-align: left;">Server health, split by error kind</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">Context utilisation</td>
+<td style="text-align: left;">Tokens used against the window</td>
+<td style="text-align: left;">4<span>,</span>009</td>
+</tr>
+<tr>
+<td style="text-align: left;">Cache hit rate</td>
+<td style="text-align: left;">Whether you honour <code>ttlMs</code></td>
+<td style="text-align: left;">96.2 %</td>
+</tr>
+<tr>
+<td style="text-align: left;">Cost per task</td>
+<td style="text-align: left;">The number finance will eventually ask about</td>
+<td style="text-align: left;">$0.0125</td>
+</tr>
+</tbody>
+</table>
+<p>Two of these are unusual enough to justify.</p>
+<p><strong>Loop iterations per task</strong> rather than requests per second. Requests per second is a server metric and it will look wonderful while your users wait eight seconds, because the expensive part is not the request.</p>
+<p><strong>Tool-selection accuracy</strong> needs an eval to measure, so most people skip it. Do not. It is the leading indicator of catalogue rot, and it degrades slowly enough that nobody notices from the inside.</p>
+</section>
+<section id="decomposing-the-loop" class="level2">
+<h2>Decomposing the loop</h2>
+<p>The single most useful thing in this chapter.</p>
+<pre class="python" data-language="python"><code>@dataclass
+class Iteration:
+    &quot;&quot;&quot;One trip round the loop, with the milliseconds attributed.&quot;&quot;&quot;
+    index: int
+    model_ms: float = 0.0
+    transport_ms: float = 0.0
+    consent_ms: float = 0.0
+    tool_calls: int = 0
+    parallel: bool = False
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cost_usd: float = 0.0</code></pre>
+<p>Four bands, and every millisecond belongs to exactly one. If you cannot say which band a millisecond went to, that is the bug: not a slow system, an unmeasurable one.</p>
+<figure id="fig:waterfall">
+<img src="figures/waterfall.svg" />
+<figcaption>One Meridian task, drawn to scale. Three iterations, three tool calls, and the shape tells you where to spend your effort.</figcaption>
+</figure>
+<p>Read that figure like a trace, because that is what it is.</p>
+<ul>
+<li><p>Three iterations, and iteration 2 does no tool calls at all. It exists so the model can read iteration 1’s results and say it is finished, and it costs 400 ms.</p></li>
+<li><p>The two tool bands are 18.0 ms and 35.9 ms. Together, 3.9 % of the task.</p></li>
+<li><p>Iteration 1’s two calls ran serially here. In parallel they cost 19.5 ms instead of 35.9.</p></li>
+</ul>
+<aside class="keyidea">
+<p>If your waterfall is mostly blue, you have a round-trip problem, and the fix is fewer iterations. If your waterfall has a fat green band, you have a server problem, and the fix is profiling. Most people assume the second and have the first.</p>
+</aside>
+<section id="the-subtraction-that-isolates-transport" class="level3">
+<h3>The subtraction that isolates transport</h3>
+<p>From Chapter <a href="ch03.html#ch:transport">3</a>, and worth restating as a technique:</p>
+<aside class="box measured"><p class="box-title">Measured: Same call, three transports</p>
+<table>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Transport</strong></td>
+<td style="text-align: right;"><strong>Mean</strong></td>
+<td style="text-align: right;"><strong>Minus control</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">In-process (control)</td>
+<td style="text-align: right;">0.031 ms</td>
+<td style="text-align: right;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">stdio</td>
+<td style="text-align: right;">0.060 ms</td>
+<td style="text-align: right;">0.029 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;">Streamable HTTP</td>
+<td style="text-align: right;">0.161 ms</td>
+<td style="text-align: right;">0.130 ms</td>
+</tr>
+</tbody>
+</table>
+</aside>
+<p>The control still serialises and deserialises, so what remains after the subtraction is transport mechanics and nothing else. That is the only honest way to answer “is my server slow or is my transport slow”, and it takes ten minutes to set up.</p>
+</section>
+</section>
+<section id="distributed-tracing-done-properly" class="level2">
+<h2>Distributed tracing, done properly</h2>
+<p>Here is where MCP gives you something genuinely nice.</p>
+<p><code>traceparent</code>, <code>tracestate</code>, and <code>baggage</code> are reserved <code>_meta</code> keys, carved out as an explicit exception to the reverse-DNS prefix rule specifically so W3C Trace Context works unchanged.</p>
+<pre class="json" data-language="json"><code>{
+  &quot;jsonrpc&quot;: &quot;2.0&quot;,
+  &quot;id&quot;: 2,
+  &quot;method&quot;: &quot;tools/call&quot;,
+  &quot;params&quot;: {
+    &quot;name&quot;: &quot;assess_account_risk&quot;,
+    &quot;arguments&quot;: { &quot;accountId&quot;: &quot;ACC-1042&quot; },
+    &quot;_meta&quot;: {
+      &quot;io.modelcontextprotocol/protocolVersion&quot;: &quot;2026-07-28&quot;,
+      &quot;io.modelcontextprotocol/clientCapabilities&quot;: {},
+      &quot;traceparent&quot;: &quot;00-0af7651916cd43dd8448eb211c80319c-00f067aa0ba902b7-01&quot;
+    }
+  }
+}</code></pre>
+<p>Client side it is one argument:</p>
+<pre class="python" data-language="python"><code>body[&quot;_meta&quot;] = build_request_meta(
+    self.capabilities, self.info,
+    protocol_version=self.protocol_version,
+    progress_token=progress_token,
+    traceparent=traceparent,
+)</code></pre>
+<p>Server side it lands on the context, ready to become a span parent:</p>
+<pre class="python" data-language="python"><code>return RequestContext(
+    ...
+    traceparent=meta.get(KEY_TRACEPARENT),
+    tracestate=meta.get(KEY_TRACESTATE),
+    baggage=meta.get(KEY_BAGGAGE),
+)</code></pre>
+<p>That is the whole integration. Your existing OpenTelemetry backend now shows host-to-server spans without knowing what MCP is.</p>
+<section id="the-span-hierarchy-worth-building" class="level3">
+<h3>The span hierarchy worth building</h3>
+<pre class="text" data-language="text"><code>task                                    [ 1,366 ms]
+ |- iteration 0                         [   447 ms]
+ |   |- model.generate                  [   430 ms]
+ |   `- tool.risk.assess_account_risk   [    18 ms]
+ |       |- transport.http              [     4 ms]
+ |       `- server.execute              [    13 ms]
+ |- iteration 1                         [   518 ms]
+ |   |- model.generate                  [   482 ms]
+ |   |- tool.fraud.screen_account       [    18 ms]
+ |   `- tool.marketdata.get_curve       [    17 ms]
+ `- iteration 2                         [   400 ms]
+     `- model.generate                  [   400 ms]</code></pre>
+<p>Three properties make this worth the effort:</p>
+<p><strong>Iterations are spans.</strong> Not just tool calls. Otherwise your trace shows 54 ms of activity inside a 1,366 ms task and a 1,312 ms hole nobody can explain.</p>
+<p><strong>Transport and execution are separate spans.</strong> That is the subtraction above, done automatically for every call rather than once in a benchmark.</p>
+<p><strong>Sibling spans that overlap in time reveal parallelism.</strong> If you fanned out, the trace shows it. If you thought you fanned out and did not, the trace shows that too, which is more useful.</p>
+<aside class="box note"><p class="box-title">What to put in <code>baggage</code></p>
+<p><code>baggage</code> propagates key-value pairs across every hop, which makes it tempting as a general-purpose channel. Resist.</p>
+<p>Good: tenant id, task id, environment. Things you want to slice traces by.</p>
+<p>Bad: anything sensitive. Baggage crosses every trust boundary in the system, including into servers you do not operate, and it lands in whatever tracing backend each of them uses.</p>
+</aside>
+</section>
+</section>
+<section id="instrumenting-a-server" class="level2">
+<h2>Instrumenting a server</h2>
+<p>Meridian keeps deliberately crude built-in counters, because something is enormously better than nothing and it costs four lines:</p>
+<pre class="python" data-language="python"><code>finally:
+    elapsed = (time.perf_counter() - started) * 1000.0
+    self.call_count[method] = self.call_count.get(method, 0) + 1
+    self.total_ms[method] = self.total_ms.get(method, 0.0) + elapsed</code></pre>
+<pre class="python" data-language="python"><code>def stats(self) -&gt; dict:
+    return {
+        &quot;calls&quot;: dict(self.call_count),
+        &quot;meanMs&quot;: {
+            m: round(self.total_ms[m] / self.call_count[m], 3)
+            for m in self.call_count if self.call_count[m]
+        },
+    }</code></pre>
+<p>Means are a lie, of course. What you actually want is percentiles, because the p99 is what your users complain about and the mean is what hides it. The client keeps those:</p>
+<pre class="python" data-language="python"><code>def percentile(self, p: float) -&gt; float:
+    if not self.latency_ms:
+        return 0.0
+    ordered = sorted(self.latency_ms)
+    idx = min(len(ordered) - 1, int(round((p / 100.0) * (len(ordered) - 1))))
+    return ordered[idx]</code></pre>
+<aside class="keyidea">
+<p>Report p50, p95, and p99. A mean of 40 ms with a p99 of 4 s is a system where one user in a hundred thinks you are broken, and the mean will never tell you.</p>
+</aside>
+</section>
+<section id="instrumenting-the-client" class="level2">
+<h2>Instrumenting the client</h2>
+<pre class="python" data-language="python"><code>@dataclass
+class CallStats:
+    &quot;&quot;&quot;The counters Chapter 16 turns into a dashboard.&quot;&quot;&quot;
+    requests: int = 0
+    mrtr_rounds: int = 0
+    retries: int = 0
+    errors: int = 0
+    bytes_sent: int = 0
+    bytes_received: int = 0
+    latency_ms: list[float] = field(default_factory=list)</code></pre>
+<p>Three of these are worth more attention than they usually get.</p>
+<p><strong><code>mrtr_rounds</code></strong> is extra round trips forced by servers asking questions, at roughly 375 ms each (Chapter <a href="ch08.html#ch:mrtr">8</a>). Chapter <a href="ch12.html#ch:building-hosts">12</a> called it the early warning for a missing schema field; on a dashboard it is also the fastest way to attribute a latency regression to a specific server deploy.</p>
+<p><strong><code>bytes_sent</code> against <code>bytes_received</code></strong> tells you whether your requests or your responses are the problem. Meridian sends a 320-byte request and receives 5,856 bytes for a <code>tools/list</code>. Requests are never the issue; catalogues frequently are.</p>
+<p><strong><code>errors</code>, split by kind.</strong> Protocol errors and tool execution errors have completely different meanings. Protocol errors are bugs. Tool execution errors are normal operation, and a rate of zero means your validation is happening somewhere it should not be.</p>
+</section>
+<section id="cache-metrics" class="level2">
+<h2>Cache metrics</h2>
+<pre class="python" data-language="python"><code>@dataclass
+class CacheStats:
+    hits: int = 0
+    misses: int = 0
+    stale: int = 0
+    invalidations: int = 0
+    stores: int = 0
+    uncacheable: int = 0</code></pre>
+<p>Six counters, and the split between <code>misses</code> and <code>stale</code> is the one that pays.</p>
+<ul>
+<li><p>High <code>misses</code>: you are seeing new things. Cold cache, or key cardinality is higher than you thought.</p></li>
+<li><p>High <code>stale</code>: TTLs are too short for your access pattern. This is tunable and usually free.</p></li>
+<li><p>High <code>invalidations</code>: the underlying data really is changing. Nothing to fix, but it explains the hit rate.</p></li>
+<li><p>High <code>uncacheable</code>: you are calling uncacheable methods, or making MRTR retries. Expected for <code>tools/call</code>; suspicious for anything else.</p></li>
+</ul>
+<p>A hit rate alone cannot distinguish “TTL too short” from “data genuinely volatile”, and those have opposite fixes.</p>
+<aside class="box measured"><p class="box-title">Measured: Meridian’s cache, 600 reads over 40 URIs</p>
+<table>
+<tbody>
+<tr>
+<td style="text-align: left;">Hit rate</td>
+<td style="text-align: right;">96.2 %</td>
+</tr>
+<tr>
+<td style="text-align: left;">Requests avoided</td>
+<td style="text-align: right;">577 of 600</td>
+</tr>
+<tr>
+<td style="text-align: left;">Wall clock</td>
+<td style="text-align: right;">12.4 ms <span class="math inline">→</span> 1.8 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;">Speedup</td>
+<td style="text-align: right;">6.82<span class="math inline">×</span></td>
+</tr>
+</tbody>
+</table>
+</aside>
+</section>
+<section id="token-and-cost-accounting" class="level2">
+<h2>Token and cost accounting</h2>
+<pre class="python" data-language="python"><code>def estimate_tokens(text: str) -&gt; int:
+    return max(1, round(len(text) / CHARS_PER_TOKEN))
+
+def estimate_cost_usd(input_tokens: int, output_tokens: int) -&gt; float:
+    return (input_tokens * INPUT_USD_PER_MTOK / 1_000_000.0
+            + output_tokens * OUTPUT_USD_PER_MTOK / 1_000_000.0)</code></pre>
+<p>The character-based estimator is wrong in the third decimal place and right enough to compare a before against an after, which is what it is for. Your provider reports exact counts; use those in production and the estimator when you need a number before you have spent the money.</p>
+<aside class="box measured"><p class="box-title">Measured: Meridian’s per-iteration cost</p>
+<table>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Iteration</strong></td>
+<td style="text-align: right;"><strong>Input</strong></td>
+<td style="text-align: right;"><strong>Output</strong></td>
+<td style="text-align: right;"><strong>Cost</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">0</td>
+<td style="text-align: right;">1<span>,</span>252</td>
+<td style="text-align: right;">12</td>
+<td style="text-align: right;">$0.003936</td>
+</tr>
+<tr>
+<td style="text-align: left;">1</td>
+<td style="text-align: right;">1<span>,</span>318</td>
+<td style="text-align: right;">19</td>
+<td style="text-align: right;">$0.004239</td>
+</tr>
+<tr>
+<td style="text-align: left;">2</td>
+<td style="text-align: right;">1<span>,</span>400</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">$0.004320</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Total</strong></td>
+<td style="text-align: right;"><strong>3<span>,</span>970</strong></td>
+<td style="text-align: right;"><strong>39</strong></td>
+<td style="text-align: right;"><strong>$0.012495</strong></td>
+</tr>
+</tbody>
+</table>
+</aside>
+<p>Input climbs, output does not, and iteration 2 is the most expensive despite doing the least. That is the economics of agent loops in one table.</p>
+<section id="catalogue-cost-as-a-first-class-metric" class="level3">
+<h3>Catalogue cost as a first-class metric</h3>
+<pre class="python" data-language="python"><code>def catalogue_tokens(self) -&gt; int:
+    return sum(
+        estimate_tokens(f&quot;{t.get(&#39;name&#39;,&#39;&#39;)}{t.get(&#39;description&#39;,&#39;&#39;)}&quot;
+                        f&quot;{t.get(&#39;inputSchema&#39;,&#39;&#39;)}{t.get(&#39;outputSchema&#39;,&#39;&#39;)}&quot;)
+        for t in self.catalogue())</code></pre>
+<p>Put this on a dashboard. It changes whenever anybody adds a tool to any connected server, it is charged on every turn of every task, and nobody notices it climbing until it is 12,000 and the model has started guessing.</p>
+</section>
+</section>
+<section id="evals-as-regression-tests" class="level2">
+<h2>Evals as regression tests</h2>
+<p>The four numbers to track per release:</p>
+<table id="tab:eval-gates">
+<caption>Gate on movement against the last release, not on absolutes. Absolute thresholds get deleted the first time somebody needs to ship.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Number</strong></td>
+<td style="text-align: left;"><strong>Regression means</strong></td>
+<td style="text-align: left;"><strong>Gate</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Task success rate</td>
+<td style="text-align: left;">Something broke behaviourally</td>
+<td style="text-align: left;">no drop <span class="math inline">&gt;</span> 3 points</td>
+</tr>
+<tr>
+<td style="text-align: left;">Iterations per task</td>
+<td style="text-align: left;">The model needs more turns for the same work</td>
+<td style="text-align: left;">no rise <span class="math inline">&gt;</span> 10 %</td>
+</tr>
+<tr>
+<td style="text-align: left;">Tokens per task</td>
+<td style="text-align: left;">Context or catalogue grew</td>
+<td style="text-align: left;">no rise <span class="math inline">&gt;</span> 10 %</td>
+</tr>
+<tr>
+<td style="text-align: left;">Cost per task</td>
+<td style="text-align: left;">All of the above, monetised</td>
+<td style="text-align: left;">no rise <span class="math inline">&gt;</span> 10 %</td>
+</tr>
+</tbody>
+</table>
+<p>Catching <em>capability drift</em> is the real prize here. The model provider ships a new version. Your tests pass, because they use a stub. Your evals show iterations per task moved from 3.0 to 3.4, which is a 13 % cost increase nobody would have seen otherwise.</p>
+</section>
+<section id="a-dashboard-worth-having" class="level2">
+<h2>A dashboard worth having</h2>
+<pre class="text" data-language="text"><code>MERIDIAN                                    last 24h
+
+  TASKS
+  completed                     14,204        +2.1%
+  p50 wall clock                 1,412 ms     +0.3%
+  p95 wall clock                 3,890 ms     +8.2%   &lt;-- look here
+  iterations per task (mean)       3.14        +0.1%
+  cost per task                  $0.0131      +4.8%
+
+  PROTOCOL
+  round trips per task             3.21        +6.9%   &lt;-- and here
+  mrtr rounds per task             0.19       +58.0%   &lt;-- and here
+  cache hit rate                   94.1%       -2.1pt
+
+  SERVERS                     calls    p95      errors
+  risk                       28,401   14 ms      0.02%
+  compliance                  9,120   31 ms      0.11%
+  fraud                      27,880    8 ms      0.00%
+  marketdata                 31,004    3 ms      0.00%</code></pre>
+<p>Read the arrows together and the story writes itself. MRTR rounds up 58 %, round trips up 6.9 %, p95 up 8.2 %, cost up 4.8 %. Somebody deployed a server that started asking for something it used to infer, and everything downstream is a consequence.</p>
+<p>That diagnosis takes ten seconds with these numbers and a week without them.</p>
+</section>
+<section id="alerting" class="level2">
+<h2>Alerting</h2>
+<p>Four alerts. Chapter <a href="ch18.html#ch:operations">18</a> adds the operational ones; these are the protocol ones.</p>
+<table id="tab:alerts">
+<caption>All four are ratios against a baseline, because absolute thresholds are wrong for every deployment except the one that set them.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Alert</strong></td>
+<td style="text-align: left;"><strong>Condition</strong></td>
+<td style="text-align: left;"><strong>Usually means</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Iteration inflation</td>
+<td style="text-align: left;">Iterations per task up <span class="math inline">&gt;</span> 20 %</td>
+<td style="text-align: left;">Tool or prompt change</td>
+</tr>
+<tr>
+<td style="text-align: left;">Catalogue bloat</td>
+<td style="text-align: left;">Catalogue tokens up <span class="math inline">&gt;</span> 25 %</td>
+<td style="text-align: left;">Somebody added tools</td>
+</tr>
+<tr>
+<td style="text-align: left;">Cache collapse</td>
+<td style="text-align: left;">Hit rate down <span class="math inline">&gt;</span> 15 points</td>
+<td style="text-align: left;">TTLs changed, or ordering went unstable</td>
+</tr>
+<tr>
+<td style="text-align: left;">MRTR surge</td>
+<td style="text-align: left;">MRTR rounds per task doubled</td>
+<td style="text-align: left;">A server started asking</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="the-harness" class="level2">
+<h2>The harness</h2>
+<p>Meridian’s measurement rig, and the shape is worth copying whatever you build.</p>
+<pre class="python" data-language="python"><code>def time_it(fn, *, n: int = 200, warmup: int = 20, label: str = &quot;&quot;) -&gt; Timing:
+    for _ in range(warmup):
+        fn()
+    timing = Timing(label)
+    for _ in range(n):
+        started = time.perf_counter()
+        fn()
+        timing.add((time.perf_counter() - started) * 1000.0)
+    return timing</code></pre>
+<p>Warmup matters more than people expect. The first calls pay import costs, JIT warmup, connection setup, and cold caches, and including them turns a distribution into a bimodal mess.</p>
+<p>Eight scenarios, each answering one question:</p>
+<table id="tab:bench-scenarios">
+<caption>Each scenario exists to answer a question somebody actually asked. Benchmarks without a question attached become numbers nobody acts on.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Scenario</strong></td>
+<td style="text-align: left;"><strong>Question</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>transport</code></td>
+<td style="text-align: left;">What does each transport cost, minus execution?</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>coldstart</code></td>
+<td style="text-align: left;">Spawn per call, or warm pool?</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>catalogue</code></td>
+<td style="text-align: left;">What does catalogue bloat cost per turn?</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>cache</code></td>
+<td style="text-align: left;">What is honouring <code>ttlMs</code> worth?</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>fanout</code></td>
+<td style="text-align: left;">What does parallelism buy, at what latency?</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>mrtr</code></td>
+<td style="text-align: left;">What does one elicitation really cost?</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>loop</code></td>
+<td style="text-align: left;">Where does a whole task’s time go?</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>serialisation</code></td>
+<td style="text-align: left;">How much of a request is envelope?</td>
+</tr>
+</tbody>
+</table>
+<pre class="bash" data-language="bash"><code>make bench                                   # everything, print a table
+python3 -m meridian.bench.run cache fanout   # named scenarios
+python3 -m meridian.bench.run --json out.json</code></pre>
+<section id="two-things-a-harness-must-be-honest-about" class="level3">
+<h3>Two things a harness must be honest about</h3>
+<p><strong>State what is simulated.</strong> Meridian’s model latency is drawn from a stated distribution and its docstring says so in the first paragraph. A harness that quietly models something is generating fiction with error bars.</p>
+<p><strong>State the machine.</strong> Absolute numbers do not transfer. Ratios do.</p>
+<pre class="python" data-language="python"><code>def machine() -&gt; dict:
+    return {
+        &quot;python&quot;: platform.python_version(),
+        &quot;platform&quot;: platform.platform(),
+        &quot;machine&quot;: platform.machine(),
+        &quot;processor&quot;: platform.processor() or platform.machine(),
+    }</code></pre>
+</section>
+</section>
+<section id="what-to-remember" class="level2">
+<h2>What to remember</h2>
+<ul>
+<li><p>Nine metrics. If you take three: iterations per task, cost per task, cache hit rate.</p></li>
+<li><p>Decompose every iteration into model, transport, execution, and consent. Every millisecond belongs to one band.</p></li>
+<li><p>Subtract an in-process control to isolate transport from execution.</p></li>
+<li><p><code>traceparent</code> in <code>_meta</code> is one line and gives you real distributed traces.</p></li>
+<li><p>Make iterations spans, not just tool calls, or your trace has a hole where 96 % of the time went.</p></li>
+<li><p>Report percentiles. Means hide the users who are suffering.</p></li>
+<li><p>Split cache misses from staleness. They have opposite fixes.</p></li>
+<li><p>Track catalogue tokens on a dashboard. It grows silently.</p></li>
+<li><p>Gate evals on movement against the last release, not on absolute thresholds.</p></li>
+<li><p>Warm up before timing, state what is simulated, and state the machine.</p></li>
+</ul>
+<p>Next: spending the measurements.</p>
+</section>
+</section>
+<div class="pager">
+<a href="ch15.html"><span class="dir">Previous</span>Testing and Debugging</a>
+<a href="ch17.html" style="text-align:right"><span class="dir">Next</span>Optimizing for Latency, Tokens, and Cost</a>
+</div>
+</main>
+</div>
+<script>
+(function(){
+  var nav = document.querySelector('nav.toc');
+  var btn = document.querySelector('.menu-btn');
+  if(btn && nav){
+    if(window.innerWidth <= 940) nav.classList.add('collapsed');
+    btn.addEventListener('click', function(){ nav.classList.toggle('collapsed'); });
+  }
+  // Wrap tables so wide ones scroll rather than overflowing the page.
+  document.querySelectorAll('main table').forEach(function(t){
+    if(t.parentElement.classList.contains('table-wrap')) return;
+    var w = document.createElement('div');
+    w.className = 'table-wrap';
+    t.parentNode.insertBefore(w, t);
+    w.appendChild(t);
+  });
+})();
+</script>
+</body>
+</html>

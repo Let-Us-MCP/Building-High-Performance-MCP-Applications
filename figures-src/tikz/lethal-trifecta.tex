@@ -1,0 +1,53 @@
+% Chapter 19. The combination that turns an inconvenience into a breach.
+\documentclass[tikz,border=6pt]{standalone}
+\input{_style}
+\begin{document}
+\begin{tikzpicture}[x=1cm, y=1cm]
+
+  \def\R{2.6}
+
+  \begin{scope}[opacity=0.30]
+    \fill[accent] (-1.45,0.85) circle (\R);
+    \fill[warm]   ( 1.45,0.85) circle (\R);
+    \fill[good]   ( 0.00,-1.65) circle (\R);
+  \end{scope}
+
+  \draw[draw=accent, line width=1pt] (-1.45,0.85) circle (\R);
+  \draw[draw=warm,   line width=1pt] ( 1.45,0.85) circle (\R);
+  \draw[draw=good,   line width=1pt] ( 0.00,-1.65) circle (\R);
+
+  \node[align=center, font=\sffamily\small\bfseries, text=accent]
+    at (-2.75,2.35) {private\\data};
+  \node[align=center, font=\sffamily\small\bfseries, text=warm]
+    at (2.75,2.35) {untrusted\\content};
+  \node[align=center, font=\sffamily\small\bfseries, text=good]
+    at (0,-3.65) {an exfiltration\\channel};
+
+  \node[align=center, font=\sffamily\scriptsize, text=accent]
+    at (-2.35,0.75) {account\\summaries\\transactions};
+  \node[align=center, font=\sffamily\scriptsize, text=warm]
+    at (2.35,0.75) {tool results\\resource text\\model output};
+  \node[align=center, font=\sffamily\scriptsize, text=good]
+    at (0,-2.5) {a tool that\\sends anywhere};
+
+  % pairwise intersections
+  \node[align=center, font=\sffamily\scriptsize, text=muted] at (0,1.55)
+    {annoying};
+  \node[align=center, font=\sffamily\scriptsize, text=muted] at (-1.55,-0.85)
+    {survivable};
+  \node[align=center, font=\sffamily\scriptsize, text=muted] at (1.55,-0.85)
+    {survivable};
+
+  % the centre
+  \node[align=center, font=\sffamily\small\bfseries, text=danger] at (0,-0.25)
+    {BREACH};
+
+  \node[boxd, minimum width=132mm, align=left, font=\sffamily\scriptsize]
+    at (0,-5.6)
+    {\textbf{You cannot reliably prevent prompt injection.} You \emph{can}
+     ensure no single agent context holds all three circles at once.\\
+     Split the privileges. Put the sending tool behind a consent gate the
+     injected text cannot pass. Deny the network by default.};
+
+\end{tikzpicture}
+\end{document}

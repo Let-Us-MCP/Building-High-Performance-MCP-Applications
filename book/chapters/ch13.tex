@@ -1,0 +1,447 @@
+\chapter{The Agent Loop, State, and Memory}
+\label{ch:agent-loop}
+
+\epigraph{``What we do in life echoes in eternity.''}{Maximus,
+\emph{Gladiator} (2000)}
+
+Or, in the agentic case, it echoes in the context window, which is worse,
+because eternity is free and the context window is billed per token on every
+subsequent turn.
+
+This chapter is about the loop: how it terminates, where state lives now that
+the protocol holds none, and how to stop the context filling with the corpses of
+completed steps.
+
+\section{The loop, instrumented}
+
+Four bands per iteration, and if you cannot attribute a millisecond to one of
+them you cannot optimise it.
+
+\begin{py}
+@dataclass
+class Iteration:
+    """One trip round the loop, with the milliseconds attributed."""
+    index: int
+    model_ms: float = 0.0
+    transport_ms: float = 0.0
+    consent_ms: float = 0.0
+    tool_calls: int = 0
+    parallel: bool = False
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cost_usd: float = 0.0
+\end{py}
+
+The loop itself:
+
+\begin{py}
+for step in range(self.max_steps):
+    iteration = Iteration(index=step)
+
+    # --- think
+    turn = self.model.think("\n".join(context), catalogue)
+    iteration.model_ms = turn.latency_ms
+    iteration.input_tokens = turn.input_tokens
+    iteration.output_tokens = turn.output_tokens
+    iteration.cost_usd = turn.cost_usd
+
+    if not turn.tool_calls:
+        result.answer = turn.text
+        result.stopped_because = "completed"
+        break
+
+    # --- act
+    iteration.parallel = self.parallel_fanout and len(turn.tool_calls) > 1
+    started = time.perf_counter()
+    if iteration.parallel:
+        results = self.host.call_tools_parallel(turn.tool_calls)
+    else:
+        results = [self.host.call_tool(c["name"], c.get("arguments"))
+                   for c in turn.tool_calls]
+    iteration.transport_ms = (time.perf_counter() - started) * 1000.0
+
+    # --- observe
+    for call, payload in zip(turn.tool_calls, results):
+        context.append(f"[{call['name']}] {_summarise(payload)}")
+\end{py}
+
+Think, act, observe. The whole thing.
+
+\section{Termination}
+
+An agent loop that cannot stop is not an agent, it is an outage with a
+personality. There are four ways out and a production loop needs all four.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXl@{}}
+\toprule
+\thead{Condition} & \thead{Means} & \thead{Meridian default} \\
+\midrule
+No tool calls    & The model is finished. The one you hope for & \\
+Step budget      & Looping without progress & 8 \\
+Token budget     & Context filling with tool output & task-dependent \\
+Cost budget      & Somebody wired this to cron and went on holiday & task-dependent \\
+\bottomrule
+\end{tabularx}
+\caption{Four exits. The last three are guardrails, and the third and fourth are
+the ones people leave unset.}
+\label{tab:termination}
+\end{table}
+
+\begin{py}
+if self.token_budget is not None and result.total_tokens > self.token_budget:
+    result.stopped_because = "token budget exhausted"
+    result.answer = "Stopped: the context budget for this task ran out."
+    break
+if self.cost_budget_usd is not None and result.cost_usd > self.cost_budget_usd:
+    result.stopped_because = "cost budget exhausted"
+    result.answer = "Stopped: the dollar budget for this task ran out."
+    break
+\end{py}
+
+Note that a budget stop still produces an \emph{answer}. Not an exception, not a
+blank. The user asked a question and deserves to be told why they are not getting
+one.
+
+\begin{py}
+def test_step_budget_stops_a_runaway(self):
+    looping = [[{"name": "fraud.screen_account",
+                 "arguments": {"accountId": "ACC-1000"}}]] * 50
+    model = StubModel(plan=looping, simulate_latency=False)
+    result = AgentLoop(host, model, max_steps=4).run("loop forever")
+    self.assertEqual(result.stopped_because, "step budget exhausted")
+    self.assertEqual(len(result.iterations), 4)
+\end{py}
+
+\keyidea{Set all four. The model cannot be trusted to stop, and the server
+cannot see enough to make it. Termination is the host's job, and an unset budget
+is not a default, it is infinity.}
+
+\subsection{Choosing the numbers}
+
+Not arbitrary, and derivable from Chapter~\ref{ch:primer}.
+
+\textbf{Step budget}: look at your traces, take the 95th percentile of
+iterations for successful tasks, and add two. Meridian's tasks finish in three,
+so eight is generous.
+
+\textbf{Token budget}: your context window, minus a reserve for the final answer,
+minus your catalogue cost times your step budget. If that arithmetic comes out
+negative, your catalogue is too big and Chapter~\ref{ch:tools} is where you
+should be.
+
+\textbf{Cost budget}: what one task is worth. A \$0.012 task with a \$0.50 budget
+has forty times the headroom it needs and still stops before anything alarming
+happens.
+
+\section{Where state lives now}
+
+The protocol holds none. So state lives in exactly three places, and knowing
+which is which prevents most of the confusion.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXX@{}}
+\toprule
+\thead{Kind} & \thead{Where} & \thead{Lifetime} \\
+\midrule
+Conversation & Host memory & The conversation \\
+Cross-call server state & A handle passed as a tool argument & Server's retention policy \\
+Durable domain state & A database, exposed as resources or tools & Forever \\
+\bottomrule
+\end{tabularx}
+\caption{Three homes. Nothing lives in the connection, because the connection is
+no longer a thing that means anything.}
+\label{tab:state-homes}
+\end{table}
+
+The middle row is the one that changed. Before 2026, a server could keep a
+per-session dictionary. Now it mints a handle and the model carries it.
+
+The interesting consequence: \textbf{the model is now part of your state
+machine}. It has to remember to pass \texttt{basket\_id} to the next call. Which
+means the handle needs to be visible in a tool result the model actually reads,
+and the tool description needs to say what to do with it.
+
+\begin{py}
+# The model is responsible for carrying `basket_id` forward; the server
+# stores the cart contents under that key and looks them up on each call.
+\end{py}
+
+If that makes you slightly nervous, good. It should. It is why
+Chapter~\ref{ch:building-servers} insists on a clear expiry error: when the model
+loses the handle, and it will, the failure has to be self-explanatory enough for
+it to recover.
+
+\section{Context management}
+
+Now the hard part.
+
+Every tool result enters the context and stays there. Ten calls returning 2\,KB
+each is 20\,KB of JSON, re-processed on every subsequent turn, most of it
+irrelevant by the time you get to turn eight.
+
+\subsection{Truncate, at minimum}
+
+Meridian's approach is blunt and bounded, which beats unbounded:
+
+\begin{py}
+def _summarise(payload: dict, limit: int = 600) -> str:
+    """Put the tool result into the context without putting *all* of it there.
+
+    Structured content is preferred over the text mirror, because it is smaller
+    and the model does not have to parse prose to find a number. Truncation is
+    blunt, and Chapter 13 replaces it with something better, but blunt and
+    bounded beats unbounded.
+    """
+    if payload.get("structuredContent") is not None:
+        text = json.dumps(payload["structuredContent"], separators=(",", ":"))
+    else:
+        text = " ".join(block.get("text", "")
+                        for block in payload.get("content", [])
+                        if block.get("type") == "text")
+    if payload.get("isError"):
+        text = "ERROR: " + text
+    return text if len(text) <= limit else text[:limit] + "...[truncated]"
+\end{py}
+
+Preferring \texttt{structuredContent} is worth more than it looks. It is smaller
+than the prose mirror and the model does not have to parse English to find a
+number.
+
+\subsection{Better strategies, roughly in order of effort}
+
+\textbf{Summarise old turns.} After N iterations, replace the oldest tool results
+with a one-line summary. Costs a model call. Best when tasks are long and early
+results stop mattering.
+
+\textbf{Retrieval-augmented re-injection.} Keep full results outside the context,
+in a store, and re-inject only what the current step needs. More machinery, and
+the right answer when results are large and reuse is unpredictable.
+
+\textbf{Sliding window.} Keep the last N results, drop the rest. Cheap. Wrong
+whenever step nine needs step one, which is more often than you would like.
+
+\textbf{Resource links instead of content.} Chapter~\ref{ch:resources} covered
+this: return a link, let the model fetch only if it needs to. Zero tokens for
+results nobody reads.
+
+\begin{notebox}{Measure against task success, not against token count}
+Every one of these makes token count go down. That is not the goal. The goal is
+tasks that still succeed.
+
+An aggressive sliding window can cut context by 60\,\% and quietly drop your
+success rate by 15\,\%, and you will only find out from the eval suite in
+Chapter~\ref{ch:measuring}. Never tune context strategy without one.
+\end{notebox}
+
+\section{Cache staleness in a long-running agent}
+
+A subtle failure mode that only shows up in autonomous systems.
+
+An agent runs for twenty minutes. It cached \texttt{tools/list} at minute zero
+with a five-minute TTL. At minute six the cache is stale, and the agent is
+mid-task.
+
+The freshness check handles it, but only if you actually check on access rather
+than on a timer. And there is a second-order problem: what if the catalogue
+\emph{changed} in a way that invalidates the plan the model already made?
+
+Three defences, in increasing order of paranoia:
+
+\textbf{Subscribe.} A \texttt{listChanged} notification invalidates immediately,
+so the window is milliseconds instead of minutes.
+
+\textbf{Treat unexpected errors as invalidation signals.} A \texttt{-32602}
+saying ``unknown tool'' on a tool you know exists means your catalogue is stale.
+Refetch and retry once, rather than reporting failure. The specification
+explicitly permits refetching before TTL expiry when you have reason to believe
+the data changed.
+
+\textbf{Re-plan on catalogue change.} If the tools available to a task change
+mid-task, the plan may no longer be valid. Expensive, and worth it for long
+autonomous runs.
+
+\section{Cost guardrails}
+
+\begin{py}
+@property
+def cost_usd(self) -> float:
+    return sum(i.cost_usd for i in self.iterations)
+\end{py}
+
+Per iteration, from tokens and price:
+
+\begin{py}
+def estimate_cost_usd(input_tokens: int, output_tokens: int) -> float:
+    return (input_tokens * INPUT_USD_PER_MTOK / 1_000_000.0
+            + output_tokens * OUTPUT_USD_PER_MTOK / 1_000_000.0)
+\end{py}
+
+\begin{measurebox}{Where Meridian's \$0.0125 goes}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+\thead{Iteration} & \thead{Input} & \thead{Output} & \thead{Cost} \\
+\midrule
+1 & 1{,}252 & 12 & \$0.003936 \\
+2 & 1{,}318 & 19 & \$0.004239 \\
+3 & 1{,}400 & 8  & \$0.004320 \\
+\midrule
+\textbf{Total} & \textbf{3{,}970} & \textbf{39} & \textbf{\$0.012495} \\
+\bottomrule
+\end{tabular}
+
+\vspace{6pt}
+\footnotesize
+Note the input column climbing while the output column does not. That is the
+context filling with tool results, and it is why iteration three costs more than
+iteration one despite doing less.
+\end{measurebox}
+
+That table is the whole economics of agent loops in six numbers. Input grows
+monotonically because everything accumulates. Output stays tiny because the model
+emits a tool call, not an essay. So \textbf{your cost is dominated by re-reading
+what you already read}, and the lever is context management rather than
+prompting.
+
+\subsection{Model routing}
+
+Not every step needs your best model.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXl@{}}
+\toprule
+\thead{Step} & \thead{Needs} & \thead{Model} \\
+\midrule
+Planning the task           & Real reasoning & Large \\
+Picking one of three tools  & Classification & Small \\
+Formatting a result         & Transcription & Small \\
+Deciding whether to stop    & Judgement & Large \\
+Summarising for context     & Compression & Small \\
+\bottomrule
+\end{tabularx}
+\caption{Route by what the step actually requires. Glue steps are the majority
+of turns in a long task, and they are the cheapest to move.}
+\label{tab:model-routing}
+\end{table}
+
+The measurement that matters is the quality/cost frontier, and the honest way to
+find it is to run your eval suite at each mix rather than to reason about it. It
+is common to move the majority of turns to a small model and lose nothing
+measurable, and it is also common to lose a lot, and which one you are in is not
+predictable from first principles.
+
+\section{Memory across sessions}
+
+The protocol is stateless. Your application probably should not be.
+
+Meridian's risk agent keeps 30 days of interaction history for an account, and
+none of it lives in MCP. It lives in a database, exposed as a resource:
+
+\begin{plain}
+meridian://accounts/{account_id}/history
+\end{plain}
+
+Which is the whole trick. \textbf{Persistence is a domain concern, not a
+protocol concern.} The protocol moved to statelessness precisely so it would stop
+having an opinion about your storage.
+
+Three layers, and it is worth being explicit about which is which:
+
+\begin{description}[leftmargin=1.4em, style=nextline, itemsep=3pt]
+\item[Conversation memory] This task. Lives in the host, dies with the
+conversation.
+\item[Session memory] This user, recently. Lives in the host's own store.
+Survives a page refresh.
+\item[Domain memory] Facts about the world. Lives in your database, reachable as
+resources and tools. Survives everything, and is the only layer another system
+can also read.
+\end{description}
+
+The mistake is putting domain memory in conversation memory, where it is
+expensive, ephemeral, and invisible to every other consumer.
+
+\section{Streaming, because perceived latency is the latency}
+
+The Meridian baseline is 1,366\,ms, 96\,\% of it model inference. You cannot make
+that faster. You can make it \emph{feel} faster, and that is not a trick, it is
+the actual user experience.
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item \textbf{Stream the model's tokens} as they arrive. Time to first token
+becomes the number the user feels, and it is a third of the total.
+\item \textbf{Show tool calls as they happen.} ``Checking fraud signals...''
+tells the user the system is working and, incidentally, gives them a chance to
+notice it is doing something wrong.
+\item \textbf{Forward progress notifications.} A server emitting
+\texttt{notifications/progress} is offering you free UX. Take it.
+\item \textbf{Stream partial results.} If iteration one produced a usable
+answer, show it while iteration two refines.
+\end{itemize}
+
+\begin{py}
+if total > 20 and i % 10 == 0:
+    ctx.progress(i, total, f"scored {i} of {total}")
+\end{py}
+
+Note the guard again. Progress on a three-item loop is noise on the wire and
+flicker in the UI.
+
+\section{Putting it together}
+
+\begin{py}
+def test_loop_terminates_and_attributes_time(self):
+    host = wire_host()
+    model = StubModel(plan=[
+        [{"name": "risk.assess_account_risk",
+          "arguments": {"accountId": "ACC-1002"}}],
+        [{"name": "fraud.screen_account",
+          "arguments": {"accountId": "ACC-1002"}}],
+        [],
+    ], simulate_latency=False)
+    result = AgentLoop(host, model).run("Assess ACC-1002 for credit and fraud.")
+
+    self.assertEqual(result.stopped_because, "completed")
+    self.assertEqual(len(result.iterations), 3)
+    self.assertEqual(result.round_trips, 2)
+    self.assertGreater(result.model_ms, 0)
+    self.assertGreater(result.total_tokens, 0)
+\end{py}
+
+Three iterations for two tool calls. The third exists solely so the model can
+read the second result and decide it is done, and that third turn costs a full
+TTFT and 1,400 input tokens.
+
+\keyidea{The last iteration of every loop is pure overhead: a model turn that
+produces no tool call and exists only to say ``I am finished''. It is the price
+of letting the model decide when to stop, and it is usually worth paying. But it
+means a two-call task costs three turns, and that is the arithmetic to use when
+estimating.}
+
+\section{What to remember}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item Think, act, observe. Attribute every millisecond to one of four bands.
+\item Four termination conditions, all four set to a number. Budget stops still
+produce an answer.
+\item State lives in host memory, in server handles passed as arguments, or in
+your database. Never in the connection.
+\item The model is now part of your state machine, so handles must be visible and
+expiry errors must be self-explanatory.
+\item Context management is the dominant cost lever, because input grows every
+turn while output does not.
+\item Tune context strategy against task success, never against token count
+alone.
+\item Treat an unexpected ``unknown tool'' as a cache invalidation signal.
+\item Route glue steps to a small model, and verify the frontier with evals
+rather than intuition.
+\item Persistence is a domain concern. Expose it as resources.
+\item Stream everything. Perceived latency is the latency.
+\end{itemize}
+
+Next: what happens when the thing calling your tools is itself an agent.

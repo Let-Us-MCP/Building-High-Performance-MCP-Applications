@@ -1,0 +1,35 @@
+# Reference clone of the MCP spec repo. Read-only input, never part of the book.
+proto/
+
+# The original brief. Working notes rather than book content.
+desc
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# LaTeX build detritus
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+*.idx
+*.ilg
+*.ind
+*.nav
+*.snm
+*.vrb
+*.xdv
+book/build/
+
+# macOS
+.DS_Store

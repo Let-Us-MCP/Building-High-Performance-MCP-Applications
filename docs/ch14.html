@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multi-Agent Topologies &middot; Building Awesome MCP Apps</title>
+<meta name="description" content="Multi-Agent Topologies. What every AI application developer should know about the Model Context Protocol">
+<meta property="og:title" content="Multi-Agent Topologies">
+<meta property="og:description" content="Multi-Agent Topologies. What every AI application developer should know about the Model Context Protocol">
+<style>
+:root{
+  --ink:#15181D; --muted:#5B6472; --rule:#D8DDE4; --wash:#F5F6F8;
+  --paper:#FFFFFF; --accent:#0F5C8C; --accent-soft:#E7F0F6;
+  --warm:#B4531A; --warm-soft:#FBF0E7; --good:#2C6E49; --good-soft:#E9F2EC;
+  --danger:#9B2226; --danger-soft:#FAECEC;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#E7EAEE; --muted:#98A2B0; --rule:#2C333D; --wash:#171B21;
+    --paper:#0F1216; --accent:#63AEDC; --accent-soft:#14232E;
+    --warm:#E08B4F; --warm-soft:#2A1D13; --good:#6FBF8E; --good-soft:#13221A;
+    --danger:#E4796F; --danger-soft:#291516;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--serif);font-size:18px;line-height:1.62;
+  -webkit-text-size-adjust:100%}
+.layout{display:grid;grid-template-columns:288px minmax(0,1fr);
+  max-width:1280px;margin:0 auto;gap:0}
+nav.toc{position:sticky;top:0;height:100vh;overflow-y:auto;padding:26px 20px 60px;
+  border-right:1px solid var(--rule);font-family:var(--sans);font-size:14px}
+nav.toc .brand{display:block;font-weight:700;font-size:16px;color:var(--ink);
+  text-decoration:none;line-height:1.3;margin-bottom:4px}
+nav.toc .tagline{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.45}
+nav.toc .part{margin:18px 0 6px;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);font-weight:700}
+nav.toc a{display:block;padding:4px 8px;margin-left:-8px;border-radius:5px;
+  color:var(--muted);text-decoration:none}
+nav.toc a:hover{background:var(--wash);color:var(--ink)}
+nav.toc a.current{background:var(--accent-soft);color:var(--accent);font-weight:600}
+main{padding:44px 52px 120px;min-width:0;max-width:78ch}
+h1,h2,h3,h4{font-family:var(--sans);line-height:1.25;color:var(--ink)}
+h1{font-size:2.05em;margin:0 0 .55em;letter-spacing:-.015em}
+h2{font-size:1.42em;margin:2em 0 .5em;padding-top:.35em}
+h3{font-size:1.14em;margin:1.7em 0 .4em}
+h4{font-size:1em;margin:1.4em 0 .3em;color:var(--muted)}
+p{margin:0 0 1.05em}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.855em;background:var(--wash);
+  padding:.12em .36em;border-radius:4px;word-break:break-word}
+pre{background:var(--wash);border-left:3px solid var(--rule);
+  border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+  font-size:13.5px;line-height:1.5;margin:1.3em 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+pre.json,pre.http{background:var(--accent-soft);border-left-color:var(--accent)}
+aside.box{border-left:3px solid var(--rule);background:var(--wash);
+  padding:14px 18px;margin:1.5em 0;border-radius:0 6px 6px 0;font-size:.955em}
+aside.box .box-title{font-family:var(--sans);font-weight:700;font-size:12px;
+  letter-spacing:.07em;text-transform:uppercase;margin:0 0 .55em}
+aside.box.legacy{border-left-color:var(--warm);background:var(--warm-soft)}
+aside.box.legacy .box-title{color:var(--warm)}
+aside.box.measured{border-left-color:var(--good);background:var(--good-soft)}
+aside.box.measured .box-title{color:var(--good)}
+aside.box.threat{border-left-color:var(--danger);background:var(--danger-soft)}
+aside.box.threat .box-title{color:var(--danger)}
+aside.box.note .box-title{color:var(--muted)}
+aside.keyidea{border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:14px 18px;margin:1.6em 0;border-radius:0 6px 6px 0;
+  font-family:var(--sans);font-style:italic;font-size:.97em}
+aside.keyidea p:last-child,aside.box p:last-child{margin-bottom:0}
+aside.keyidea pre,aside.keyidea code,aside.keyidea table{font-style:normal}
+aside.epigraph{border:0;margin:0 0 2em;padding:0 0 0 clamp(0px,7%,52px);
+  color:var(--muted);font-size:.97em}
+aside.epigraph p{margin:0 0 .3em}
+main figure{margin:2em 0;text-align:center}
+main figure img{max-width:100%;height:auto;border-radius:6px}
+@media (prefers-color-scheme: dark){
+  main figure img{background:#fff;padding:10px;border-radius:8px}
+}
+figcaption{font-family:var(--sans);font-size:13.5px;color:var(--muted);
+  margin-top:.7em;text-align:left;line-height:1.5}
+.table-wrap{overflow-x:auto;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:14.5px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+thead th{border-bottom:2px solid var(--rule);font-weight:700}
+caption{caption-side:bottom;font-size:13.5px;color:var(--muted);
+  text-align:left;padding-top:.7em;line-height:1.5}
+ul,ol{padding-left:1.35em;margin:0 0 1.05em}
+li{margin-bottom:.32em}
+dl{margin:0 0 1.05em}
+dt{font-weight:700;font-family:var(--sans);font-size:.95em;margin-top:.75em}
+dd{margin:.15em 0 0 1.35em}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
+.pager{display:flex;justify-content:space-between;gap:16px;margin-top:4em;
+  padding-top:1.5em;border-top:1px solid var(--rule);font-family:var(--sans);
+  font-size:14px}
+.pager a{text-decoration:none;max-width:46%}
+.pager .dir{display:block;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted)}
+.masthead{border-bottom:1px solid var(--rule);padding-bottom:1.8em;margin-bottom:2.2em}
+.masthead .kicker{font-family:var(--sans);font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);font-weight:700}
+.lede{font-size:1.12em;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:14px;margin:1.8em 0}
+.card{border:1px solid var(--rule);border-radius:9px;padding:15px 17px;
+  font-family:var(--sans);font-size:14px}
+.card h3{margin:0 0 .35em;font-size:15px}
+.card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+.menu-btn{display:none}
+@media (max-width:940px){
+  body{font-size:17px}
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:0;
+    border-bottom:1px solid var(--rule);max-height:none}
+  nav.toc.collapsed .toc-body{display:none}
+  main{padding:28px 20px 90px}
+  .menu-btn{display:inline-block;font-family:var(--sans);font-size:13px;
+    background:var(--wash);border:1px solid var(--rule);color:var(--ink);
+    border-radius:6px;padding:6px 11px;cursor:pointer;margin-bottom:10px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc"><button class="menu-btn" type="button">Contents</button>
+<div class="toc-body">
+<a class="brand" href="index.html">Building Awesome MCP Apps</a>
+<p class="tagline">What every AI application developer should know about the Model Context Protocol</p>
+<a href="preface.html">Preface</a>
+<a href="how-to-read.html">How to read this book</a>
+<div class="part">Part I. Protocol Fundamentals</div>
+<a href="ch01.html">A Primer on Latency, Tokens, and Context</a>
+<a href="ch02.html">The MCP Architectural Model</a>
+<a href="ch03.html">Building Blocks of the Transport</a>
+<a href="ch04.html">Authorization on the Wire</a>
+<div class="part">Part II. The Primitives</div>
+<a href="ch05.html">Tools: The Execution Layer</a>
+<a href="ch06.html">Resources: The Context Layer</a>
+<a href="ch07.html">Prompts: Workflow Blueprints</a>
+<a href="ch08.html">Multi Round-Trip Requests</a>
+<a href="ch09.html">Extensions and Tasks</a>
+<a href="ch10.html">MCP Apps: Interactive Interfaces</a>
+<div class="part">Part III. Building MCP Applications</div>
+<a href="ch11.html">Building Servers</a>
+<a href="ch12.html">Building Hosts and Clients</a>
+<a href="ch13.html">The Agent Loop, State, and Memory</a>
+<a href="ch14.html" class="current">Multi-Agent Topologies</a>
+<div class="part">Part IV. Performance Engineering</div>
+<a href="ch15.html">Testing and Debugging</a>
+<a href="ch16.html">Measuring MCP Applications</a>
+<a href="ch17.html">Optimizing for Latency, Tokens, and Cost</a>
+<a href="ch18.html">Deployment and Operations</a>
+<div class="part">Part V. Security and Trust</div>
+<a href="ch19.html">Threat Modeling Agentic Applications</a>
+<a href="ch20.html">Access Control, Audit, and MCP in the Enterprise</a>
+<div class="part">Back matter</div>
+<a href="epilogue.html">Epilogue: The Evolving Protocol</a>
+<div class="part">Appendices</div>
+<a href="appendix-a.html">A. Method and Message Reference</a>
+<a href="appendix-b.html">B. Transport Decision Matrix</a>
+<a href="appendix-c.html">C. Performance Checklist</a>
+<a href="appendix-d.html">D. Security Hardening Checklist</a>
+<a href="appendix-e.html">E. The Meridian Companion Repository</a>
+<a href="about.html">About the author</a>
+</div></nav>
+<main>
+<section id="ch:multi-agent" class="level1">
+<h1>Multi-Agent Topologies</h1>
+<aside class="epigraph">
+<p><em>“There is no spoon.”</em></p>
+<p>Spoon Boy, <em>The Matrix</em> (1999)</p>
+</aside>
+<p>The line is usually quoted as mysticism. It is actually a debugging technique: the constraint you are struggling against is a category you invented. In multi-agent systems the invented category is “agent” as a special kind of thing. There is no agent. There is a host that also happens to be a server, and once you see that, the whole topic collapses into things you already know.</p>
+<section id="an-agent-is-a-host-and-a-server-at-the-same-time" class="level2">
+<h2>An agent is a host and a server at the same time</h2>
+<p>That is the entire architectural insight.</p>
+<ul>
+<li><p>On its <strong>consumer</strong> side, it is a host: it connects to servers, merges catalogues, runs a loop.</p></li>
+<li><p>On its <strong>provider</strong> side, it is a server: it exposes tools that happen to be implemented by running a loop.</p></li>
+</ul>
+<p>Nothing in the protocol distinguishes “a tool that queries a database” from “a tool that runs a four-step agent loop and returns a synthesis”. The caller sees a tool call. This is a good property, and it is why MCP does not need a multi-agent extension.</p>
+<pre class="python" data-language="python"><code>risk_agent = Server(&quot;meridian-risk-agent&quot;, &quot;1.0.0&quot;, instructions=(
+    &quot;Delegated credit analysis. Give it an account and a question; it will &quot;
+    &quot;consult the risk, fraud, and market-data servers and return a synthesis.&quot;
+))
+
+@risk_agent.tool(
+    &quot;analyse_account&quot;,
+    &quot;Full credit analysis of one account: risk score, fraud signals, and &quot;
+    &quot;indicative pricing, synthesised into a recommendation.&quot;,
+    {
+        &quot;type&quot;: &quot;object&quot;,
+        &quot;properties&quot;: {
+            &quot;accountId&quot;: {&quot;type&quot;: &quot;string&quot;, &quot;pattern&quot;: &quot;^ACC-[0-9]{4}$&quot;},
+            &quot;question&quot;: {&quot;type&quot;: &quot;string&quot;,
+                         &quot;description&quot;: &quot;What the caller wants to know&quot;},
+        },
+        &quot;required&quot;: [&quot;accountId&quot;],
+    },
+)
+def analyse_account(ctx: RequestContext):
+    budget = _inherit_budget(ctx)          # see below
+    result = AgentLoop(inner_host, model,
+                       max_steps=budget.steps,
+                       token_budget=budget.tokens,
+                       cost_budget_usd=budget.dollars).run(
+        f&quot;Analyse {ctx.arguments[&#39;accountId&#39;]}. &quot;
+        f&quot;{ctx.arguments.get(&#39;question&#39;, &#39;&#39;)}&quot;)
+    return text_result(result.answer,
+                       structured={&quot;iterations&quot;: len(result.iterations),
+                                   &quot;costUsd&quot;: result.cost_usd})</code></pre>
+<p>A tool whose implementation is a loop. The caller cannot tell, and mostly should not need to.</p>
+</section>
+<section id="three-shapes" class="level2">
+<h2>Three shapes</h2>
+<figure id="fig:multi-agent">
+<img src="figures/multi-agent.svg" />
+<figcaption>The three topologies, what each one buys, and what each one costs. The box at the bottom applies to all three.</figcaption>
+</figure>
+<section id="supervisor-tree" class="level3">
+<h3>Supervisor tree</h3>
+<p>One coordinator, several specialists. The shape most teams reach for, and usually correctly.</p>
+<p><strong>Isolation:</strong> a specialist that fails, hangs, or misbehaves is contained by the supervisor. It can retry, route around, or report.</p>
+<p><strong>Failure mode:</strong> the supervisor is a single point of failure and, more insidiously, a single point of context. Every specialist’s summary lands in the supervisor’s window, which fills.</p>
+</section>
+<section id="peer-mesh" class="level3">
+<h3>Peer mesh</h3>
+<p>Agents call each other directly. No coordinator.</p>
+<p><strong>Isolation:</strong> none, structurally. Peers route around damage, which is resilience of a different kind.</p>
+<p><strong>Failure mode:</strong> cycles. A calls B calls C calls A, and now you have an infinite recursion distributed across three machines with a token meter attached.</p>
+</section>
+<section id="hierarchy" class="level3">
+<h3>Hierarchy</h3>
+<p>Levels, each summarising for the one above. Portfolio, sector, account.</p>
+<p><strong>Isolation:</strong> good, and the context property is the real prize: each level sees summaries rather than raw results, so the top-level window stays small regardless of how many accounts exist.</p>
+<p><strong>Failure mode:</strong> depth multiplies latency. Three levels means the leaf’s model turn, the middle’s model turn, and the top’s model turn, in series. A 1.4-second task becomes a four-second task.</p>
+</section>
+</section>
+<section id="the-four-counters" class="level2">
+<h2>The four counters</h2>
+<p>Whatever the shape, four things must travel with a delegated request, and all four ride in <code>_meta</code>.</p>
+<pre class="python" data-language="python"><code>DEPTH_KEY   = &quot;com.meridian/delegationDepth&quot;
+TOKENS_KEY  = &quot;com.meridian/tokenBudgetRemaining&quot;
+DOLLARS_KEY = &quot;com.meridian/costBudgetRemaining&quot;
+# `traceparent` is already reserved by the spec for the fourth.
+
+MAX_DELEGATION_DEPTH = 3
+
+def _inherit_budget(ctx: RequestContext) -&gt; Budget:
+    &quot;&quot;&quot;Read the caller&#39;s remaining budget, or assume the smallest.
+
+    An agent that receives no budget must not assume an unlimited one. That
+    default is how a misconfigured caller turns into a four-figure invoice.
+    &quot;&quot;&quot;
+    meta = ctx.raw_meta
+    depth = int(meta.get(DEPTH_KEY, 0))
+    if depth &gt;= MAX_DELEGATION_DEPTH:
+        raise errors.InvalidParams(
+            f&quot;Delegation depth {depth} exceeds the limit of &quot;
+            f&quot;{MAX_DELEGATION_DEPTH}&quot;)
+    return Budget(
+        depth=depth + 1,
+        tokens=int(meta.get(TOKENS_KEY, DEFAULT_TOKEN_BUDGET)),
+        dollars=float(meta.get(DOLLARS_KEY, DEFAULT_COST_BUDGET)),
+        steps=max(1, MAX_STEPS - depth * 2),
+    )</code></pre>
+<p>Four decisions in that function, each worth stating:</p>
+<p><strong>Depth is checked before any work.</strong> Refusing at depth 3 costs one request. Discovering the recursion at depth 30 costs thirty.</p>
+<p><strong>The default budget is small, not infinite.</strong> An agent that receives no budget is talking to a caller that has not thought about budgets, which is exactly when a conservative default matters most.</p>
+<p><strong>Steps shrink with depth.</strong> A leaf agent does not need eight iterations. If it does, the decomposition is wrong.</p>
+<p><strong>Budgets are <em>remaining</em>, not allocated.</strong> This is the one people get wrong. Passing “you may spend $0.50” to three children authorises $1.50. Passing what is left, and decrementing as results return, authorises $0.50 total.</p>
+<aside class="box threat"><p class="box-title">Threat: Budget fan-out is multiplicative</p>
+<p>A supervisor with a $1.00 budget delegating to 3 agents, each delegating to 3 more, each running 8 steps: if every level passes its full budget down, the system is authorised to spend $9.00 and will happily do so.</p>
+<p>Depth limits alone do not fix this. You need the budget to be a shared, decrementing quantity rather than a per-node allowance.</p>
+</aside>
+</section>
+<section id="circuit-breakers" class="level2">
+<h2>Circuit breakers</h2>
+<p>Budgets stop runaway spending. Circuit breakers stop runaway <em>waiting</em>.</p>
+<pre class="python" data-language="python"><code>class CircuitBreaker:
+    &quot;&quot;&quot;Stop calling something that is clearly broken.
+
+    Three states. Closed: normal. Open: fail fast without calling. Half-open:
+    let exactly one probe through and decide from its outcome. The half-open
+    state is what stops a recovering service being flattened by every client
+    reconnecting at once.
+    &quot;&quot;&quot;
+
+    def __init__(self, *, threshold: int = 5, cooldown: float = 30.0):
+        self.threshold = threshold
+        self.cooldown = cooldown
+        self.failures = 0
+        self.opened_at: float | None = None
+
+    def allows(self, now: float) -&gt; bool:
+        if self.opened_at is None:
+            return True
+        if now - self.opened_at &gt;= self.cooldown:
+            self.opened_at = None      # half-open: one probe gets through
+            self.failures = self.threshold - 1
+            return True
+        return False
+
+    def record(self, ok: bool, now: float) -&gt; None:
+        if ok:
+            self.failures = 0
+            self.opened_at = None
+        else:
+            self.failures += 1
+            if self.failures &gt;= self.threshold:
+                self.opened_at = now</code></pre>
+<p>Failing fast is better than timing out, for a reason specific to agent systems: a timeout consumes the caller’s step budget while producing no information. A fast failure lets the model try something else with the steps it has left.</p>
+</section>
+<section id="discovery-at-scale" class="level2">
+<h2>Discovery at scale</h2>
+<p>Two servers you configure by hand. Two hundred you do not.</p>
+<table id="tab:discovery">
+<caption>Discovery options. Most organisations end up with static config for development and a private registry for production.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Mechanism</strong></td>
+<td style="text-align: left;"><strong>Good for</strong></td>
+<td style="text-align: left;"><strong>Watch out for</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Static config (<code>.mcp.json</code>)</td>
+<td style="text-align: left;">Development, small fixed fleets</td>
+<td style="text-align: left;">Drift between environments</td>
+</tr>
+<tr>
+<td style="text-align: left;">The official MCP Registry</td>
+<td style="text-align: left;">Public, discoverable servers</td>
+<td style="text-align: left;">Anything public is untrusted (<a href="ch19.html#ch:threats">Chapter 19</a>)</td>
+</tr>
+<tr>
+<td style="text-align: left;">A private registry</td>
+<td style="text-align: left;">Enterprise fleets, approval workflows</td>
+<td style="text-align: left;">You now operate a registry</td>
+</tr>
+<tr>
+<td style="text-align: left;">Runtime binding</td>
+<td style="text-align: left;">Selecting a server per task from a catalogue</td>
+<td style="text-align: left;">Discovery latency in the critical path</td>
+</tr>
+</tbody>
+</table>
+<p>Whatever you use, <code>server/discover</code> is cacheable with a TTL, so honour it. A supervisor rediscovering twelve servers per task is spending twelve round trips on information that changes when somebody deploys.</p>
+</section>
+<section id="tracing-across-the-tree" class="level2">
+<h2>Tracing across the tree</h2>
+<p>This is where multi-agent systems become debuggable or do not.</p>
+<p>One trace id, propagated through every hop, so a request that fans out to three agents and eleven servers is one trace with a shape you can read.</p>
+<pre class="python" data-language="python"><code>body[&quot;_meta&quot;] = build_request_meta(
+    self.capabilities, self.info,
+    protocol_version=self.protocol_version,
+    progress_token=progress_token,
+    traceparent=traceparent,
+)</code></pre>
+<p>W3C trace context, in the reserved <code>traceparent</code> key. The specification carves out an explicit exception to the reverse-DNS prefix rule for exactly this, which tells you how important the working group considered it.</p>
+<p>Without it, a slow request in a three-level hierarchy is eleven separate log searches and a guess. With it, it is one waterfall. Chapter <a href="ch16.html#ch:measuring">16</a> builds the waterfall.</p>
+</section>
+<section id="meridians-supervisor" class="level2">
+<h2>Meridian’s supervisor</h2>
+<p>Three specialists, one coordinator, one traced request.</p>
+<pre class="python" data-language="python"><code>supervisor = Host(name=&quot;meridian-supervisor&quot;,
+                  consent=ConsentPolicy(auto_allow_read_only=True),
+                  tool_token_budget=3000)
+
+supervisor.connect(&quot;risk&quot;,       StreamableHttpClient(RISK_AGENT_URL))
+supervisor.connect(&quot;compliance&quot;, StreamableHttpClient(COMPLIANCE_AGENT_URL))
+supervisor.connect(&quot;fraud&quot;,      StreamableHttpClient(FRAUD_AGENT_URL))
+supervisor.discover_all()
+supervisor.refresh_catalogue()
+
+result = AgentLoop(supervisor, model,
+                   max_steps=6,
+                   token_budget=40_000,
+                   cost_budget_usd=0.25,
+                   parallel_fanout=True).run(
+    &quot;Full review of ACC-1042 for the credit committee.&quot;)</code></pre>
+<p><code>parallel_fanout=True</code> is doing heavy lifting here. The three specialists are independent, so the supervisor should call them together. From Chapter <a href="ch01.html#ch:primer">1</a>, that is a 2.8<span class="math inline">×</span> speedup on the tool-call band, and in a hierarchy each level’s fan-out compounds.</p>
+<section id="what-the-trace-looks-like" class="level3">
+<h3>What the trace looks like</h3>
+<pre class="text" data-language="text"><code>supervisor.analyse_portfolio                        [ 4,180 ms]
+ |- model turn (plan)                               [   440 ms]
+ |- parallel fan-out                                [ 1,820 ms]
+ |   |- risk-agent.analyse_account                  [ 1,820 ms]
+ |   |   |- model turn (plan)                       [   430 ms]
+ |   |   |- risk.assess_account_risk                [    12 ms]
+ |   |   |- marketdata.price_facility               [     9 ms]
+ |   |   `- model turn (synthesise)                 [   410 ms]
+ |   |- fraud-agent.screen                          [   890 ms]
+ |   `- compliance-agent.review                     [ 1,240 ms]
+ `- model turn (synthesise)                         [   470 ms]</code></pre>
+<p>Read the shape rather than the numbers. The fan-out costs the <em>maximum</em> of its children (1,820) rather than the sum (3,950), which is what parallelism bought. And the leaf tool calls are 12 ms and 9 ms against model turns of 430 and 410, which is Chapter <a href="ch01.html#ch:primer">1</a>’s point restated at a different scale: you are paying for thinking, not for calling.</p>
+<aside class="keyidea">
+<p>Every level of delegation adds at least two model turns: one to decide what to delegate and one to read what came back. Delegate because the decomposition genuinely helps, not because the architecture diagram looks tidier.</p>
+</aside>
+</section>
+</section>
+<section id="when-not-to-build-a-multi-agent-system" class="level2">
+<h2>When not to build a multi-agent system</h2>
+<p>The section this chapter exists for.</p>
+<p>Multi-agent architectures are intellectually appealing and expensive. Each delegation adds model turns, adds a failure mode, adds a trace to correlate, and adds a budget to enforce. Sometimes that is worth it. Often it is not.</p>
+<table id="tab:when-delegate">
+<caption>The right-hand column describes most systems that have a multi-agent architecture.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Delegate when</strong></td>
+<td style="text-align: left;"><strong>Do not when</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">The sub-task needs a genuinely different tool catalogue</td>
+<td style="text-align: left;">You could have added three tools to one server</td>
+</tr>
+<tr>
+<td style="text-align: left;">The sub-task needs different authorization, and the boundary is real</td>
+<td style="text-align: left;">The boundary is organisational rather than technical</td>
+</tr>
+<tr>
+<td style="text-align: left;">Sub-tasks are independent and parallel fan-out pays</td>
+<td style="text-align: left;">They are sequential, so you pay depth for no concurrency</td>
+</tr>
+<tr>
+<td style="text-align: left;">Context isolation is the point: the child sees data the parent must not</td>
+<td style="text-align: left;">You are isolating context you could have summarised in one turn</td>
+</tr>
+<tr>
+<td style="text-align: left;">Different teams own different agents and deploy independently</td>
+<td style="text-align: left;">One team owns all of it</td>
+</tr>
+</tbody>
+</table>
+<p>The honest test: <em>would this be a function call if the components were in one process?</em> If yes, and you have made it an agent, you have added several hundred milliseconds and a distributed systems problem in exchange for an organisational boundary you could have drawn with a module.</p>
+</section>
+<section id="security-across-agent-boundaries" class="level2">
+<h2>Security across agent boundaries</h2>
+<p>Every boundary is a trust boundary, and delegation makes it easy to forget that.</p>
+<aside class="box threat"><p class="box-title">Threat: Confused deputy, delegated</p>
+<p>A supervisor holds broad authorization. A specialist agent asks it to call a tool. If the supervisor executes on behalf of the specialist using the supervisor’s own credentials, the specialist has just escalated to the supervisor’s privileges.</p>
+<p>Which is the confused deputy from Chapter <a href="ch04.html#ch:authorization">4</a>, one layer up and much easier to build by accident, because the specialist is “one of ours”.</p>
+</aside>
+<p>Three rules:</p>
+<p><strong>Delegate authorization, not just work.</strong> The child should act with its own credentials, scoped to what it needs. Token exchange exists for this.</p>
+<p><strong>Never pass through a token.</strong> It was forbidden in Chapter <a href="ch04.html#ch:authorization">4</a> and it is still forbidden here.</p>
+<p><strong>Audit the delegation, not just the leaves.</strong> An audit log showing <code>assess_account_risk</code> was called tells you nothing about who decided to call it. Record the chain.</p>
+<p>And the one that people find surprising: an agent that consumes untrusted content and then calls another agent has extended the injection surface. If a compliance agent reads poisoned guidance text and then delegates to a risk agent, the injection now reaches a system with different privileges. Chapter <a href="ch19.html#ch:threats">19</a> follows that thread to its conclusion.</p>
+</section>
+<section id="what-to-remember" class="level2">
+<h2>What to remember</h2>
+<ul>
+<li><p>An agent is a host on one side and a server on the other. The protocol needs no extension for this.</p></li>
+<li><p>Supervisor trees for isolation, peer meshes for resilience, hierarchies for context management. Pick for the property you need.</p></li>
+<li><p>Four counters travel in <code>_meta</code>: depth, token budget, cost budget, trace id.</p></li>
+<li><p>Check depth before doing work. Default to a small budget, never an unlimited one.</p></li>
+<li><p>Budgets must be remaining-and-decrementing, not per-node allowances, or fan-out multiplies them.</p></li>
+<li><p>Circuit breakers with a half-open probe, because a timeout burns the caller’s step budget and tells it nothing.</p></li>
+<li><p>Propagate <code>traceparent</code>, or a slow request becomes eleven log searches.</p></li>
+<li><p>Every delegation adds at least two model turns. Delegate for real reasons.</p></li>
+<li><p>Delegate authorization along with work, never a token.</p></li>
+</ul>
+<p>That closes Part III. You can build all of it now. Part IV is about finding out whether it is any good.</p>
+</section>
+</section>
+<div class="pager">
+<a href="ch13.html"><span class="dir">Previous</span>The Agent Loop, State, and Memory</a>
+<a href="ch15.html" style="text-align:right"><span class="dir">Next</span>Testing and Debugging</a>
+</div>
+</main>
+</div>
+<script>
+(function(){
+  var nav = document.querySelector('nav.toc');
+  var btn = document.querySelector('.menu-btn');
+  if(btn && nav){
+    if(window.innerWidth <= 940) nav.classList.add('collapsed');
+    btn.addEventListener('click', function(){ nav.classList.toggle('collapsed'); });
+  }
+  // Wrap tables so wide ones scroll rather than overflowing the page.
+  document.querySelectorAll('main table').forEach(function(t){
+    if(t.parentElement.classList.contains('table-wrap')) return;
+    var w = document.createElement('div');
+    w.className = 'table-wrap';
+    t.parentNode.insertBefore(w, t);
+    w.appendChild(t);
+  });
+})();
+</script>
+</body>
+</html>

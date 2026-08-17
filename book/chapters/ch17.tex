@@ -1,0 +1,461 @@
+\chapter{Optimizing for Latency, Tokens, and Cost}
+\label{ch:optimizing}
+
+\epigraph{``Every second I'm in this room, I'm getting worse.''}{Frankie Dunn,
+\emph{Million Dollar Baby} (2004)}
+
+This is the chapter the rest of the book has been setting up. Everything from
+here is a technique, a measurement, and an honest note about when it does not
+help.
+
+One ground rule before we start, and it is the whole discipline: \textbf{every
+change gets attributed}. Not ``we did six things and it got faster''. Six
+numbers, one per change, including the ones that turned out to be worth nothing.
+Chapter~\ref{ch:measuring} gave you the instrument; this chapter uses it.
+
+\section{The Meridian optimisation pass}
+
+Same task throughout: score an account for credit risk, screen it for fraud, and
+fetch the reference curve. Four servers, 12\,ms simulated per-call latency.
+
+\bookfig[0.98]{optimization}{Four changes, measured cumulatively. Note that the
+two panels improve at different steps, which is the point of measuring them
+separately.}{optimization}
+
+\begin{measurebox}{The full pass, attributed}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\thead{Change} & \thead{Iterations} & \thead{Wall} & \thead{Tokens} & \thead{Cost} \\
+\midrule
+Baseline (38 tools, one call per turn) & 4 & 1{,}753\,ms & 22{,}846 & \$0.0690 \\
+Trim the catalogue to 10 tools         & 4 & 1{,}751\,ms & 5{,}370  & \$0.0166 \\
+Batch independent calls into one turn  & 2 & 1{,}067\,ms & 2{,}692  & \$0.0086 \\
+Fan out that batch in parallel         & 2 & 1{,}014\,ms & 2{,}692  & \$0.0086 \\
+\midrule
+\textbf{Total} & \textbf{4 $\rightarrow$ 2} & \textbf{-42.2\,\%} & \textbf{-88.2\,\%} & \textbf{-87.6\,\%} \\
+\bottomrule
+\end{tabular}
+\end{measurebox}
+
+Read that table row by row, because each row teaches something different.
+
+\textbf{Trimming the catalogue saved 76\,\% of tokens and zero milliseconds.}
+The catalogue is not on the critical path for latency; it is on the critical
+path for cost. Two budgets, two levers, and confusing them is how people spend a
+sprint on the wrong one.
+
+\textbf{Batching saved both, and by the most.} Four iterations became two, which
+halved the model turns, which is where 96\,\% of the wall clock lives. This is
+the round-trip lesson from Chapter~\ref{ch:primer}, cashed out.
+
+\textbf{Parallel fan-out saved 53\,ms of a 1,067\,ms task.} Real, worth having,
+and five percent. At 12\,ms per call there is not much to win; at 40\,ms there
+is three times more.
+
+\keyidea{Optimise iterations first, catalogue second, transport third. That is
+the order of magnitude order, and it is stable across every system I have
+measured.}
+
+\section{Cut round trips}
+
+The category that returns the most, always.
+
+\subsection{Front-load MRTR inputs}
+
+An elicitation costs about 375\,ms, of which 35 is transport and 340 is the
+model turn it forces (Chapter~\ref{ch:mrtr}). So the cheapest elicitation is the
+one that never happens.
+
+\begin{py}
+"exposureUsd": {
+    "type": "number", "minimum": 0,
+    "description": "Proposed exposure. Above 5,000,000 an "
+                   "approver is required before scoring.",
+},
+\end{py}
+
+That description is an optimisation. The model reads it, sees the threshold, and
+can collect the approver from the user \emph{before} calling, in a turn it was
+going to spend anyway. When it works, the round trip disappears entirely.
+
+Better still, take the approver as an optional argument, so a model that already
+knows it can supply it and skip the interrupt.
+
+\subsection{Batch arguments}
+
+\texttt{rank\_portfolio\_risk} exists for exactly one reason:
+
+\begin{measurebox}{Portfolio review, 40 accounts}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+& \thead{Per-account tool} & \thead{Batch tool} \\
+\midrule
+Round trips           & 40 & 1 \\
+Model turns           & 41 & 2 \\
+Estimated wall clock  & \textasciitilde{}18\,s & \textasciitilde{}0.9\,s \\
+\bottomrule
+\end{tabular}
+
+\vspace{6pt}
+\footnotesize
+Wall clock extrapolated from the measured 440\,ms mean model turn. The round-trip
+counts are exact.
+\end{measurebox}
+
+Twenty times faster, from one extra tool. And the server-side description points
+the model at it:
+
+\begin{py}
+"Rank a set of accounts by risk score in one call. Prefer this over "
+"calling assess_account_risk repeatedly."
+\end{py}
+
+\subsection{Let the model batch, then fan out}
+
+Two separate things that people conflate.
+
+\emph{Batching} is the model emitting three tool calls in one turn instead of
+three turns. That saves model turns, which is the expensive part.
+
+\emph{Fan-out} is the host executing those three concurrently. That saves
+transport time, which is the cheap part.
+
+The measurement above shows the split precisely: batching took 1,751\,ms to
+1,067\,ms, and fan-out took 1,067 to 1,014. Batching is thirteen times more
+valuable, and it is the one that depends on your \emph{tool design} rather than
+on your host code.
+
+\subsection{Prefetch App templates}
+
+Predeclared \texttt{ui://} templates can be fetched during idle time
+(Chapter~\ref{ch:apps}). Meridian's is 2.6\,KB with a 24-hour public TTL, so
+after the first fetch it is free forever. Cold, it is a resource read in the
+critical path of the first render.
+
+\section{Cache at every layer}
+
+\subsection{Honour \texttt{ttlMs}}
+
+The single cheapest win in the book, and the measurement is stark:
+
+\begin{measurebox}{Per-task setup, 20 consecutive tasks, four servers}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+& \thead{Re-fetch every task} & \thead{Honour \texttt{ttlMs}} \\
+\midrule
+Requests issued (total)  & 164 & 8 \\
+Setup time per task      & 274.1\,ms & 2.5\,ms \\
+\bottomrule
+\end{tabular}
+
+\vspace{6pt}
+\footnotesize
+The naive host re-runs \texttt{server/discover} and \texttt{tools/list} against
+all four servers before every task. The honouring host does it once.
+\end{measurebox}
+
+Twenty times fewer requests, and a hundred times less setup latency, from
+respecting a field the server already sends you. If you implement one thing from
+this chapter, implement this.
+
+And the resource-read side, from Chapter~\ref{ch:resources}: 577 of 600 reads
+avoided, 96.2\,\% hit rate, 6.82$\times$ faster.
+
+\subsection{Use \texttt{cacheScope: public} where it is true}
+
+A \texttt{public} result can be served by a shared gateway to every user. For
+Meridian's market-data server, which returns identical data to everybody, that
+turns N clients' worth of load into one fetch.
+
+For anything personalised, it is a data breach. Chapter~\ref{ch:resources} has
+the reasoning; the rule is that \texttt{public} is a claim about the
+\emph{content}, not about the endpoint's authentication.
+
+\subsection{Stable ordering, for the provider's prompt cache}
+
+Deterministic \texttt{tools/list} ordering is a specification SHOULD, and the
+reason is prompt caching. Providers cache on a stable prefix. Reorder your
+catalogue and every request misses.
+
+\begin{py}
+def test_tools_list_order_is_stable(self):
+    """Unstable ordering silently destroys the provider's prompt cache."""
+\end{py}
+
+The word ``silently'' is the problem. Nothing errors. Your server looks healthy.
+You just pay full prompt-processing price on every turn forever.
+
+The same discipline applies to your host's merged catalogue
+(\texttt{sorted(self.bindings)}) and to your system prompt, which should not
+contain a timestamp.
+
+\subsection{Invalidate on notification}
+
+TTL and \texttt{listChanged} together let you run long TTLs safely. Without the
+notification you must choose between staleness and refetching; with it you can
+have a five-minute TTL and still see changes in milliseconds.
+
+\section{Stream everything}
+
+Perceived latency is the latency. The Meridian baseline is 1,366\,ms and 96\,\%
+of it is model inference you cannot speed up, so the remaining lever is making
+the wait legible.
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item \textbf{Token streaming.} Time to first token is 340\,ms of a 440\,ms
+turn. Stream, and the user waits 340\,ms instead of 440.
+\item \textbf{Progress notifications.} Free UX from any server that emits them.
+Forward them.
+\item \textbf{Partial results.} Chapter~\ref{ch:agent-loop} argued for this;
+the measurement here is why. Iteration 0 finishes at 447\,ms of a 1,366\,ms
+task, so showing its result buys the user two thirds of the wait back.
+\item \textbf{\texttt{X-Accel-Buffering: no}} on every SSE response, or a proxy
+will buffer your carefully streamed events into one lump at the end.
+\end{itemize}
+
+\section{Transport tuning}
+
+The smallest category, included because it is cheap and because people ask.
+
+\subsection{Reuse connections}
+
+\begin{py}
+def _connection(self):
+    """Reuse the connection. HTTP/1.1 keep-alive is the cheapest win in the
+    whole transport and costs one line of bookkeeping."""
+    if self._conn is not None:
+        self.reused_connections += 1
+        return self._conn
+    ...
+\end{py}
+
+\begin{py}
+def test_connection_is_reused(self):
+    transport = StreamableHttpClient(self.url)
+    client = Client(transport, server_label="wire")
+    for _ in range(5):
+        client.call_tool("echo", {"text": "x"})
+    self.assertEqual(transport.new_connections, 1)
+    self.assertGreaterEqual(transport.reused_connections, 4)
+\end{py}
+
+On loopback this saves almost nothing. Over TLS to another region it saves a TCP
+handshake plus a TLS handshake per call, which is two extra round trips, which at
+68\,ms each is 136\,ms you were about to pay repeatedly.
+
+\subsection{Warm pools for stdio}
+
+\begin{measurebox}{stdio cold start}
+\begin{tabular}{@{}lr@{}}
+\toprule
+Spawn to first usable response & 44.6\,ms \\
+Warm call                      & 0.060\,ms \\
+Calls to amortise one spawn    & \textasciitilde{}750 \\
+\bottomrule
+\end{tabular}
+\end{measurebox}
+
+Spawn-per-call is indefensible for anything but a one-shot CLI. Keep a pool,
+size it to your concurrency, and recycle processes on a schedule rather than per
+request.
+
+\subsection{Let the gateway route on headers}
+
+\texttt{Mcp-Method} and \texttt{Mcp-Name} exist so intermediaries need not parse
+bodies. Use them: send \texttt{tools/list} to a cache tier and
+\texttt{tools/call} to a compute tier, rate-limit per method, apply strict WAF
+policy to the two tools that matter and relaxed policy to the rest.
+
+And validate them, always, because two sources of truth that can disagree is a
+request-smuggling primitive (Chapter~\ref{ch:transport}).
+
+\section{Spend tokens deliberately}
+
+\subsection{Right-size the catalogue}
+
+The biggest single token lever, measured twice now:
+
+\begin{measurebox}{Catalogue cost}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+& \thead{REST mirror} & \thead{Task-shaped} \\
+\midrule
+Tools                     & 38 & 10 \\
+Tokens per turn           & 5{,}617 & 1{,}246 \\
+Tokens per task (4 turns) & 22{,}846 & 5{,}370 \\
+Cost per task             & \$0.0690 & \$0.0166 \\
+\bottomrule
+\end{tabular}
+\end{measurebox}
+
+Four techniques, in order of how much they usually return:
+
+\begin{enumerate}[leftmargin=1.6em, itemsep=3pt]
+\item \textbf{Delete unused tools.} Check your telemetry. Anything with no calls
+in 90 days is pure cost.
+\item \textbf{Merge near-duplicates.} Three tools that differ by one flag should
+be one tool with a parameter.
+\item \textbf{Compress descriptions.} Lead with the outcome, drop the transport
+trivia. Chapter~\ref{ch:tools} has the before and after.
+\item \textbf{Filter per task.} Send the tools plausibly relevant to this
+request. Costs a retrieval step, and it is the only technique that scales past a
+few dozen tools.
+\end{enumerate}
+
+\subsection{Structured outputs eliminate parse-retry loops}
+
+Chapter~\ref{ch:tools} made the correctness argument. The performance argument
+is the retry: a misparse costs a full model turn, roughly 440\,ms and 1,300
+input tokens, and client-side validation against an \texttt{outputSchema} catches
+the malformed response at the boundary instead.
+
+An \texttt{enum} is worth extra attention. Telling the model that \texttt{band}
+is one of four values stops it inventing a fifth and stops it writing defensive
+handling for cases that cannot occur.
+
+\subsection{Truncate tool results before they enter context}
+
+\begin{py}
+return text if len(text) <= limit else text[:limit] + "...[truncated]"
+\end{py}
+
+Blunt, and better than unbounded. Chapter~\ref{ch:agent-loop} has the more
+sophisticated options; the important thing is that a bound exists, because a
+single 40\,KB tool result poisons every subsequent turn of the task.
+
+\subsection{Tune task polling}
+
+For the Tasks extension, cadence is a direct token and request cost. Honour
+\texttt{pollIntervalMs}, back off for long jobs, and add jitter so a thousand
+clients that started together do not stay together.
+
+\section{Route models}
+
+Not every turn needs your best model.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXl@{}}
+\toprule
+\thead{Turn} & \thead{Cognitive load} & \thead{Model} \\
+\midrule
+Initial planning            & High. Real reasoning & Large \\
+Tool selection from 3 options & Low. Classification & Small \\
+Reading a structured result & Low. Extraction & Small \\
+Deciding whether to stop    & Medium. Judgement & Large \\
+Summarising for context     & Low. Compression & Small \\
+Final synthesis             & High. Composition & Large \\
+\bottomrule
+\end{tabularx}
+\caption{In a long task the middle rows are the majority of turns, which is what
+makes routing worth the complexity.}
+\label{tab:routing}
+\end{table}
+
+Two warnings, both learned expensively.
+
+\textbf{Measure the frontier, do not reason about it.} Run your eval suite at
+each mix. It is common to move most turns to a small model and lose nothing
+measurable. It is also common to lose 15 points of task success, and which one
+you are in is not predictable from first principles.
+
+\textbf{A cheap wrong answer is not cheap.} A small model that picks the wrong
+tool costs a full recovery cycle: another model turn, another tool call, another
+model turn. That is more expensive than the large model would have been.
+
+\section{The order to do things in}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXll@{}}
+\toprule
+\thead{\#} & \thead{Change} & \thead{Typical return} & \thead{Effort} \\
+\midrule
+1 & Honour \texttt{ttlMs}              & 20$\times$ fewer setup requests & one afternoon \\
+2 & Trim the catalogue                 & 76\,\% of tokens & one conversation \\
+3 & Add batch variants of looped tools & 20$\times$ on portfolio tasks & one tool \\
+4 & Batch and fan out                  & 40\,\% of wall clock & host change \\
+5 & Deterministic ordering             & prompt-cache hits & one \texttt{sorted()} \\
+6 & Stream tokens and progress         & perceived latency & UI work \\
+7 & Connection reuse, warm pools       & 2 RTT per call & config \\
+8 & Route models                       & 30 to 60\,\% of cost & eval work \\
+9 & Rewrite the server in a fast language & 3\,ms & three weeks \\
+\bottomrule
+\end{tabularx}
+\caption{Roughly descending value per unit effort. Row nine is from the preface,
+and it is there to be looked at again.}
+\label{tab:optimisation-order}
+\end{table}
+
+\section{What did not help}
+
+The section every performance chapter should have and almost none do.
+
+\textbf{Trimming the catalogue did not reduce latency.} Zero milliseconds, twice
+measured. Tokens and time are different budgets.
+
+\textbf{Caching did not speed up the loop itself.} Meridian fetches its catalogue
+before the loop starts, so the loop never touches the cache. Caching helped the
+setup path enormously and the loop not at all. If you had measured only the loop,
+you would have concluded caching was useless.
+
+\textbf{Parallel fan-out returned 5\,\% at 12\,ms per call.} Real, worth keeping,
+and not the story. At 40\,ms it is worth three times more, which is a reminder
+that the value of an optimisation depends on the environment you measured it in.
+
+\textbf{The \texttt{\_meta} envelope's 160\,\% byte overhead is irrelevant.} It
+looks alarming and it is 197 bytes on a request whose unit of work is hundreds of
+milliseconds of inference. Do not optimise it. I have watched somebody try.
+
+\keyidea{Publish the changes that did not work. They are how you stop the next
+person spending a sprint on the thing you already measured.}
+
+\section{Meridian, before and after}
+
+\begin{measurebox}{The complete pass}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+& \thead{Before} & \thead{After} & \thead{Change} \\
+\midrule
+Loop iterations       & 4 & 2 & -50\,\% \\
+Wall clock            & 1{,}753\,ms & 1{,}014\,ms & -42.2\,\% \\
+Transport time        & 104.5\,ms & 36.8\,ms & -64.8\,\% \\
+Tokens per task       & 22{,}846 & 2{,}692 & -88.2\,\% \\
+Cost per task         & \$0.0690 & \$0.0086 & -87.6\,\% \\
+Setup requests (20 tasks) & 164 & 8 & -95.1\,\% \\
+\midrule
+Cost per 1,000 tasks  & \$69.01 & \$8.56 & \textbf{-\$60.45} \\
+\bottomrule
+\end{tabular}
+
+\vspace{6pt}
+\footnotesize
+Regenerate with \texttt{make bench}. Every row is attributed to a specific
+change in the table at the top of this chapter.
+\end{measurebox}
+
+No new hardware. No faster language. Four changes, each measured, each
+attributable, and the largest of them was deleting tools.
+
+\section{What to remember}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item Attribute every change. Six numbers, not one story.
+\item Iterations first, catalogue second, transport third.
+\item Batching saves model turns; fan-out saves transport. Batching is worth
+roughly thirteen times more.
+\item Honouring \texttt{ttlMs} cut setup requests by 95\,\%. Do this first.
+\item Deterministic ordering protects the provider's prompt cache, and losing it
+is silent.
+\item Front-load MRTR inputs. The cheapest elicitation is the one that never
+happens.
+\item Structured outputs remove parse-retry loops; enums remove invented values.
+\item Route glue turns to small models, and verify with evals rather than
+intuition.
+\item A cheap wrong answer costs a full recovery cycle.
+\item Publish what did not work.
+\end{itemize}
+
+Next: running it, once it is fast.

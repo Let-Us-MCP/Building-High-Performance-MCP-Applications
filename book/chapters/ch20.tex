@@ -1,0 +1,475 @@
+\chapter{Access Control, Audit, and MCP in the Enterprise}
+\label{ch:access-control}
+
+\epigraph{``Follow the money.''}{Deep Throat, \emph{All the President's Men}
+(1976)}
+
+The line is about tracing accountability through a system that was designed to
+diffuse it. Which is the audit problem exactly. In an agentic application the
+chain runs user, model, host, client, server, data, and every link is a place
+where responsibility can go missing if nobody wrote it down.
+
+This chapter is about writing it down, and about the access controls that make
+the record worth having.
+
+\section{Scoped authorization, in practice}
+
+Chapter~\ref{ch:authorization} did the wire mechanics. Here is what to do with
+them.
+
+Three granularities, and you probably need all three.
+
+\subsection{Per-tool}
+
+The coarsest and the easiest. A scope per tool, or per group of tools.
+
+\begin{py}
+REQUIRED_SCOPE = {
+    "assess_account_risk": "risk:read",
+    "rank_portfolio_risk": "risk:read",
+    "underwrite_loan":     "risk:write",
+    "review_transaction":  "compliance:write",
+    "export_audit_log":    "audit:read",
+}
+
+class ScopedRiskServer(Server):
+    def visible_tools(self, ctx):
+        scopes = set((ctx.auth or {}).get("scopes", []))
+        return [t for t in super().visible_tools(ctx)
+                if not REQUIRED_SCOPE.get(t.name)
+                or REQUIRED_SCOPE[t.name] in scopes]
+\end{py}
+
+Two properties worth noting.
+
+The filtering happens in \texttt{visible\_tools}, so an unauthorized tool is
+\emph{invisible} rather than present-and-forbidden. The model never sees it,
+never plans around it, and never wastes a turn discovering it cannot call it.
+
+And \texttt{super()} sorts first, so the filtered list stays deterministic and
+the prompt-cache property from Chapter~\ref{ch:tools} survives.
+
+\begin{dangerbox}{Invisible is not the same as protected}
+Filtering the catalogue is a usability feature. It is not access control.
+
+A caller can invoke \texttt{tools/call} for a tool that was never listed. So the
+handler must check authorization too. If your only check is in
+\texttt{visible\_tools}, you have built a menu, not a lock.
+\end{dangerbox}
+
+\subsection{Per-resource}
+
+\begin{py}
+@server.template("meridian://accounts/{account_id}/summary", ...)
+def account_summary(ctx: RequestContext, uri: str, params: dict):
+    account_id = params["account_id"]
+    if not can_read_account(ctx.auth, account_id):
+        # Same error as "does not exist". Distinguishing them tells an
+        # attacker which account ids are real.
+        raise ResourceNotFound(uri)
+    ...
+\end{py}
+
+That comment is the point. Returning ``forbidden'' for accounts that exist and
+``not found'' for those that do not turns your error responses into an
+enumeration oracle. Return the same thing for both.
+
+\subsection{Per-request, which is row-level security}
+
+The finest grain, and the one that actually matters for multi-tenant systems.
+
+\begin{py}
+def rank_portfolio_risk(ctx: RequestContext):
+    ids = ctx.arguments.get("accountIds") or []
+    # Intersect what was asked for with what this principal may see, before
+    # touching the data. The model can request anything; the server decides.
+    permitted = accounts_visible_to(ctx.auth)
+    ids = [a for a in ids if a in permitted]
+    ...
+\end{py}
+
+\keyidea{The model can ask for anything. It has read attacker-influenced text and
+it is not an authorization component. Every access decision belongs on the server,
+against the credential on the request, and never against an argument the model
+supplied.}
+
+\section{Context isolation between tenants}
+
+The architecture gives you some of this. The rest you build.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXl@{}}
+\toprule
+\thead{Leak path} & \thead{Control} & \thead{Where} \\
+\midrule
+Shared cache entry & Fold auth context into every cache key & host \\
+Shared task store & Authorize \texttt{tasks/get} per caller & server \\
+MRTR state replay & Bind \texttt{requestState} to the principal & server \\
+Handle guessing & Opaque handles, authorized on every use & server \\
+Enumerable URIs & Non-sequential ids; identical not-found errors & server \\
+Error message detail & Say less to callers, log more internally & server \\
+\bottomrule
+\end{tabularx}
+\caption{Six paths. The first is the one that fails silently and at scale.}
+\label{tab:isolation-paths}
+\end{table}
+
+Meridian's cache is deliberately conservative:
+
+\begin{py}
+def cache_key(server, method, params, auth_context):
+    """Method plus the params that affect the answer, plus who is asking.
+
+    `auth_context` is folded in unconditionally rather than only for `private`
+    entries. Doing it the other way round means a single mislabelled response
+    leaks across users, and the cost of being wrong is far higher than the cost
+    of a few duplicate entries.
+    """
+\end{py}
+
+That trades some gateway-level sharing of public resources for making a
+mislabelling bug harmless. For a financial system it is obviously the right
+trade. Make the choice deliberately rather than inheriting it.
+
+\begin{py}
+def test_private_entries_are_keyed_by_auth_context(self):
+    cache = ResultCache()
+    result = {"resultType": "complete",
+              "contents": [{"uri": "u", "text": "alice"}],
+              "ttlMs": 60000, "cacheScope": "private"}
+    cache.put("s", "resources/read", {"uri": "u"}, result, auth_context="alice")
+    self.assertIsNotNone(cache.get("s", "resources/read", {"uri": "u"}, "alice"))
+    self.assertIsNone(cache.get("s", "resources/read", {"uri": "u"}, "bob"))
+\end{py}
+
+\section{Human in the loop as a control}
+
+Chapter~\ref{ch:mrtr} covered the mechanism. Here it is as a security boundary,
+and the distinction that makes it one.
+
+Meridian requires a named officer for any flagged transaction. Not a checkbox. A
+name, which goes in the audit log, attached to a decision.
+
+\begin{py}
+"officer": {"type": "string", "title": "Officer", "minLength": 2},
+"decision": {
+    "type": "string", "title": "Decision",
+    "enum": ["clear", "escalate", "hold"],
+    "default": "escalate",
+},
+"note": {"type": "string", "title": "Note", "maxLength": 500},
+\end{py}
+
+Four design decisions in that schema:
+
+\textbf{The officer is named.} An approval without an approver is a log entry
+nobody owns.
+
+\textbf{The decision is an enum.} Three outcomes, no free text, so the audit log
+is queryable.
+
+\textbf{The default is \texttt{escalate}, not \texttt{clear}.} A user who clicks
+through without reading escalates. Defaults are policy, and this one fails safe.
+
+\textbf{There is a note field.} Because ``why'' is what the reviewer will want in
+eighteen months, and the only moment anyone knows it is now.
+
+\subsection{Where the gate belongs}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXX@{}}
+\toprule
+\thead{Gate at} & \thead{Good for} & \thead{Weakness} \\
+\midrule
+Host consent prompt & Anything with side effects & The user learns to click \\
+Server MRTR elicitation & Domain rules the host cannot know & Costs a round trip \\
+Both & High-value operations & Two prompts unless coordinated \\
+\bottomrule
+\end{tabularx}
+\caption{Server-side gates are the stronger ones, because they hold regardless of
+which host is calling.}
+\label{tab:gate-placement}
+\end{table}
+
+That last point matters more than it looks. A host-side gate protects users of
+\emph{your} host. A server-side gate protects everyone, including a user running a
+host you have never seen, which in an MCP ecosystem is most of them.
+
+\keyidea{Put approval gates for domain-critical operations on the server, not in
+the host. The server is the only component that every caller shares.}
+
+\section{Audit, designed for the regulator}
+
+Most audit logs are debugger output with a compliance label. Here is what changes
+when you write one for somebody who will read it under pressure, years later.
+
+\begin{py}
+def _audit(ctx: RequestContext, tool: str, subject: str, payload: dict) -> None:
+    """Append-only, structured, and written for a regulator rather than a
+    debugger."""
+    AUDIT_LOG.append({
+        "tool": tool,
+        "subject": subject,
+        "principal": (ctx.auth or {}).get("sub", "anonymous"),
+        "client": ctx.client_info.name if ctx.client_info else "unknown",
+        "protocolVersion": ctx.protocol_version,
+        "traceparent": ctx.traceparent,
+        "outcome": payload.get("outcome"),
+        "officer": payload.get("officer"),
+    })
+\end{py}
+
+\subsection{What a record must contain}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+\thead{Field} & \thead{Answers} \\
+\midrule
+\texttt{principal} & Who, authoritatively, from the token \\
+\texttt{tool}, \texttt{subject} & What, and to which object \\
+timestamp & When \\
+\texttt{traceparent} & What else was part of the same request \\
+\texttt{outcome} & What happened \\
+\texttt{officer} & Who authorised it, when a human did \\
+\texttt{client} & Which software, for display only \\
+\texttt{protocolVersion} & Which contract was in force \\
+\bottomrule
+\end{tabularx}
+\caption{Eight fields. \texttt{traceparent} is the one that turns a list of
+events into a reconstructable story.}
+\label{tab:audit-fields}
+\end{table}
+
+Two notes on the last two rows.
+
+\texttt{client} is self-reported and unverified. Log it, because it is useful for
+support. Never make a decision with it, and never present it in a report as
+though it were established fact.
+
+\texttt{protocolVersion} matters because behaviour changes between revisions. In
+2028 somebody will ask why a 2026 request behaved a particular way, and the
+answer will be ``because it was \texttt{2026-07-28}''.
+
+\subsection{What Chapter~\ref{ch:threats} proved was missing}
+
+The pen test caught the fan-out and could not explain it. The log recorded every
+action and nothing about the \emph{input} that caused them.
+
+\begin{py}
+AUDIT_LOG.append({
+    ...
+    # What entered the model's context, and where it came from. Without this,
+    # an injection is invisible in the record: you see the actions and not the
+    # sentence that produced them.
+    "inputDigest": hashlib.sha256(result_text.encode()).hexdigest()[:32],
+    "inputSource": f"{server_label}.{tool_name}",
+    "inputBytes": len(result_text),
+})
+\end{py}
+
+Hashes rather than content, for a reason: the content may be private, and
+retaining it turns your audit log into a second copy of the data you were
+protecting. A hash plus a source plus a length is enough to prove that a
+particular result preceded a particular behaviour, which is what an incident
+review needs.
+
+\subsection{Properties, not just fields}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item \textbf{Append-only.} If it can be edited it is a database, not an audit
+log.
+\item \textbf{Written before the action.} Meridian audits before executing, so
+the record exists even when the call times out.
+\item \textbf{Independently queryable.} By principal, by subject, by trace, by
+time.
+\item \textbf{Retained past the incident.} Compromises are found late. A 30-day
+retention is a 30-day investigation limit.
+\item \textbf{Not the same store as your application data.} An attacker who
+reaches your database should not thereby reach the record of what they did.
+\end{itemize}
+
+\section{Wrapping legacy systems}
+
+The practical enterprise problem. There is a mainframe. There is a SOAP service
+somebody wrote in 2009. There is an API with 340 endpoints.
+
+\subsection{Anti-corruption layer}
+
+Do not expose the legacy model. Chapter~\ref{ch:tools} measured what happens: the
+REST mirror cost 4,371 extra tokens per turn and \$26 per thousand tasks in pure
+waste.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}XX@{}}
+\toprule
+\thead{Legacy shape} & \thead{MCP shape} \\
+\midrule
+\texttt{GET /accounts/\{id\}} plus four more calls & \texttt{assess\_account\_risk} \\
+\texttt{POST /jobs} then poll \texttt{/jobs/\{id\}} & one tool returning a task \\
+SOAP envelope with 40 optional fields & a schema with the six that matter \\
+Error codes in a 200 response body & tool execution errors with actionable text \\
+\bottomrule
+\end{tabularx}
+\caption{The translation is the work. A thin wrapper over a legacy API produces a
+legacy-shaped MCP server, which is the worst of both.}
+\label{tab:anti-corruption}
+\end{table}
+
+\subsection{Strangler fig}
+
+Migrating from bespoke function calling, without a rewrite:
+
+\begin{enumerate}[leftmargin=1.6em, itemsep=3pt]
+\item Stand up an MCP server beside the existing integration. Both work.
+\item Move one workflow. Measure it: round trips, tokens, cost, success rate.
+\item Move the rest, one at a time, each with a measurement.
+\item Delete the old integration when nothing calls it.
+\end{enumerate}
+
+Step two is the one to insist on. If the first migrated workflow is not measurably
+better, the problem is your tool design and moving forty more will multiply it.
+
+\section{Registries and change management}
+
+At enterprise scale, a private registry, and the governance questions it answers:
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+\thead{Question} & \thead{Answered by} \\
+\midrule
+Which servers exist? & The registry \\
+Who owns this one? & A required ownership field \\
+What data does it touch? & A data-classification field \\
+Has the App template been reviewed? & An approval record with a hash \\
+What changed last Tuesday? & A version history \\
+Which hosts may connect? & An allowlist \\
+\bottomrule
+\end{tabularx}
+\caption{A registry is a governance artefact that happens to also do discovery.}
+\label{tab:registry}
+\end{table}
+
+Two policies worth adopting.
+
+\textbf{Approve tool definitions, not just servers.} Pin the hash of what you
+approved. Chapter~\ref{ch:threats} explained why: without pinning,
+\texttt{listChanged} is a rug-pull mechanism.
+
+\textbf{Give your own surface a deprecation window.} The specification promises
+you twelve months. Your internal consumers deserve the same, and the discipline
+is identical: mark it Deprecated, publish the migration, wait, then remove.
+
+\section{Measuring success}
+
+The KPIs that survive contact with a steering committee.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXl@{}}
+\toprule
+\thead{KPI} & \thead{Definition} & \thead{Source} \\
+\midrule
+Task success rate & Completed without human rescue & evals \\
+p95 task latency & What impatient users experience & traces \\
+Cost per task & Total model spend divided by tasks & accounting \\
+Context coherence & Tasks completing within the token budget & loop stats \\
+Integration cost & Days to connect a new system & project tracking \\
+Consent friction & Prompts per task, and approval rate & host audit \\
+\bottomrule
+\end{tabularx}
+\caption{The last two are the ones nobody tracks. Both predict whether the system
+survives contact with real users.}
+\label{tab:kpis}
+\end{table}
+
+Integration cost is the one that justifies MCP existing. Before, connecting a new
+system meant an integration per host. After, it means one server. If that number
+is not falling, the protocol is not paying for itself and somebody should ask
+why.
+
+Consent friction is the leading indicator of a security control that is about to
+stop working. If users approve 99.8\,\% of prompts, they are not reading them,
+and your human-in-the-loop is a human-shaped rubber stamp.
+
+\section{Meridian, final state}
+
+\begin{plain}
+                        [ users ]
+                            |
+                   [ host: consent, audit,
+                     namespacing, budgets ]
+                            |
+                   [ supervisor agent ]
+                            |
+        +-------------------+-------------------+
+        |                   |                   |
+  [ risk agent ]    [ compliance agent ]  [ fraud agent ]
+        |                   |                   |
+  [ risk server ]   [ compliance server ] [ fraud server ]
+        |                   |                   |
+        +-------------------+-------------------+
+                            |
+                   [ marketdata server ]
+                     public, gateway-cached
+\end{plain}
+
+\begin{measurebox}{The complete measured system}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+& \thead{Chapter 1} & \thead{Chapter 20} \\
+\midrule
+Loop iterations       & 4 & 2 \\
+Wall clock            & 1{,}753\,ms & 1{,}014\,ms \\
+Tokens per task       & 22{,}846 & 2{,}692 \\
+Cost per task         & \$0.0690 & \$0.0086 \\
+Setup requests (20 tasks) & 164 & 8 \\
+Cache hit rate        & 0\,\% & 96.2\,\% \\
+\midrule
+Tests                 & \multicolumn{2}{r}{134, all passing} \\
+Third-party runtime dependencies & \multicolumn{2}{r}{0} \\
+\bottomrule
+\end{tabular}
+
+\vspace{6pt}
+\footnotesize
+Regenerate every row with \texttt{make bench} and \texttt{make test}.
+\end{measurebox}
+
+Every number is reproducible on your own machine, and every one of them came from
+a technique in this book rather than from faster hardware.
+
+\section{What to remember}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item Filter the catalogue by scope for usability, and check authorization in the
+handler for safety. The first is a menu, the second is a lock.
+\item Identical errors for forbidden and nonexistent, or your errors enumerate
+your data.
+\item Every access decision uses the credential on the request, never an argument
+the model supplied.
+\item Fold the auth context into every cache key, public or private.
+\item Put approval gates on the server. It is the only component every caller
+shares.
+\item Defaults are policy. Default to \texttt{escalate}.
+\item Audit for the regulator: principal, subject, trace, outcome, approver, and
+a digest of what entered the model's context.
+\item Hash inputs rather than storing them, or your audit log becomes a second
+copy of the data.
+\item Wrap legacy systems with a translation, never a mirror.
+\item Track integration cost and consent friction. Nobody else will.
+\end{itemize}
+
+That is the book. What remains is where it goes next.

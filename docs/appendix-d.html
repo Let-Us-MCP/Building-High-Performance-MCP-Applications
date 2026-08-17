@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D. Security Hardening Checklist &middot; Building Awesome MCP Apps</title>
+<meta name="description" content="D. Security Hardening Checklist. What every AI application developer should know about the Model Context Protocol">
+<meta property="og:title" content="D. Security Hardening Checklist">
+<meta property="og:description" content="D. Security Hardening Checklist. What every AI application developer should know about the Model Context Protocol">
+<style>
+:root{
+  --ink:#15181D; --muted:#5B6472; --rule:#D8DDE4; --wash:#F5F6F8;
+  --paper:#FFFFFF; --accent:#0F5C8C; --accent-soft:#E7F0F6;
+  --warm:#B4531A; --warm-soft:#FBF0E7; --good:#2C6E49; --good-soft:#E9F2EC;
+  --danger:#9B2226; --danger-soft:#FAECEC;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#E7EAEE; --muted:#98A2B0; --rule:#2C333D; --wash:#171B21;
+    --paper:#0F1216; --accent:#63AEDC; --accent-soft:#14232E;
+    --warm:#E08B4F; --warm-soft:#2A1D13; --good:#6FBF8E; --good-soft:#13221A;
+    --danger:#E4796F; --danger-soft:#291516;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--serif);font-size:18px;line-height:1.62;
+  -webkit-text-size-adjust:100%}
+.layout{display:grid;grid-template-columns:288px minmax(0,1fr);
+  max-width:1280px;margin:0 auto;gap:0}
+nav.toc{position:sticky;top:0;height:100vh;overflow-y:auto;padding:26px 20px 60px;
+  border-right:1px solid var(--rule);font-family:var(--sans);font-size:14px}
+nav.toc .brand{display:block;font-weight:700;font-size:16px;color:var(--ink);
+  text-decoration:none;line-height:1.3;margin-bottom:4px}
+nav.toc .tagline{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.45}
+nav.toc .part{margin:18px 0 6px;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);font-weight:700}
+nav.toc a{display:block;padding:4px 8px;margin-left:-8px;border-radius:5px;
+  color:var(--muted);text-decoration:none}
+nav.toc a:hover{background:var(--wash);color:var(--ink)}
+nav.toc a.current{background:var(--accent-soft);color:var(--accent);font-weight:600}
+main{padding:44px 52px 120px;min-width:0;max-width:78ch}
+h1,h2,h3,h4{font-family:var(--sans);line-height:1.25;color:var(--ink)}
+h1{font-size:2.05em;margin:0 0 .55em;letter-spacing:-.015em}
+h2{font-size:1.42em;margin:2em 0 .5em;padding-top:.35em}
+h3{font-size:1.14em;margin:1.7em 0 .4em}
+h4{font-size:1em;margin:1.4em 0 .3em;color:var(--muted)}
+p{margin:0 0 1.05em}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.855em;background:var(--wash);
+  padding:.12em .36em;border-radius:4px;word-break:break-word}
+pre{background:var(--wash);border-left:3px solid var(--rule);
+  border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+  font-size:13.5px;line-height:1.5;margin:1.3em 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+pre.json,pre.http{background:var(--accent-soft);border-left-color:var(--accent)}
+aside.box{border-left:3px solid var(--rule);background:var(--wash);
+  padding:14px 18px;margin:1.5em 0;border-radius:0 6px 6px 0;font-size:.955em}
+aside.box .box-title{font-family:var(--sans);font-weight:700;font-size:12px;
+  letter-spacing:.07em;text-transform:uppercase;margin:0 0 .55em}
+aside.box.legacy{border-left-color:var(--warm);background:var(--warm-soft)}
+aside.box.legacy .box-title{color:var(--warm)}
+aside.box.measured{border-left-color:var(--good);background:var(--good-soft)}
+aside.box.measured .box-title{color:var(--good)}
+aside.box.threat{border-left-color:var(--danger);background:var(--danger-soft)}
+aside.box.threat .box-title{color:var(--danger)}
+aside.box.note .box-title{color:var(--muted)}
+aside.keyidea{border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:14px 18px;margin:1.6em 0;border-radius:0 6px 6px 0;
+  font-family:var(--sans);font-style:italic;font-size:.97em}
+aside.keyidea p:last-child,aside.box p:last-child{margin-bottom:0}
+aside.keyidea pre,aside.keyidea code,aside.keyidea table{font-style:normal}
+aside.epigraph{border:0;margin:0 0 2em;padding:0 0 0 clamp(0px,7%,52px);
+  color:var(--muted);font-size:.97em}
+aside.epigraph p{margin:0 0 .3em}
+main figure{margin:2em 0;text-align:center}
+main figure img{max-width:100%;height:auto;border-radius:6px}
+@media (prefers-color-scheme: dark){
+  main figure img{background:#fff;padding:10px;border-radius:8px}
+}
+figcaption{font-family:var(--sans);font-size:13.5px;color:var(--muted);
+  margin-top:.7em;text-align:left;line-height:1.5}
+.table-wrap{overflow-x:auto;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:14.5px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+thead th{border-bottom:2px solid var(--rule);font-weight:700}
+caption{caption-side:bottom;font-size:13.5px;color:var(--muted);
+  text-align:left;padding-top:.7em;line-height:1.5}
+ul,ol{padding-left:1.35em;margin:0 0 1.05em}
+li{margin-bottom:.32em}
+dl{margin:0 0 1.05em}
+dt{font-weight:700;font-family:var(--sans);font-size:.95em;margin-top:.75em}
+dd{margin:.15em 0 0 1.35em}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
+.pager{display:flex;justify-content:space-between;gap:16px;margin-top:4em;
+  padding-top:1.5em;border-top:1px solid var(--rule);font-family:var(--sans);
+  font-size:14px}
+.pager a{text-decoration:none;max-width:46%}
+.pager .dir{display:block;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted)}
+.masthead{border-bottom:1px solid var(--rule);padding-bottom:1.8em;margin-bottom:2.2em}
+.masthead .kicker{font-family:var(--sans);font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);font-weight:700}
+.lede{font-size:1.12em;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:14px;margin:1.8em 0}
+.card{border:1px solid var(--rule);border-radius:9px;padding:15px 17px;
+  font-family:var(--sans);font-size:14px}
+.card h3{margin:0 0 .35em;font-size:15px}
+.card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+.menu-btn{display:none}
+@media (max-width:940px){
+  body{font-size:17px}
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:0;
+    border-bottom:1px solid var(--rule);max-height:none}
+  nav.toc.collapsed .toc-body{display:none}
+  main{padding:28px 20px 90px}
+  .menu-btn{display:inline-block;font-family:var(--sans);font-size:13px;
+    background:var(--wash);border:1px solid var(--rule);color:var(--ink);
+    border-radius:6px;padding:6px 11px;cursor:pointer;margin-bottom:10px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc"><button class="menu-btn" type="button">Contents</button>
+<div class="toc-body">
+<a class="brand" href="index.html">Building Awesome MCP Apps</a>
+<p class="tagline">What every AI application developer should know about the Model Context Protocol</p>
+<a href="preface.html">Preface</a>
+<a href="how-to-read.html">How to read this book</a>
+<div class="part">Part I. Protocol Fundamentals</div>
+<a href="ch01.html">A Primer on Latency, Tokens, and Context</a>
+<a href="ch02.html">The MCP Architectural Model</a>
+<a href="ch03.html">Building Blocks of the Transport</a>
+<a href="ch04.html">Authorization on the Wire</a>
+<div class="part">Part II. The Primitives</div>
+<a href="ch05.html">Tools: The Execution Layer</a>
+<a href="ch06.html">Resources: The Context Layer</a>
+<a href="ch07.html">Prompts: Workflow Blueprints</a>
+<a href="ch08.html">Multi Round-Trip Requests</a>
+<a href="ch09.html">Extensions and Tasks</a>
+<a href="ch10.html">MCP Apps: Interactive Interfaces</a>
+<div class="part">Part III. Building MCP Applications</div>
+<a href="ch11.html">Building Servers</a>
+<a href="ch12.html">Building Hosts and Clients</a>
+<a href="ch13.html">The Agent Loop, State, and Memory</a>
+<a href="ch14.html">Multi-Agent Topologies</a>
+<div class="part">Part IV. Performance Engineering</div>
+<a href="ch15.html">Testing and Debugging</a>
+<a href="ch16.html">Measuring MCP Applications</a>
+<a href="ch17.html">Optimizing for Latency, Tokens, and Cost</a>
+<a href="ch18.html">Deployment and Operations</a>
+<div class="part">Part V. Security and Trust</div>
+<a href="ch19.html">Threat Modeling Agentic Applications</a>
+<a href="ch20.html">Access Control, Audit, and MCP in the Enterprise</a>
+<div class="part">Back matter</div>
+<a href="epilogue.html">Epilogue: The Evolving Protocol</a>
+<div class="part">Appendices</div>
+<a href="appendix-a.html">A. Method and Message Reference</a>
+<a href="appendix-b.html">B. Transport Decision Matrix</a>
+<a href="appendix-c.html">C. Performance Checklist</a>
+<a href="appendix-d.html" class="current">D. Security Hardening Checklist</a>
+<a href="appendix-e.html">E. The Meridian Companion Repository</a>
+<a href="about.html">About the author</a>
+</div></nav>
+<main>
+<section id="ch:security-checklist" class="level1">
+<h1>Security Hardening Checklist</h1>
+<p>Chapters <a href="ch19.html#ch:threats">19</a> and <a href="ch20.html#ch:access-control">20</a> in one page.</p>
+<p>Start with the architectural section. Everything after it is defence in depth, and defence in depth on top of a bad architecture is decoration.</p>
+<section id="architecture-the-trifecta" class="level2">
+<h2>Architecture: the trifecta</h2>
+<ul>
+<li><p><strong>List your agent contexts.</strong> Each loop is one.</p></li>
+<li><p><strong>For each, mark the three ingredients:</strong> access to private data, exposure to untrusted content, and an exfiltration channel.</p></li>
+<li><p><strong>Any context with all three needs a named control.</strong> Not “we are careful”. A specific, testable one.</p></li>
+<li><p><strong>Split privileges</strong> so the reading context and the sending context are not the same context.</p></li>
+<li><p><strong>Write a test for each control</strong>, or it will be refactored away. (<a href="ch19.html#ch:threats">Chapter 19</a>)</p></li>
+</ul>
+</section>
+<section id="host" class="level2">
+<h2>Host</h2>
+<ul>
+<li><p>Consent prompts show <strong>arguments</strong>, not just tool names. (<a href="ch12.html#ch:building-hosts">Chapter 12</a>)</p></li>
+<li><p>Standing approvals are <strong>scoped to a tool</strong>, never “allow everything”.</p></li>
+<li><p>Related prompts are batched, so users do not learn to click.</p></li>
+<li><p>Tool definitions are <strong>pinned after approval</strong>; a changed hash re-prompts. (<a href="ch19.html#ch:threats">Chapter 19</a>)</p></li>
+<li><p>Tool annotations from untrusted servers are <strong>not</strong> believed. (<a href="ch05.html#ch:tools">Chapter 5</a>)</p></li>
+<li><p>Auto-approved read-only tools are reviewed for what private data they can read. (<a href="ch19.html#ch:threats">Chapter 19</a>)</p></li>
+<li><p>Tool calls come from <strong>structured output</strong>, never from parsing text.</p></li>
+<li><p>Arbitrary <code>https://</code> resource URIs are <strong>not</strong> auto-fetched. (<a href="ch19.html#ch:threats">Chapter 19</a>)</p></li>
+<li><p>Step, token, and cost budgets are set to numbers. (<a href="ch13.html#ch:agent-loop">Chapter 13</a>)</p></li>
+<li><p>An unhealthy server drops out of the catalogue without taking the host with it. (<a href="ch12.html#ch:building-hosts">Chapter 12</a>)</p></li>
+<li><p>The default input provider <strong>declines</strong>.</p></li>
+</ul>
+</section>
+<section id="server" class="level2">
+<h2>Server</h2>
+<ul>
+<li><p>Every tool input validated against its schema at the edge. (<a href="ch11.html#ch:building-servers">Chapter 11</a>)</p></li>
+<li><p>Remote <code>$ref</code> <strong>never</strong> dereferenced. Schemas that fail to resolve are rejected, not treated as permissive. (<a href="ch05.html#ch:tools">Chapter 5</a>)</p></li>
+<li><p>Schema depth and subschema count bounded. (<a href="ch05.html#ch:tools">Chapter 5</a>)</p></li>
+<li><p>Tool visibility filtered by <strong>authorization</strong>, never by connection. (<a href="ch11.html#ch:building-servers">Chapter 11</a>)</p></li>
+<li><p>Handlers check authorization too. Filtering the catalogue is a menu, not a lock. (<a href="ch20.html#ch:access-control">Chapter 20</a>)</p></li>
+<li><p>Forbidden and nonexistent return the <strong>same error</strong>, or your errors enumerate your data. (<a href="ch20.html#ch:access-control">Chapter 20</a>)</p></li>
+<li><p>Handles are opaque, high-entropy, expiring, and authorized on every use. (<a href="ch11.html#ch:building-servers">Chapter 11</a>)</p></li>
+<li><p>Resource reads authorized per URI; file paths sanitised against traversal. (<a href="ch06.html#ch:resources">Chapter 6</a>)</p></li>
+<li><p>Mutating tools take an idempotency key, because retries are routine. (<a href="ch03.html#ch:transport">Chapter 3</a>)</p></li>
+<li><p>Tool outputs sanitised, and rate limits applied.</p></li>
+<li><p>Extensions declared only when implemented. (<a href="ch11.html#ch:building-servers">Chapter 11</a>)</p></li>
+</ul>
+</section>
+<section id="mrtr-and-requeststate" class="level2">
+<h2>MRTR and <code>requestState</code></h2>
+<ul>
+<li><p><strong>Integrity protected</strong> with a MAC, verified in constant time.</p></li>
+<li><p><strong>Bound to the principal</strong>, blocking cross-user replay.</p></li>
+<li><p><strong>Bound to the request</strong>, blocking cross-request replay.</p></li>
+<li><p><strong>Expiring</strong>, with a short TTL.</p></li>
+<li><p>Signed with a <strong>fleet-wide</strong> secret, not per process.</p></li>
+<li><p>Rotation window longer than the state TTL. (<a href="ch18.html#ch:operations">Chapter 18</a>)</p></li>
+<li><p><strong>No secrets inside.</strong> HMAC gives integrity, not confidentiality.</p></li>
+<li><p>Single-use enforced <strong>server-side</strong> if the operation requires it. Binding and expiry do not provide it.</p></li>
+<li><p>Never send an input request the client did not declare support for. (<a href="ch08.html#ch:mrtr">Chapter 8</a>)</p></li>
+<li><p>Form mode <strong>never</strong> for passwords, keys, tokens, or payment credentials. URL mode instead. (<a href="ch08.html#ch:mrtr">Chapter 8</a>)</p></li>
+<li><p>URL mode verifies that the user who <em>opens</em> the URL is the user it was minted for. (<a href="ch08.html#ch:mrtr">Chapter 8</a>)</p></li>
+</ul>
+</section>
+<section id="transport" class="level2">
+<h2>Transport</h2>
+<ul>
+<li><p><code>Origin</code> validated; <code>403</code> when disallowed. (<a href="ch03.html#ch:transport">Chapter 3</a>)</p></li>
+<li><p>Local servers bind to <code>127.0.0.1</code>, not <code>0.0.0.0</code>.</p></li>
+<li><p>Header and body agreement enforced, <code>400</code> with <code>-32020</code> on mismatch. This is the request-smuggling control.</p></li>
+<li><p>Base64 sentinel encoding applied, including to values that merely resemble the sentinel.</p></li>
+<li><p>Sensitive parameters <strong>not</strong> marked <code>x-mcp-header</code>; headers are visible to intermediaries. (<a href="ch05.html#ch:tools">Chapter 5</a>)</p></li>
+<li><p>TLS everywhere that is not a local pipe.</p></li>
+<li><p>stdio servers get an explicit environment allowlist. (<a href="ch18.html#ch:operations">Chapter 18</a>)</p></li>
+</ul>
+</section>
+<section id="authorization" class="level2">
+<h2>Authorization</h2>
+<ul>
+<li><p>Protected resource metadata published at <code>/.well-known/oauth-protected-resource</code>. (<a href="ch04.html#ch:authorization">Chapter 4</a>)</p></li>
+<li><p>Audience binding (RFC 8707) enforced. Tokens issued for someone else are rejected.</p></li>
+<li><p><strong>No token passthrough.</strong> Never forward the client’s token to a third party.</p></li>
+<li><p><code>iss</code> validated before redeeming a code, by simple string comparison, with no normalisation, including on error responses.</p></li>
+<li><p>Scope challenges include everything the operation needs, in one challenge.</p></li>
+<li><p>Clients request the <strong>union</strong> on step-up, not just the new scope.</p></li>
+<li><p>Re-auth retries are bounded.</p></li>
+<li><p>Client credentials keyed by issuer, never reused across authorization servers.</p></li>
+</ul>
+</section>
+<section id="mcp-apps" class="level2">
+<h2>MCP Apps</h2>
+<ul>
+<li><p>Templates reviewed before rendering; predeclaration exists to make this possible. (<a href="ch10.html#ch:apps">Chapter 10</a>)</p></li>
+<li><p>Declared CSP origins read and allowlisted. A <code>connect-src</code> to an unknown host is an exfiltration request in writing.</p></li>
+<li><p>Network denied by default.</p></li>
+<li><p><code>postMessage</code> origin and payload shape validated on every message.</p></li>
+<li><p><strong>UI-initiated tool calls traverse the normal consent and audit path.</strong> No exceptions.</p></li>
+<li><p>Tools degrade to useful text for hosts that render nothing.</p></li>
+</ul>
+</section>
+<section id="multi-agent" class="level2">
+<h2>Multi-agent</h2>
+<ul>
+<li><p>Delegation depth checked <strong>before</strong> doing work. (<a href="ch14.html#ch:multi-agent">Chapter 14</a>)</p></li>
+<li><p>Budgets are <strong>remaining and decrementing</strong>, not per-node allowances, or fan-out multiplies them.</p></li>
+<li><p>An agent with no budget assumes the <strong>smallest</strong>, never unlimited.</p></li>
+<li><p>Children act with <strong>their own</strong> scoped credentials.</p></li>
+<li><p>Circuit breakers, with a half-open probe.</p></li>
+<li><p><code>traceparent</code> propagated through every hop.</p></li>
+</ul>
+</section>
+<section id="audit" class="level2">
+<h2>Audit</h2>
+<ul>
+<li><p>Append-only, and in a different store from application data. (<a href="ch20.html#ch:access-control">Chapter 20</a>)</p></li>
+<li><p>Written <strong>before</strong> the action, so timeouts are recorded.</p></li>
+<li><p>Principal from the <strong>token</strong>, never from an argument.</p></li>
+<li><p><code>traceparent</code> recorded, so one incident is one query.</p></li>
+<li><p>Approver recorded by <strong>name</strong> for human-gated operations.</p></li>
+<li><p><strong>Inputs recorded, not only actions</strong>: a digest, source, and length of what entered the model’s context. Without this an injection is invisible in the record. (<a href="ch19.html#ch:threats">Chapter 19</a>)</p></li>
+<li><p>Hashes rather than content, so the log does not become a second copy of the data.</p></li>
+<li><p>Retention longer than your realistic detection time.</p></li>
+<li><p><code>clientInfo</code> logged but <strong>never</strong> used for decisions.</p></li>
+</ul>
+</section>
+<section id="the-twelve-questions" class="level2">
+<h2>The twelve questions</h2>
+<p>Run these against a live deployment. Each has a yes-or-no answer, and each answer is a finding or a relief.</p>
+<ol>
+<li><p>Does any agent context hold private data, untrusted content, and a way out?</p></li>
+<li><p>Can a tool result reach the model without being marked as data?</p></li>
+<li><p>Which private data can your auto-approved read-only tools reach?</p></li>
+<li><p>Can the host fetch an arbitrary <code>https://</code> resource URI?</p></li>
+<li><p>Are tool definitions pinned after approval?</p></li>
+<li><p>Is <code>requestState</code> integrity-protected, principal-bound, and request-bound? All three?</p></li>
+<li><p>Can a compromised server reach the internet?</p></li>
+<li><p>Does the audit log record what entered the model’s context?</p></li>
+<li><p>Are tool calls ever extracted by parsing text?</p></li>
+<li><p>Do MCP App tool calls traverse the consent path?</p></li>
+<li><p>Which servers’ annotations do you trust, and why?</p></li>
+<li><p>What happens when a server returns 40 MB?</p></li>
+</ol>
+<p>Question three finds more real problems than the rest combined, because auto-approving read-only tools is so obviously reasonable and “read-only” does not mean “harmless”.</p>
+</section>
+</section>
+<div class="pager">
+<a href="appendix-c.html"><span class="dir">Previous</span>C. Performance Checklist</a>
+<a href="appendix-e.html" style="text-align:right"><span class="dir">Next</span>E. The Meridian Companion Repository</a>
+</div>
+</main>
+</div>
+<script>
+(function(){
+  var nav = document.querySelector('nav.toc');
+  var btn = document.querySelector('.menu-btn');
+  if(btn && nav){
+    if(window.innerWidth <= 940) nav.classList.add('collapsed');
+    btn.addEventListener('click', function(){ nav.classList.toggle('collapsed'); });
+  }
+  // Wrap tables so wide ones scroll rather than overflowing the page.
+  document.querySelectorAll('main table').forEach(function(t){
+    if(t.parentElement.classList.contains('table-wrap')) return;
+    var w = document.createElement('div');
+    w.className = 'table-wrap';
+    t.parentNode.insertBefore(w, t);
+    w.appendChild(t);
+  });
+})();
+</script>
+</body>
+</html>

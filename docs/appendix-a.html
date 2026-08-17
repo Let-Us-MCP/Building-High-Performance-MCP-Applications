@@ -1,0 +1,805 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A. Method and Message Reference &middot; Building Awesome MCP Apps</title>
+<meta name="description" content="A. Method and Message Reference. What every AI application developer should know about the Model Context Protocol">
+<meta property="og:title" content="A. Method and Message Reference">
+<meta property="og:description" content="A. Method and Message Reference. What every AI application developer should know about the Model Context Protocol">
+<style>
+:root{
+  --ink:#15181D; --muted:#5B6472; --rule:#D8DDE4; --wash:#F5F6F8;
+  --paper:#FFFFFF; --accent:#0F5C8C; --accent-soft:#E7F0F6;
+  --warm:#B4531A; --warm-soft:#FBF0E7; --good:#2C6E49; --good-soft:#E9F2EC;
+  --danger:#9B2226; --danger-soft:#FAECEC;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#E7EAEE; --muted:#98A2B0; --rule:#2C333D; --wash:#171B21;
+    --paper:#0F1216; --accent:#63AEDC; --accent-soft:#14232E;
+    --warm:#E08B4F; --warm-soft:#2A1D13; --good:#6FBF8E; --good-soft:#13221A;
+    --danger:#E4796F; --danger-soft:#291516;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--serif);font-size:18px;line-height:1.62;
+  -webkit-text-size-adjust:100%}
+.layout{display:grid;grid-template-columns:288px minmax(0,1fr);
+  max-width:1280px;margin:0 auto;gap:0}
+nav.toc{position:sticky;top:0;height:100vh;overflow-y:auto;padding:26px 20px 60px;
+  border-right:1px solid var(--rule);font-family:var(--sans);font-size:14px}
+nav.toc .brand{display:block;font-weight:700;font-size:16px;color:var(--ink);
+  text-decoration:none;line-height:1.3;margin-bottom:4px}
+nav.toc .tagline{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.45}
+nav.toc .part{margin:18px 0 6px;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);font-weight:700}
+nav.toc a{display:block;padding:4px 8px;margin-left:-8px;border-radius:5px;
+  color:var(--muted);text-decoration:none}
+nav.toc a:hover{background:var(--wash);color:var(--ink)}
+nav.toc a.current{background:var(--accent-soft);color:var(--accent);font-weight:600}
+main{padding:44px 52px 120px;min-width:0;max-width:78ch}
+h1,h2,h3,h4{font-family:var(--sans);line-height:1.25;color:var(--ink)}
+h1{font-size:2.05em;margin:0 0 .55em;letter-spacing:-.015em}
+h2{font-size:1.42em;margin:2em 0 .5em;padding-top:.35em}
+h3{font-size:1.14em;margin:1.7em 0 .4em}
+h4{font-size:1em;margin:1.4em 0 .3em;color:var(--muted)}
+p{margin:0 0 1.05em}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.855em;background:var(--wash);
+  padding:.12em .36em;border-radius:4px;word-break:break-word}
+pre{background:var(--wash);border-left:3px solid var(--rule);
+  border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+  font-size:13.5px;line-height:1.5;margin:1.3em 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+pre.json,pre.http{background:var(--accent-soft);border-left-color:var(--accent)}
+aside.box{border-left:3px solid var(--rule);background:var(--wash);
+  padding:14px 18px;margin:1.5em 0;border-radius:0 6px 6px 0;font-size:.955em}
+aside.box .box-title{font-family:var(--sans);font-weight:700;font-size:12px;
+  letter-spacing:.07em;text-transform:uppercase;margin:0 0 .55em}
+aside.box.legacy{border-left-color:var(--warm);background:var(--warm-soft)}
+aside.box.legacy .box-title{color:var(--warm)}
+aside.box.measured{border-left-color:var(--good);background:var(--good-soft)}
+aside.box.measured .box-title{color:var(--good)}
+aside.box.threat{border-left-color:var(--danger);background:var(--danger-soft)}
+aside.box.threat .box-title{color:var(--danger)}
+aside.box.note .box-title{color:var(--muted)}
+aside.keyidea{border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:14px 18px;margin:1.6em 0;border-radius:0 6px 6px 0;
+  font-family:var(--sans);font-style:italic;font-size:.97em}
+aside.keyidea p:last-child,aside.box p:last-child{margin-bottom:0}
+aside.keyidea pre,aside.keyidea code,aside.keyidea table{font-style:normal}
+aside.epigraph{border:0;margin:0 0 2em;padding:0 0 0 clamp(0px,7%,52px);
+  color:var(--muted);font-size:.97em}
+aside.epigraph p{margin:0 0 .3em}
+main figure{margin:2em 0;text-align:center}
+main figure img{max-width:100%;height:auto;border-radius:6px}
+@media (prefers-color-scheme: dark){
+  main figure img{background:#fff;padding:10px;border-radius:8px}
+}
+figcaption{font-family:var(--sans);font-size:13.5px;color:var(--muted);
+  margin-top:.7em;text-align:left;line-height:1.5}
+.table-wrap{overflow-x:auto;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:14.5px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+thead th{border-bottom:2px solid var(--rule);font-weight:700}
+caption{caption-side:bottom;font-size:13.5px;color:var(--muted);
+  text-align:left;padding-top:.7em;line-height:1.5}
+ul,ol{padding-left:1.35em;margin:0 0 1.05em}
+li{margin-bottom:.32em}
+dl{margin:0 0 1.05em}
+dt{font-weight:700;font-family:var(--sans);font-size:.95em;margin-top:.75em}
+dd{margin:.15em 0 0 1.35em}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
+.pager{display:flex;justify-content:space-between;gap:16px;margin-top:4em;
+  padding-top:1.5em;border-top:1px solid var(--rule);font-family:var(--sans);
+  font-size:14px}
+.pager a{text-decoration:none;max-width:46%}
+.pager .dir{display:block;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted)}
+.masthead{border-bottom:1px solid var(--rule);padding-bottom:1.8em;margin-bottom:2.2em}
+.masthead .kicker{font-family:var(--sans);font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);font-weight:700}
+.lede{font-size:1.12em;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:14px;margin:1.8em 0}
+.card{border:1px solid var(--rule);border-radius:9px;padding:15px 17px;
+  font-family:var(--sans);font-size:14px}
+.card h3{margin:0 0 .35em;font-size:15px}
+.card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+.menu-btn{display:none}
+@media (max-width:940px){
+  body{font-size:17px}
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:0;
+    border-bottom:1px solid var(--rule);max-height:none}
+  nav.toc.collapsed .toc-body{display:none}
+  main{padding:28px 20px 90px}
+  .menu-btn{display:inline-block;font-family:var(--sans);font-size:13px;
+    background:var(--wash);border:1px solid var(--rule);color:var(--ink);
+    border-radius:6px;padding:6px 11px;cursor:pointer;margin-bottom:10px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc"><button class="menu-btn" type="button">Contents</button>
+<div class="toc-body">
+<a class="brand" href="index.html">Building Awesome MCP Apps</a>
+<p class="tagline">What every AI application developer should know about the Model Context Protocol</p>
+<a href="preface.html">Preface</a>
+<a href="how-to-read.html">How to read this book</a>
+<div class="part">Part I. Protocol Fundamentals</div>
+<a href="ch01.html">A Primer on Latency, Tokens, and Context</a>
+<a href="ch02.html">The MCP Architectural Model</a>
+<a href="ch03.html">Building Blocks of the Transport</a>
+<a href="ch04.html">Authorization on the Wire</a>
+<div class="part">Part II. The Primitives</div>
+<a href="ch05.html">Tools: The Execution Layer</a>
+<a href="ch06.html">Resources: The Context Layer</a>
+<a href="ch07.html">Prompts: Workflow Blueprints</a>
+<a href="ch08.html">Multi Round-Trip Requests</a>
+<a href="ch09.html">Extensions and Tasks</a>
+<a href="ch10.html">MCP Apps: Interactive Interfaces</a>
+<div class="part">Part III. Building MCP Applications</div>
+<a href="ch11.html">Building Servers</a>
+<a href="ch12.html">Building Hosts and Clients</a>
+<a href="ch13.html">The Agent Loop, State, and Memory</a>
+<a href="ch14.html">Multi-Agent Topologies</a>
+<div class="part">Part IV. Performance Engineering</div>
+<a href="ch15.html">Testing and Debugging</a>
+<a href="ch16.html">Measuring MCP Applications</a>
+<a href="ch17.html">Optimizing for Latency, Tokens, and Cost</a>
+<a href="ch18.html">Deployment and Operations</a>
+<div class="part">Part V. Security and Trust</div>
+<a href="ch19.html">Threat Modeling Agentic Applications</a>
+<a href="ch20.html">Access Control, Audit, and MCP in the Enterprise</a>
+<div class="part">Back matter</div>
+<a href="epilogue.html">Epilogue: The Evolving Protocol</a>
+<div class="part">Appendices</div>
+<a href="appendix-a.html" class="current">A. Method and Message Reference</a>
+<a href="appendix-b.html">B. Transport Decision Matrix</a>
+<a href="appendix-c.html">C. Performance Checklist</a>
+<a href="appendix-d.html">D. Security Hardening Checklist</a>
+<a href="appendix-e.html">E. The Meridian Companion Repository</a>
+<a href="about.html">About the author</a>
+</div></nav>
+<main>
+<section id="ch:method-reference" class="level1">
+<h1>Method and Message Reference</h1>
+<p>Everything in protocol revision <code>2026-07-28</code>, on a few pages. Where a chapter covers something properly, it is cross-referenced rather than repeated.</p>
+<section id="methods" class="level2">
+<h2>Methods</h2>
+<table id="tab:all-methods">
+<caption>The complete core surface. “Page” means the operation supports cursor pagination; “Cache” means results carry <code>ttlMs</code> and <code>cacheScope</code>; “MRTR” means the server may answer <code>input_required</code>.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Method</strong></td>
+<td style="text-align: left;"><strong>Purpose</strong></td>
+<td style="text-align: center;"><strong>Page</strong></td>
+<td style="text-align: center;"><strong>Cache</strong></td>
+<td style="text-align: left;"><strong>MRTR</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>server/discover</code></td>
+<td style="text-align: left;">Versions, capabilities, identity</td>
+<td style="text-align: center;">no</td>
+<td style="text-align: center;">yes</td>
+<td style="text-align: left;">no</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tools/list</code></td>
+<td style="text-align: left;">Available tools</td>
+<td style="text-align: center;">yes</td>
+<td style="text-align: center;">yes</td>
+<td style="text-align: left;">no</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tools/call</code></td>
+<td style="text-align: left;">Invoke a tool</td>
+<td style="text-align: center;">no</td>
+<td style="text-align: center;">no</td>
+<td style="text-align: left;"><strong>yes</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>resources/list</code></td>
+<td style="text-align: left;">Available resources</td>
+<td style="text-align: center;">yes</td>
+<td style="text-align: center;">yes</td>
+<td style="text-align: left;">no</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>resources/templates/list</code></td>
+<td style="text-align: left;">Parameterised resource families</td>
+<td style="text-align: center;">yes</td>
+<td style="text-align: center;">yes</td>
+<td style="text-align: left;">no</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>resources/read</code></td>
+<td style="text-align: left;">Resource contents</td>
+<td style="text-align: center;">no</td>
+<td style="text-align: center;">yes</td>
+<td style="text-align: left;"><strong>yes</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>prompts/list</code></td>
+<td style="text-align: left;">Available prompts</td>
+<td style="text-align: center;">yes</td>
+<td style="text-align: center;">yes</td>
+<td style="text-align: left;">no</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>prompts/get</code></td>
+<td style="text-align: left;">Render a prompt</td>
+<td style="text-align: center;">no</td>
+<td style="text-align: center;">no</td>
+<td style="text-align: left;"><strong>yes</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>subscriptions/listen</code></td>
+<td style="text-align: left;">Long-lived notification stream</td>
+<td style="text-align: center;">no</td>
+<td style="text-align: center;">no</td>
+<td style="text-align: left;">no</td>
+</tr>
+</tbody>
+</table>
+<p>Nine methods. That is the entire core protocol.</p>
+<section id="tasks-extension-io.modelcontextprotocoltasks" class="level3">
+<h3>Tasks extension (<code>io.modelcontextprotocol/tasks</code>)</h3>
+<table id="tab:tasks-methods">
+<caption>See Chapter <a href="ch09.html#ch:tasks">9</a>.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>tasks/get</code></td>
+<td style="text-align: left;">Poll a task. Honour <code>pollIntervalMs</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tasks/update</code></td>
+<td style="text-align: left;">Supply <code>inputResponses</code>. Must be idempotent</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tasks/cancel</code></td>
+<td style="text-align: left;">Request cancellation. Cooperative, not binding</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="removed-in-this-revision" class="level3">
+<h3>Removed in this revision</h3>
+<table id="tab:removed-methods">
+<caption>Sending any of these to a strictly modern server yields <code>-32601</code>.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Gone</strong></td>
+<td style="text-align: left;"><strong>Replacement</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>initialize</code></td>
+<td style="text-align: left;">Per-request <code>_meta</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>notifications/initialized</code></td>
+<td style="text-align: left;">nothing</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ping</code></td>
+<td style="text-align: left;">nothing; use a transport-level check</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>logging/setLevel</code></td>
+<td style="text-align: left;"><code>io.modelcontextprotocol/logLevel</code> per request</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>resources/subscribe</code></td>
+<td style="text-align: left;"><code>subscriptions/listen</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>resources/unsubscribe</code></td>
+<td style="text-align: left;">close the stream</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>notifications/roots/list_changed</code></td>
+<td style="text-align: left;">nothing; Roots is deprecated</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tasks/result</code>, <code>tasks/list</code></td>
+<td style="text-align: left;"><code>tasks/get</code></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="notifications" class="level2">
+<h2>Notifications</h2>
+<table id="tab:notifications">
+<caption>The channel column is the part people get wrong. Request-scoped notifications never appear on the listen stream.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Notification</strong></td>
+<td style="text-align: left;"><strong>Meaning</strong></td>
+<td style="text-align: left;"><strong>Channel</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>notifications/progress</code></td>
+<td style="text-align: left;">Progress on a request</td>
+<td style="text-align: left;">that request’s stream</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>notifications/message</code></td>
+<td style="text-align: left;">A log line</td>
+<td style="text-align: left;">that request’s stream</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>notifications/subscriptions/acknowledged</code></td>
+<td style="text-align: left;">Subscription accepted</td>
+<td style="text-align: left;">listen stream</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>notifications/tools/list_changed</code></td>
+<td style="text-align: left;">Catalogue changed</td>
+<td style="text-align: left;">listen stream</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>notifications/prompts/list_changed</code></td>
+<td style="text-align: left;">Prompts changed</td>
+<td style="text-align: left;">listen stream</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>notifications/resources/list_changed</code></td>
+<td style="text-align: left;">Resource list changed</td>
+<td style="text-align: left;">listen stream</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>notifications/resources/updated</code></td>
+<td style="text-align: left;">One resource changed</td>
+<td style="text-align: left;">listen stream</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>notifications/cancelled</code></td>
+<td style="text-align: left;">Client cancels a request</td>
+<td style="text-align: left;">stdio only</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="the-_meta-envelope" class="level2">
+<h2>The <code>_meta</code> envelope</h2>
+<table id="tab:meta-reference">
+<caption>See Chapter <a href="ch02.html#ch:architecture">2</a>. The last three are an explicit exception to the reverse-DNS prefix rule.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Key</strong></td>
+<td style="text-align: left;"><strong>Purpose</strong></td>
+<td style="text-align: center;"><strong>Req.</strong></td>
+<td style="text-align: left;"><strong>On</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>io.modelcontextprotocol/protocolVersion</code></td>
+<td style="text-align: left;">Version for this request</td>
+<td style="text-align: center;"><strong>yes</strong></td>
+<td style="text-align: left;">requests</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>io.modelcontextprotocol/clientCapabilities</code></td>
+<td style="text-align: left;">What the client supports</td>
+<td style="text-align: center;"><strong>yes</strong></td>
+<td style="text-align: left;">requests</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>io.modelcontextprotocol/clientInfo</code></td>
+<td style="text-align: left;">Client name and version</td>
+<td style="text-align: center;">no</td>
+<td style="text-align: left;">requests</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>io.modelcontextprotocol/logLevel</code></td>
+<td style="text-align: left;">Minimum log level</td>
+<td style="text-align: center;">no</td>
+<td style="text-align: left;">requests</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>io.modelcontextprotocol/serverInfo</code></td>
+<td style="text-align: left;">Server name and version</td>
+<td style="text-align: center;">no</td>
+<td style="text-align: left;">results</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>io.modelcontextprotocol/subscriptionId</code></td>
+<td style="text-align: left;">Correlates a notification</td>
+<td style="text-align: center;">yes</td>
+<td style="text-align: left;">listen stream</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>progressToken</code></td>
+<td style="text-align: left;">Opts into progress</td>
+<td style="text-align: center;">no</td>
+<td style="text-align: left;">requests</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>traceparent</code></td>
+<td style="text-align: left;">W3C trace context</td>
+<td style="text-align: center;">no</td>
+<td style="text-align: left;">requests</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>tracestate</code></td>
+<td style="text-align: left;">W3C trace state</td>
+<td style="text-align: center;">no</td>
+<td style="text-align: left;">requests</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>baggage</code></td>
+<td style="text-align: left;">W3C baggage</td>
+<td style="text-align: center;">no</td>
+<td style="text-align: left;">requests</td>
+</tr>
+</tbody>
+</table>
+<section id="key-naming" class="level3">
+<h3>Key naming</h3>
+<p>Prefixes are reverse DNS with a trailing slash. A prefix whose <em>second</em> label is <code>modelcontextprotocol</code> or <code>mcp</code> is reserved.</p>
+<table id="tab:meta-prefixes">
+<caption>The second label is what counts.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>io.modelcontextprotocol/x</code></td>
+<td style="text-align: left;">reserved</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>dev.mcp/x</code></td>
+<td style="text-align: left;">reserved</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>org.modelcontextprotocol.api/x</code></td>
+<td style="text-align: left;">reserved</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>com.mcp.tools/x</code></td>
+<td style="text-align: left;">reserved</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>com.example.mcp/x</code></td>
+<td style="text-align: left;"><strong>yours</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>com.meridian/promptVersion</code></td>
+<td style="text-align: left;"><strong>yours</strong></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="error-codes" class="level2">
+<h2>Error codes</h2>
+<table id="tab:error-reference">
+<caption>See Chapter <a href="ch03.html#ch:transport">3</a>.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Code</strong></td>
+<td style="text-align: left;"><strong>Name</strong></td>
+<td style="text-align: left;"><strong>Meaning</strong></td>
+<td style="text-align: left;"><strong>HTTP</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>-32700</code></td>
+<td style="text-align: left;">ParseError</td>
+<td style="text-align: left;">Invalid JSON</td>
+<td style="text-align: left;">400</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>-32600</code></td>
+<td style="text-align: left;">InvalidRequest</td>
+<td style="text-align: left;">Bad JSON-RPC framing</td>
+<td style="text-align: left;">400</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>-32601</code></td>
+<td style="text-align: left;">MethodNotFound</td>
+<td style="text-align: left;">Unknown method</td>
+<td style="text-align: left;">404</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>-32602</code></td>
+<td style="text-align: left;">InvalidParams</td>
+<td style="text-align: left;">Bad params, unknown tool, missing resource</td>
+<td style="text-align: left;">400</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>-32603</code></td>
+<td style="text-align: left;">InternalError</td>
+<td style="text-align: left;">Server fault</td>
+<td style="text-align: left;">500</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>-32020</code></td>
+<td style="text-align: left;">HeaderMismatch</td>
+<td style="text-align: left;">Header disagrees with body</td>
+<td style="text-align: left;">400</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>-32021</code></td>
+<td style="text-align: left;">MissingRequiredClientCapability</td>
+<td style="text-align: left;">Client lacks a capability</td>
+<td style="text-align: left;">400</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>-32022</code></td>
+<td style="text-align: left;">UnsupportedProtocolVersion</td>
+<td style="text-align: left;">Version not supported</td>
+<td style="text-align: left;">400</td>
+</tr>
+</tbody>
+</table>
+<table id="tab:error-ranges-ref">
+<caption>Retired and never reissued: <code>-32002</code> (resource not found, now <code>-32602</code>) and <code>-32042</code> (URL elicitation required).</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Range</strong></td>
+<td style="text-align: left;"><strong>Rule</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>-32000</code> to <code>-32019</code></td>
+<td style="text-align: left;">Legacy. Do not allocate; assume no meaning</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>-32020</code> to <code>-32099</code></td>
+<td style="text-align: left;"><strong>Reserved for the specification</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Outside <code>-32768..-32000</code></td>
+<td style="text-align: left;">Yours</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="result-types" class="level2">
+<h2>Result types</h2>
+<table id="tab:result-types">
+<caption>See Chapter <a href="ch02.html#ch:architecture">2</a>.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong><code>resultType</code></strong></td>
+<td style="text-align: left;"><strong>Source</strong></td>
+<td style="text-align: left;"><strong>Client does</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>"complete"</code></td>
+<td style="text-align: left;">core</td>
+<td style="text-align: left;">Reads the result</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>"input_required"</code></td>
+<td style="text-align: left;">core</td>
+<td style="text-align: left;">Gathers input, retries with a new id</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>"task"</code></td>
+<td style="text-align: left;">Tasks ext.</td>
+<td style="text-align: left;">Polls <code>tasks/get</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">absent</td>
+<td style="text-align: left;">pre-2026 servers</td>
+<td style="text-align: left;">Treats as <code>"complete"</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">unrecognised</td>
+<td style="text-align: left;">anywhere</td>
+<td style="text-align: left;"><strong>Treats as invalid</strong></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="http-headers" class="level2">
+<h2>HTTP headers</h2>
+<table id="tab:header-reference">
+<caption>Any mismatch between header and body must be rejected with 400 and <code>-32020</code>. See Chapter <a href="ch03.html#ch:transport">3</a>.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Header</strong></td>
+<td style="text-align: left;"><strong>Mirrors</strong></td>
+<td style="text-align: left;"><strong>Required</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>MCP-Protocol-Version</code></td>
+<td style="text-align: left;"><code>_meta</code> protocol version</td>
+<td style="text-align: left;">every POST</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Mcp-Method</code></td>
+<td style="text-align: left;"><code>method</code></td>
+<td style="text-align: left;">every POST</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Mcp-Name</code></td>
+<td style="text-align: left;"><code>params.name</code> or <code>params.uri</code></td>
+<td style="text-align: left;"><code>tools/call</code>, <code>prompts/get</code>, <code>resources/read</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Mcp-Param-{Name}</code></td>
+<td style="text-align: left;">An <code>x-mcp-header</code> argument</td>
+<td style="text-align: left;">when the schema declares one</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Accept</code></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;">must list both JSON and SSE</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>X-Accel-Buffering: no</code></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;">response header on every SSE stream</td>
+</tr>
+</tbody>
+</table>
+<p>Values outside printable ASCII, with surrounding whitespace, or resembling the sentinel, are wrapped: <code>=?base64?{payload}?=</code>.</p>
+</section>
+<section id="capabilities" class="level2">
+<h2>Capabilities</h2>
+<table id="tab:capabilities-reference">
+<caption>An empty <code>elicitation</code> object means form mode only, for backwards compatibility.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Side</strong></td>
+<td style="text-align: left;"><strong>Capability</strong></td>
+<td style="text-align: left;"><strong>Settings</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Server</td>
+<td style="text-align: left;"><code>tools</code></td>
+<td style="text-align: left;"><code>listChanged</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Server</td>
+<td style="text-align: left;"><code>resources</code></td>
+<td style="text-align: left;"><code>listChanged</code>, <code>subscribe</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Server</td>
+<td style="text-align: left;"><code>prompts</code></td>
+<td style="text-align: left;"><code>listChanged</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Server</td>
+<td style="text-align: left;"><code>completions</code></td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">Both</td>
+<td style="text-align: left;"><code>extensions</code></td>
+<td style="text-align: left;">map of identifier to settings</td>
+</tr>
+<tr>
+<td style="text-align: left;">Client</td>
+<td style="text-align: left;"><code>elicitation</code></td>
+<td style="text-align: left;"><code>form</code>, <code>url</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Client</td>
+<td style="text-align: left;"><code>sampling</code></td>
+<td style="text-align: left;"><em>deprecated</em></td>
+</tr>
+<tr>
+<td style="text-align: left;">Client</td>
+<td style="text-align: left;"><code>roots</code></td>
+<td style="text-align: left;"><em>deprecated</em></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="the-deprecated-features-registry" class="level2">
+<h2>The deprecated features registry</h2>
+<table id="tab:deprecated-reference">
+<caption>Deprecated features remain functional. New implementations should not adopt them. Twelve-month minimum window. See Chapter <a href="ch02.html#ch:architecture">2</a>.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Feature</strong></td>
+<td style="text-align: left;"><strong>Migrate to</strong></td>
+<td style="text-align: left;"><strong>Earliest removal</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Roots</td>
+<td style="text-align: left;">Tool parameters, resource URIs, or server config</td>
+<td style="text-align: left;">2027-07-28</td>
+</tr>
+<tr>
+<td style="text-align: left;">Sampling</td>
+<td style="text-align: left;">Direct provider APIs</td>
+<td style="text-align: left;">2027-07-28</td>
+</tr>
+<tr>
+<td style="text-align: left;">Logging</td>
+<td style="text-align: left;"><code>stderr</code> on stdio; OpenTelemetry elsewhere</td>
+<td style="text-align: left;">2027-07-28</td>
+</tr>
+<tr>
+<td style="text-align: left;">Dynamic Client Registration</td>
+<td style="text-align: left;">Client ID Metadata Documents</td>
+<td style="text-align: left;">2027-07-28</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>includeContext: "thisServer"</code> / <code>"allServers"</code></td>
+<td style="text-align: left;">Omit, or <code>"none"</code></td>
+<td style="text-align: left;">with Sampling</td>
+</tr>
+<tr>
+<td style="text-align: left;">HTTP+SSE transport</td>
+<td style="text-align: left;">Streamable HTTP</td>
+<td style="text-align: left;">sooner</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="version-history" class="level2">
+<h2>Version history</h2>
+<table id="tab:version-history">
+<caption>“Era” is the distinction that matters for interoperability: legacy versions open with <code>initialize</code>. See Chapter <a href="ch02.html#ch:architecture">2</a>.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Version</strong></td>
+<td style="text-align: left;"><strong>Era</strong></td>
+<td style="text-align: left;"><strong>Headline</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>2024-11-05</code></td>
+<td style="text-align: left;">legacy</td>
+<td style="text-align: left;">First release. HTTP+SSE transport</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>2025-03-26</code></td>
+<td style="text-align: left;">legacy</td>
+<td style="text-align: left;">Streamable HTTP; HTTP+SSE deprecated</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>2025-06-18</code></td>
+<td style="text-align: left;">legacy</td>
+<td style="text-align: left;">Elicitation, structured output, <code>MCP-Protocol-Version</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>2025-11-25</code></td>
+<td style="text-align: left;">legacy</td>
+<td style="text-align: left;">URL-mode elicitation, task experiments</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>2026-07-28</code></td>
+<td style="text-align: left;"><strong>modern</strong></td>
+<td style="text-align: left;">Stateless core, MRTR, extensions, lifecycle policy</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<div class="pager">
+<a href="epilogue.html"><span class="dir">Previous</span>Epilogue: The Evolving Protocol</a>
+<a href="appendix-b.html" style="text-align:right"><span class="dir">Next</span>B. Transport Decision Matrix</a>
+</div>
+</main>
+</div>
+<script>
+(function(){
+  var nav = document.querySelector('nav.toc');
+  var btn = document.querySelector('.menu-btn');
+  if(btn && nav){
+    if(window.innerWidth <= 940) nav.classList.add('collapsed');
+    btn.addEventListener('click', function(){ nav.classList.toggle('collapsed'); });
+  }
+  // Wrap tables so wide ones scroll rather than overflowing the page.
+  document.querySelectorAll('main table').forEach(function(t){
+    if(t.parentElement.classList.contains('table-wrap')) return;
+    var w = document.createElement('div');
+    w.className = 'table-wrap';
+    t.parentNode.insertBefore(w, t);
+    w.appendChild(t);
+  });
+})();
+</script>
+</body>
+</html>

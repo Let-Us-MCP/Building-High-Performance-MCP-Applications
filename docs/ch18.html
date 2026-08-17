@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deployment and Operations &middot; Building Awesome MCP Apps</title>
+<meta name="description" content="Deployment and Operations. What every AI application developer should know about the Model Context Protocol">
+<meta property="og:title" content="Deployment and Operations">
+<meta property="og:description" content="Deployment and Operations. What every AI application developer should know about the Model Context Protocol">
+<style>
+:root{
+  --ink:#15181D; --muted:#5B6472; --rule:#D8DDE4; --wash:#F5F6F8;
+  --paper:#FFFFFF; --accent:#0F5C8C; --accent-soft:#E7F0F6;
+  --warm:#B4531A; --warm-soft:#FBF0E7; --good:#2C6E49; --good-soft:#E9F2EC;
+  --danger:#9B2226; --danger-soft:#FAECEC;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#E7EAEE; --muted:#98A2B0; --rule:#2C333D; --wash:#171B21;
+    --paper:#0F1216; --accent:#63AEDC; --accent-soft:#14232E;
+    --warm:#E08B4F; --warm-soft:#2A1D13; --good:#6FBF8E; --good-soft:#13221A;
+    --danger:#E4796F; --danger-soft:#291516;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--serif);font-size:18px;line-height:1.62;
+  -webkit-text-size-adjust:100%}
+.layout{display:grid;grid-template-columns:288px minmax(0,1fr);
+  max-width:1280px;margin:0 auto;gap:0}
+nav.toc{position:sticky;top:0;height:100vh;overflow-y:auto;padding:26px 20px 60px;
+  border-right:1px solid var(--rule);font-family:var(--sans);font-size:14px}
+nav.toc .brand{display:block;font-weight:700;font-size:16px;color:var(--ink);
+  text-decoration:none;line-height:1.3;margin-bottom:4px}
+nav.toc .tagline{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.45}
+nav.toc .part{margin:18px 0 6px;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);font-weight:700}
+nav.toc a{display:block;padding:4px 8px;margin-left:-8px;border-radius:5px;
+  color:var(--muted);text-decoration:none}
+nav.toc a:hover{background:var(--wash);color:var(--ink)}
+nav.toc a.current{background:var(--accent-soft);color:var(--accent);font-weight:600}
+main{padding:44px 52px 120px;min-width:0;max-width:78ch}
+h1,h2,h3,h4{font-family:var(--sans);line-height:1.25;color:var(--ink)}
+h1{font-size:2.05em;margin:0 0 .55em;letter-spacing:-.015em}
+h2{font-size:1.42em;margin:2em 0 .5em;padding-top:.35em}
+h3{font-size:1.14em;margin:1.7em 0 .4em}
+h4{font-size:1em;margin:1.4em 0 .3em;color:var(--muted)}
+p{margin:0 0 1.05em}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.855em;background:var(--wash);
+  padding:.12em .36em;border-radius:4px;word-break:break-word}
+pre{background:var(--wash);border-left:3px solid var(--rule);
+  border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+  font-size:13.5px;line-height:1.5;margin:1.3em 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+pre.json,pre.http{background:var(--accent-soft);border-left-color:var(--accent)}
+aside.box{border-left:3px solid var(--rule);background:var(--wash);
+  padding:14px 18px;margin:1.5em 0;border-radius:0 6px 6px 0;font-size:.955em}
+aside.box .box-title{font-family:var(--sans);font-weight:700;font-size:12px;
+  letter-spacing:.07em;text-transform:uppercase;margin:0 0 .55em}
+aside.box.legacy{border-left-color:var(--warm);background:var(--warm-soft)}
+aside.box.legacy .box-title{color:var(--warm)}
+aside.box.measured{border-left-color:var(--good);background:var(--good-soft)}
+aside.box.measured .box-title{color:var(--good)}
+aside.box.threat{border-left-color:var(--danger);background:var(--danger-soft)}
+aside.box.threat .box-title{color:var(--danger)}
+aside.box.note .box-title{color:var(--muted)}
+aside.keyidea{border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:14px 18px;margin:1.6em 0;border-radius:0 6px 6px 0;
+  font-family:var(--sans);font-style:italic;font-size:.97em}
+aside.keyidea p:last-child,aside.box p:last-child{margin-bottom:0}
+aside.keyidea pre,aside.keyidea code,aside.keyidea table{font-style:normal}
+aside.epigraph{border:0;margin:0 0 2em;padding:0 0 0 clamp(0px,7%,52px);
+  color:var(--muted);font-size:.97em}
+aside.epigraph p{margin:0 0 .3em}
+main figure{margin:2em 0;text-align:center}
+main figure img{max-width:100%;height:auto;border-radius:6px}
+@media (prefers-color-scheme: dark){
+  main figure img{background:#fff;padding:10px;border-radius:8px}
+}
+figcaption{font-family:var(--sans);font-size:13.5px;color:var(--muted);
+  margin-top:.7em;text-align:left;line-height:1.5}
+.table-wrap{overflow-x:auto;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:14.5px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+thead th{border-bottom:2px solid var(--rule);font-weight:700}
+caption{caption-side:bottom;font-size:13.5px;color:var(--muted);
+  text-align:left;padding-top:.7em;line-height:1.5}
+ul,ol{padding-left:1.35em;margin:0 0 1.05em}
+li{margin-bottom:.32em}
+dl{margin:0 0 1.05em}
+dt{font-weight:700;font-family:var(--sans);font-size:.95em;margin-top:.75em}
+dd{margin:.15em 0 0 1.35em}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
+.pager{display:flex;justify-content:space-between;gap:16px;margin-top:4em;
+  padding-top:1.5em;border-top:1px solid var(--rule);font-family:var(--sans);
+  font-size:14px}
+.pager a{text-decoration:none;max-width:46%}
+.pager .dir{display:block;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted)}
+.masthead{border-bottom:1px solid var(--rule);padding-bottom:1.8em;margin-bottom:2.2em}
+.masthead .kicker{font-family:var(--sans);font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);font-weight:700}
+.lede{font-size:1.12em;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:14px;margin:1.8em 0}
+.card{border:1px solid var(--rule);border-radius:9px;padding:15px 17px;
+  font-family:var(--sans);font-size:14px}
+.card h3{margin:0 0 .35em;font-size:15px}
+.card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+.menu-btn{display:none}
+@media (max-width:940px){
+  body{font-size:17px}
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:0;
+    border-bottom:1px solid var(--rule);max-height:none}
+  nav.toc.collapsed .toc-body{display:none}
+  main{padding:28px 20px 90px}
+  .menu-btn{display:inline-block;font-family:var(--sans);font-size:13px;
+    background:var(--wash);border:1px solid var(--rule);color:var(--ink);
+    border-radius:6px;padding:6px 11px;cursor:pointer;margin-bottom:10px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc"><button class="menu-btn" type="button">Contents</button>
+<div class="toc-body">
+<a class="brand" href="index.html">Building Awesome MCP Apps</a>
+<p class="tagline">What every AI application developer should know about the Model Context Protocol</p>
+<a href="preface.html">Preface</a>
+<a href="how-to-read.html">How to read this book</a>
+<div class="part">Part I. Protocol Fundamentals</div>
+<a href="ch01.html">A Primer on Latency, Tokens, and Context</a>
+<a href="ch02.html">The MCP Architectural Model</a>
+<a href="ch03.html">Building Blocks of the Transport</a>
+<a href="ch04.html">Authorization on the Wire</a>
+<div class="part">Part II. The Primitives</div>
+<a href="ch05.html">Tools: The Execution Layer</a>
+<a href="ch06.html">Resources: The Context Layer</a>
+<a href="ch07.html">Prompts: Workflow Blueprints</a>
+<a href="ch08.html">Multi Round-Trip Requests</a>
+<a href="ch09.html">Extensions and Tasks</a>
+<a href="ch10.html">MCP Apps: Interactive Interfaces</a>
+<div class="part">Part III. Building MCP Applications</div>
+<a href="ch11.html">Building Servers</a>
+<a href="ch12.html">Building Hosts and Clients</a>
+<a href="ch13.html">The Agent Loop, State, and Memory</a>
+<a href="ch14.html">Multi-Agent Topologies</a>
+<div class="part">Part IV. Performance Engineering</div>
+<a href="ch15.html">Testing and Debugging</a>
+<a href="ch16.html">Measuring MCP Applications</a>
+<a href="ch17.html">Optimizing for Latency, Tokens, and Cost</a>
+<a href="ch18.html" class="current">Deployment and Operations</a>
+<div class="part">Part V. Security and Trust</div>
+<a href="ch19.html">Threat Modeling Agentic Applications</a>
+<a href="ch20.html">Access Control, Audit, and MCP in the Enterprise</a>
+<div class="part">Back matter</div>
+<a href="epilogue.html">Epilogue: The Evolving Protocol</a>
+<div class="part">Appendices</div>
+<a href="appendix-a.html">A. Method and Message Reference</a>
+<a href="appendix-b.html">B. Transport Decision Matrix</a>
+<a href="appendix-c.html">C. Performance Checklist</a>
+<a href="appendix-d.html">D. Security Hardening Checklist</a>
+<a href="appendix-e.html">E. The Meridian Companion Repository</a>
+<a href="about.html">About the author</a>
+</div></nav>
+<main>
+<section id="ch:operations" class="level1">
+<h1>Deployment and Operations</h1>
+<aside class="epigraph">
+<p><em>“Get busy living, or get busy dying.”</em></p>
+<p>Andy Dufresne, <em>The Shawshank Redemption</em> (1994)</p>
+</aside>
+<p>Andy’s plan worked because he did the same small thing every night for nineteen years. Operations is that. Not heroics at three in the morning, but the unglamorous compounding of health checks that mean something, drains that actually drain, and alerts that fire before the user notices.</p>
+<p>The good news for MCP specifically: the stateless core deleted most of the hard parts of this chapter before it was written.</p>
+<section id="what-statelessness-bought-you" class="level2">
+<h2>What statelessness bought you</h2>
+<p>Worth listing explicitly, because if you deployed a 2025-era MCP server you spent real effort on all of these.</p>
+<table id="tab:statelessness-ops">
+<caption>The right-hand column is why this chapter is shorter than it would have been a year ago.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Concern</strong></td>
+<td style="text-align: left;"><strong>Handshake era</strong></td>
+<td style="text-align: left;"><strong>2026-07-28</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Load balancing</td>
+<td style="text-align: left;">Sticky sessions, session affinity</td>
+<td style="text-align: left;">Round robin</td>
+</tr>
+<tr>
+<td style="text-align: left;">Session store</td>
+<td style="text-align: left;">Redis, or affinity you regret</td>
+<td style="text-align: left;">None</td>
+</tr>
+<tr>
+<td style="text-align: left;">Scaling out</td>
+<td style="text-align: left;">Drain sessions, migrate state</td>
+<td style="text-align: left;">Add a replica</td>
+</tr>
+<tr>
+<td style="text-align: left;">Deploys</td>
+<td style="text-align: left;">Sessions break or must migrate</td>
+<td style="text-align: left;">Requests retry</td>
+</tr>
+<tr>
+<td style="text-align: left;">Serverless</td>
+<td style="text-align: left;">Awkward at best</td>
+<td style="text-align: left;">First-class</td>
+</tr>
+<tr>
+<td style="text-align: left;">Crash recovery</td>
+<td style="text-align: left;">Rebuild session state</td>
+<td style="text-align: left;">Lose one request</td>
+</tr>
+</tbody>
+</table>
+<aside class="keyidea">
+<p>If you find yourself needing sticky sessions for an MCP server, you have per-request state somewhere it should not be. Find it. It is usually a task store, a signing secret, or a cache with a per-process lifetime.</p>
+</aside>
+</section>
+<section id="three-topologies" class="level2">
+<h2>Three topologies</h2>
+<section id="stdio-sidecar" class="level3">
+<h3>stdio sidecar</h3>
+<p>One server process per host, launched as a subprocess. No network.</p>
+<p><strong>Good for:</strong> local tools, filesystem access, developer machines, anything where the user’s own credentials are the right credentials.</p>
+<p><strong>Operational profile:</strong> no ports, no TLS, no auth infrastructure. The process boundary is the isolation boundary. Cold start is 44.6 ms, which Chapter <a href="ch17.html#ch:optimizing">17</a> says to amortise with a pool.</p>
+<p><strong>Watch for:</strong> the server inheriting more environment than it should. A subprocess gets the parent’s environment by default, including credentials for things it has no business touching.</p>
+<pre class="python" data-language="python"><code>self._proc = subprocess.Popen(
+    command,
+    stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE if capture_stderr else None,
+    env={**os.environ, **(env or {})},
+    ...
+)</code></pre>
+<p>Meridian merges the parent environment because it is a book. A hardened launcher passes an explicit allowlist instead.</p>
+</section>
+<section id="containerised-streamable-http" class="level3">
+<h3>Containerised Streamable HTTP</h3>
+<p>The default for anything shared.</p>
+<pre class="python" data-language="python"><code>FROM python:3.13-slim
+WORKDIR /app
+COPY meridian/ ./meridian/
+ENV PYTHONUNBUFFERED=1
+EXPOSE 8931
+CMD [&quot;python3&quot;, &quot;-m&quot;, &quot;meridian.serve&quot;, &quot;risk&quot;, &quot;--http&quot;, &quot;8931&quot;]</code></pre>
+<p><code>PYTHONUNBUFFERED=1</code> matters more than it looks: buffered stderr means your logs arrive in 4 KB chunks, which during an incident means they arrive after you needed them.</p>
+<p>Behind it, a plain round-robin load balancer. No affinity configuration. That is the entire deployment story now.</p>
+</section>
+<section id="serverless" class="level3">
+<h3>Serverless</h3>
+<p>Newly viable, and genuinely so.</p>
+<p><strong>Good for:</strong> spiky traffic, low steady-state volume, and anything where you would rather not run a fleet.</p>
+<p><strong>The catch, and it is the whole catch:</strong> cold start. Your first request pays interpreter boot plus imports plus whatever runs at module scope. Meridian’s <code>servers/data.py</code> builds 240 accounts, 1,440 transactions, and 120 filings at import time, which is fine at 40 ms and would not be at four seconds.</p>
+<p>Two rules for serverless MCP servers:</p>
+<ul>
+<li><p><strong>Nothing expensive at module scope.</strong> Lazy-load anything heavy, so a cold container answers <code>tools/list</code> without loading your scoring model.</p></li>
+<li><p><strong>Tasks need external storage.</strong> Obviously, but people forget: a container that answered <code>tools/call</code> will not be the one that answers <code>tasks/get</code>.</p></li>
+</ul>
+</section>
+</section>
+<section id="health-checks-that-mean-something" class="level2">
+<h2>Health checks that mean something</h2>
+<p>Most MCP health checks are wrong, and in an interesting way. They check that the process is listening, which tells you almost nothing.</p>
+<p>A useful health check exercises the protocol:</p>
+<pre class="python" data-language="python"><code>def healthy(server) -&gt; tuple[bool, dict]:
+    &quot;&quot;&quot;Health means `server/discover` answers correctly, not that a port is open.
+
+    A process can accept connections while its catalogue is empty, its
+    dependencies are down, or its handlers all raise. Answering discovery
+    proves routing, capability derivation, and serialisation all work.
+    &quot;&quot;&quot;
+    probe = {
+        &quot;jsonrpc&quot;: &quot;2.0&quot;, &quot;id&quot;: &quot;health&quot;, &quot;method&quot;: &quot;server/discover&quot;,
+        &quot;params&quot;: {&quot;_meta&quot;: {
+            KEY_PROTOCOL_VERSION: PROTOCOL_VERSION,
+            KEY_CLIENT_CAPABILITIES: {},
+        }},
+    }
+    resp = server.handle(probe)
+    if &quot;error&quot; in resp:
+        return False, {&quot;reason&quot;: resp[&quot;error&quot;][&quot;message&quot;]}
+    result = resp[&quot;result&quot;]
+    return (
+        PROTOCOL_VERSION in result.get(&quot;supportedVersions&quot;, [])
+        and bool(result.get(&quot;capabilities&quot;)),
+        {&quot;capabilities&quot;: sorted(result.get(&quot;capabilities&quot;, {}))},
+    )</code></pre>
+<p>Three levels, and use all three:</p>
+<table id="tab:health-checks">
+<caption>The deep check is the one that catches a server whose database went away, and it is the one most people skip.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Check</strong></td>
+<td style="text-align: left;"><strong>Proves</strong></td>
+<td style="text-align: left;"><strong>Frequency</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Liveness: process responds</td>
+<td style="text-align: left;">It has not deadlocked</td>
+<td style="text-align: left;">seconds</td>
+</tr>
+<tr>
+<td style="text-align: left;">Readiness: <code>server/discover</code> returns capabilities</td>
+<td style="text-align: left;">Routing and serialisation work</td>
+<td style="text-align: left;">seconds</td>
+</tr>
+<tr>
+<td style="text-align: left;">Deep: one real tool call against a known fixture</td>
+<td style="text-align: left;">Dependencies are reachable</td>
+<td style="text-align: left;">minutes</td>
+</tr>
+</tbody>
+</table>
+<aside class="box note"><p class="box-title">Do not use <code>ping</code></p>
+<p>It was removed in <code>2026-07-28</code>. If your health check sends it, a modern server answers <code>-32601</code> and your orchestrator concludes the server is unhealthy and restarts it, forever.</p>
+<p>The dual-era bridge answers <code>ping</code> for exactly this reason, which is a compatibility shim rather than a recommendation.</p>
+</aside>
+</section>
+<section id="graceful-drain" class="level2">
+<h2>Graceful drain</h2>
+<p>Statelessness makes this easy, and there is still a right order.</p>
+<ol>
+<li><p><strong>Fail readiness.</strong> The load balancer stops sending new requests.</p></li>
+<li><p><strong>Finish in-flight requests.</strong> They are short. Give them a bounded window.</p></li>
+<li><p><strong>Close <code>subscriptions/listen</code> streams gracefully.</strong> This is the MCP-specific step and it is the one people miss.</p></li>
+<li><p><strong>Exit.</strong></p></li>
+</ol>
+<p>Step three deserves attention. A subscription stream that just dies tells the client nothing. A stream that closes with the response to its originating request tells it “this ended on purpose”:</p>
+<pre class="python" data-language="python"><code>def close_gracefully(self) -&gt; None:
+    &quot;&quot;&quot;End the subscription with a proper JSON-RPC response.
+
+    A stream that just dies tells the client nothing. A stream that closes
+    with the response to the original `subscriptions/listen` request tells
+    it &quot;this ended on purpose, do not reconnect in a panic&quot;. The difference
+    matters at three in the morning.
+    &quot;&quot;&quot;
+    self._send_raw(jsonrpc.result_response(
+        self.id, {&quot;_meta&quot;: {KEY_SUBSCRIPTION_ID: self.id}}))
+    self.closed = True</code></pre>
+<p>Without it, every client treats your rolling deploy as an outage and reconnects immediately, all at once, to the replicas that are still up.</p>
+<p>On stdio, drain means honouring EOF on stdin:</p>
+<pre class="python" data-language="python"><code>def close(self, timeout: float = 5.0) -&gt; None:
+    try:
+        self._proc.stdin.close()
+    except Exception:
+        pass
+    try:
+        self._proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        # Escalate only if the server ignored the EOF on stdin.
+        self._proc.terminate()</code></pre>
+</section>
+<section id="rolling-out-a-capability-change" class="level2">
+<h2>Rolling out a capability change</h2>
+<p>The awkward case: you are adding a tool, and for a while some replicas have it and some do not.</p>
+<aside class="box threat"><p class="box-title">Threat: The split-catalogue window</p>
+<p>Replica A has the new tool. Replica B does not. A client fetches <code>tools/list</code> from A, caches it for five minutes, then calls the new tool and hits B, which returns <code>-32602</code>.</p>
+<p>Round-robin load balancing plus client-side caching makes this the <em>normal</em> case during a deploy, not an edge case.</p>
+</aside>
+<p>Three mitigations, and use the first two always:</p>
+<p><strong>Deploy the handler before the declaration.</strong> Ship a release where the tool works but is not listed. Then ship a release that lists it. Now no replica ever advertises something it cannot do.</p>
+<p><strong>Keep TTLs short enough that the window closes.</strong> Meridian’s <code>tools/list</code> TTL is five minutes, so a deploy is fully visible within five minutes of finishing.</p>
+<p><strong>Emit <code>listChanged</code> when the rollout completes.</strong> Clients with an open subscription refetch immediately instead of waiting out the TTL.</p>
+<p>Removal runs in reverse: stop listing it, wait for the TTL plus a margin, then delete the handler. And if it is a public server, apply the deprecation window from Chapter <a href="ch02.html#ch:architecture">2</a> to your own surface. Your callers deserve the same twelve months the specification gives you.</p>
+</section>
+<section id="multi-tenancy-without-sessions" class="level2">
+<h2>Multi-tenancy without sessions</h2>
+<p>Tenancy used to ride on the session. There is no session, so it rides on the credential, which is better.</p>
+<pre class="python" data-language="python"><code>def visible_tools(self, ctx: RequestContext) -&gt; list[Tool]:
+    &quot;&quot;&quot;Override to filter by scope. The set may vary by authorization,
+    never by connection.&quot;&quot;&quot;</code></pre>
+<p>Four rules:</p>
+<p><strong>Tenant comes from the token, never from an argument.</strong> A tenant id in <code>arguments</code> is a suggestion from a model that read attacker-controlled text. A tenant id in a validated token claim is a fact.</p>
+<p><strong>Fold tenancy into every cache key.</strong> Meridian folds the auth context in unconditionally, public or private, precisely so a mislabelled response cannot leak across tenants.</p>
+<p><strong>Bind MRTR state to the principal.</strong> Chapter <a href="ch08.html#ch:mrtr">8</a> covers it. Across tenants it is the difference between an approval and an incident.</p>
+<p><strong>Put the tenant in <code>baggage</code> for tracing, and nothing else.</strong> Sliceable traces, no sensitive data crossing trust boundaries.</p>
+</section>
+<section id="alerting" class="level2">
+<h2>Alerting</h2>
+<p>Chapter <a href="ch16.html#ch:measuring">16</a> covered the protocol alerts. These are the operational ones, and each has an MCP-specific flavour.</p>
+<table id="tab:ops-alerts">
+<caption>Five alerts. The first is the one that costs money silently.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Alert</strong></td>
+<td style="text-align: left;"><strong>Symptom</strong></td>
+<td style="text-align: left;"><strong>Usual cause</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Tool-call loop</td>
+<td style="text-align: left;">Same tool, same arguments, many times in one task</td>
+<td style="text-align: left;">Unhelpful error message; the model cannot self-correct</td>
+</tr>
+<tr>
+<td style="text-align: left;">Subscription storm</td>
+<td style="text-align: left;"><code>subscriptions/listen</code> count spikes</td>
+<td style="text-align: left;">A deploy dropped streams without graceful closure</td>
+</tr>
+<tr>
+<td style="text-align: left;">Timeout spike on one method</td>
+<td style="text-align: left;">p99 up on <code>tools/call</code>, flat elsewhere</td>
+<td style="text-align: left;">One tool’s dependency is degraded</td>
+</tr>
+<tr>
+<td style="text-align: left;">Cache stampede</td>
+<td style="text-align: left;">Request spike at a TTL boundary</td>
+<td style="text-align: left;">Synchronised TTLs; add jitter</td>
+</tr>
+<tr>
+<td style="text-align: left;">Task store growth</td>
+<td style="text-align: left;">Store size climbing without bound</td>
+<td style="text-align: left;">Expiry sweep not running</td>
+</tr>
+</tbody>
+</table>
+<p>The tool-call loop deserves elaboration because it is uniquely agentic. A model calls a tool, gets an unhelpful error, retries identically, gets the same error, and repeats until the step budget stops it. Every cycle is a full model turn. Nothing is down, nothing errors at the infrastructure level, and your bill goes up.</p>
+<p>The fix is Chapter <a href="ch05.html#ch:tools">5</a>: error messages a model can act on. The alert is a detector for having failed to do that.</p>
+<p>Cache stampede is worth a sentence too. A thousand clients that started together have synchronised TTLs, so they all expire together and all refetch together. Jitter the TTL by a few percent per client and the herd disperses.</p>
+</section>
+<section id="capacity-planning" class="level2">
+<h2>Capacity planning</h2>
+<p>The useful thing about MCP servers: they are ordinary request-response services and your existing capacity model applies.</p>
+<p>The unusual thing: your traffic shape is driven by <em>loop iterations</em>, not by user actions. One user request becomes three model turns becomes three tool calls, sometimes fanned out in parallel bursts.</p>
+<p>So plan for the burst. From Chapter <a href="ch16.html#ch:measuring">16</a>, work forward:</p>
+<pre class="text" data-language="text"><code>tasks/second                    x  round trips/task
+                                =  requests/second (mean)
+
+requests/second (mean)          x  fan-out width
+                                =  concurrent requests at the burst</code></pre>
+<p>Meridian at 100 tasks/second: 3 round trips each is 300 requests/second mean, and a fan-out of 3 means bursts of up to 900 concurrent. Provisioning for the mean gives you a service that falls over during every parallel fan-out, which is to say during every task.</p>
+</section>
+<section id="load-testing-to-failure" class="level2">
+<h2>Load testing to failure</h2>
+<p>Do it before production does it for you, and test the right thing.</p>
+<table id="tab:load-tests">
+<caption>The last row is the interesting one: in an agent system a slow dependency does not just add latency, it consumes the caller’s step budget and produces no information.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Test</strong></td>
+<td style="text-align: left;"><strong>What it finds</strong></td>
+<td style="text-align: left;"><strong>Why MCP-specific</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Sustained load</td>
+<td style="text-align: left;">Steady-state capacity</td>
+<td style="text-align: left;">Baseline</td>
+</tr>
+<tr>
+<td style="text-align: left;">Burst load</td>
+<td style="text-align: left;">Fan-out behaviour</td>
+<td style="text-align: left;">Real traffic is bursty by construction</td>
+</tr>
+<tr>
+<td style="text-align: left;">Cold cache</td>
+<td style="text-align: left;">Load with no client caching</td>
+<td style="text-align: left;">Your first minute after a deploy</td>
+</tr>
+<tr>
+<td style="text-align: left;">Split catalogue</td>
+<td style="text-align: left;">Half the replicas on the new version</td>
+<td style="text-align: left;">The deploy window above</td>
+</tr>
+<tr>
+<td style="text-align: left;">Slow dependency</td>
+<td style="text-align: left;">Behaviour when a downstream is degraded</td>
+<td style="text-align: left;">Timeouts consume step budgets</td>
+</tr>
+</tbody>
+</table>
+<section id="what-breaks-first" class="level3">
+<h3>What breaks first</h3>
+<p>From running Meridian’s compliance server under load, in the order it happened:</p>
+<ol>
+<li><p><strong>Thread pool exhaustion under fan-out.</strong> Bursts are three times mean concurrency and the pool was sized for the mean.</p></li>
+<li><p><strong>The audit log became the bottleneck.</strong> Every call writes a record synchronously, so the log’s write path caps your throughput. Batch it, or write it asynchronously with a durable queue in front.</p></li>
+<li><p><strong>SSE streams accumulated.</strong> Clients that vanish without closing leave streams open. Keep-alives detect it; without them, file descriptors leak until the process stops accepting connections.</p></li>
+</ol>
+<p>None of those are protocol problems. All three are consequences of the traffic shape the protocol produces.</p>
+</section>
+</section>
+<section id="configuration-and-secrets" class="level2">
+<h2>Configuration and secrets</h2>
+<table id="tab:config">
+<caption>The bold row is the one that produces intermittent, replica-count- proportional failures when it is wrong.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Setting</strong></td>
+<td style="text-align: left;"><strong>Notes</strong></td>
+<td style="text-align: left;"><strong>Scope</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">MRTR signing secret</td>
+<td style="text-align: left;">Rotatable, verify old and new during rotation</td>
+<td style="text-align: left;"><strong>fleet</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Task store URL</td>
+<td style="text-align: left;">Shared and durable</td>
+<td style="text-align: left;">fleet</td>
+</tr>
+<tr>
+<td style="text-align: left;">TTL values</td>
+<td style="text-align: left;">Tune per resource, jitter per client</td>
+<td style="text-align: left;">fleet</td>
+</tr>
+<tr>
+<td style="text-align: left;">Auth issuer, audience</td>
+<td style="text-align: left;">Per environment</td>
+<td style="text-align: left;">fleet</td>
+</tr>
+<tr>
+<td style="text-align: left;">Page size</td>
+<td style="text-align: left;">Balance round trips against response size</td>
+<td style="text-align: left;">per server</td>
+</tr>
+<tr>
+<td style="text-align: left;">Extension toggles</td>
+<td style="text-align: left;">Only if implemented</td>
+<td style="text-align: left;">per server</td>
+</tr>
+</tbody>
+</table>
+<p>Rotating the MRTR secret needs care, because an in-flight elicitation may be sealed with the old key. Accept both during the rotation window, sign only with the new one, and make the window longer than the state TTL. Otherwise every approval in flight at rotation time fails, and the failure looks exactly like tampering.</p>
+</section>
+<section id="meridian-in-production" class="level2">
+<h2>Meridian in production</h2>
+<pre class="text" data-language="text"><code>internet
+                        |
+                 [ API gateway ]     TLS, OAuth, rate limits,
+                        |            routes on Mcp-Method / Mcp-Name
+        +---------------+---------------+
+        |               |               |
+   [ risk x3 ]   [ compliance x2 ]  [ fraud x3 ]   [ marketdata x2 ]
+        |               |               |               |
+        +---------------+---------------+---------------+
+                        |
+              [ shared task store ]     durable, expiring
+              [ signing secret    ]     from the secret manager</code></pre>
+<p>Every replica count above one is possible because there is nothing to make sticky. The gateway routes on headers without parsing bodies, caches <code>public</code> results from market data, and enforces per-method rate limits.</p>
+<aside class="box measured"><p class="box-title">Measured: What the gateway cache is worth</p>
+<table>
+<tbody>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: right;"><strong>Per-task setup</strong></td>
+<td style="text-align: right;"><strong>Requests, 20 tasks</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">No client caching</td>
+<td style="text-align: right;">274.1 ms</td>
+<td style="text-align: right;">164</td>
+</tr>
+<tr>
+<td style="text-align: left;">Honouring <code>ttlMs</code></td>
+<td style="text-align: right;">2.5 ms</td>
+<td style="text-align: right;">8</td>
+</tr>
+</tbody>
+</table>
+<p>Client-side. A shared gateway cache in front of <code>marketdata</code>, whose results are <code>public</code>, removes most of the remainder for every client at once.</p>
+</aside>
+</section>
+<section id="the-runbook" class="level2">
+<h2>The runbook</h2>
+<p>What you want written down before you need it.</p>
+<table id="tab:runbook">
+<caption>Eight symptoms, eight first moves. Every one of them appears somewhere earlier in this book.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Symptom</strong></td>
+<td style="text-align: left;"><strong>First thing to check</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Intermittent failures, roughly <span class="math inline">1 − 1/<em>N</em></span></td>
+<td style="text-align: left;">Per-process state: signing secret, task store, cache</td>
+</tr>
+<tr>
+<td style="text-align: left;">Clients cannot connect at all</td>
+<td style="text-align: left;">Era mismatch. Probe with <code>server/discover</code> by hand</td>
+</tr>
+<tr>
+<td style="text-align: left;">Everything times out on stdio</td>
+<td style="text-align: left;">Something wrote to <code>stdout</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Latency up, server metrics flat</td>
+<td style="text-align: left;">Iterations per task. It is a round-trip problem</td>
+</tr>
+<tr>
+<td style="text-align: left;">Cost up, latency flat</td>
+<td style="text-align: left;">Catalogue tokens. Somebody added tools</td>
+</tr>
+<tr>
+<td style="text-align: left;">Cache hit rate collapsed</td>
+<td style="text-align: left;">TTLs changed, or <code>tools/list</code> ordering went unstable</td>
+</tr>
+<tr>
+<td style="text-align: left;">Streaming stopped working through the proxy</td>
+<td style="text-align: left;"><code>X-Accel-Buffering: no</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Approvals failing since the deploy</td>
+<td style="text-align: left;">Signing secret rotation window too short</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="what-to-remember" class="level2">
+<h2>What to remember</h2>
+<ul>
+<li><p>Statelessness deleted sticky sessions, session stores, and session migration. If you still need affinity, find the per-process state.</p></li>
+<li><p>Health checks should call <code>server/discover</code>, not open a socket. Do not use <code>ping</code>; it was removed.</p></li>
+<li><p>Drain in order, and close subscription streams gracefully or every deploy looks like an outage.</p></li>
+<li><p>Deploy the handler before the declaration; remove the declaration before the handler.</p></li>
+<li><p>Tenancy comes from the token, folds into every cache key, and binds MRTR state.</p></li>
+<li><p>Plan capacity for the fan-out burst, not the mean.</p></li>
+<li><p>Alert on tool-call loops. They cost money while every dashboard stays green.</p></li>
+<li><p>Jitter your TTLs.</p></li>
+<li><p>Rotate the MRTR signing secret with an overlap window longer than the state TTL.</p></li>
+</ul>
+<p>That closes Part IV. You can build it, measure it, make it fast, and run it. Part V is about the people trying to break it.</p>
+</section>
+</section>
+<div class="pager">
+<a href="ch17.html"><span class="dir">Previous</span>Optimizing for Latency, Tokens, and Cost</a>
+<a href="ch19.html" style="text-align:right"><span class="dir">Next</span>Threat Modeling Agentic Applications</a>
+</div>
+</main>
+</div>
+<script>
+(function(){
+  var nav = document.querySelector('nav.toc');
+  var btn = document.querySelector('.menu-btn');
+  if(btn && nav){
+    if(window.innerWidth <= 940) nav.classList.add('collapsed');
+    btn.addEventListener('click', function(){ nav.classList.toggle('collapsed'); });
+  }
+  // Wrap tables so wide ones scroll rather than overflowing the page.
+  document.querySelectorAll('main table').forEach(function(t){
+    if(t.parentElement.classList.contains('table-wrap')) return;
+    var w = document.createElement('div');
+    w.className = 'table-wrap';
+    t.parentNode.insertBefore(w, t);
+    w.appendChild(t);
+  });
+})();
+</script>
+</body>
+</html>

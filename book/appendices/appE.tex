@@ -1,0 +1,269 @@
+\chapter{The Meridian Companion Repository}
+\label{ch:companion}
+
+Every listing in this book was extracted from here. Every number was produced
+here. It has no third-party runtime dependencies, which means you can clone it
+and run everything with a stock Python.
+
+\begin{center}
+\texttt{https://github.com/krimler/Building-Awesome-MCP-Apps}
+\end{center}
+
+\section{Two minutes}
+
+\begin{sh}
+git clone https://github.com/krimler/Building-Awesome-MCP-Apps
+cd Building-Awesome-MCP-Apps
+
+make test      # 134 tests, about two seconds
+make bench     # every measurement printed in this book
+make lint      # prose rules and cross-reference integrity
+make book      # build the PDF
+\end{sh}
+
+Python 3.11 or later. Nothing else for the code. The book build additionally
+wants a TeX distribution and, for the figures, matplotlib.
+
+\section{Layout}
+
+\begin{plain}
+meridian/
+  protocol/          3,892 lines. A complete 2026-07-28 implementation
+    jsonrpc.py         framing, resultType, SSE parsing
+    meta.py            the _meta envelope, capabilities, RequestContext
+    errors.py          the error-code allocation
+    server.py          routing, primitives, schema validation
+    client.py          the MRTR loop, caching, era detection
+    stdio.py           subprocess transport, both sides
+    http.py            Streamable HTTP, header validation, SSE
+    inproc.py          the control group for benchmarks
+    mrtr.py            input_required, elicitation, StateSealer
+    subscriptions.py   subscriptions/listen
+    cache.py           ttlMs and cacheScope
+    tasks.py           the Tasks extension
+    legacy.py          the dual-era bridge
+  servers/           the four Meridian servers, plus fixtures
+  host/              Host, AgentLoop, StubModel
+  bench/             the measurement harness and results.json
+  tests/             134 tests across four files
+  serve.py           the launcher
+\end{plain}
+
+\section{Running the servers}
+
+\begin{sh}
+python3 -m meridian.serve risk                 # dual-era stdio
+python3 -m meridian.serve risk --modern-only   # refuses the handshake
+python3 -m meridian.serve risk --http 8931     # Streamable HTTP
+python3 -m meridian.serve all --http 8931      # all four, sequential ports
+\end{sh}
+
+Dual-era is the default, because that is what connects to the clients shipping
+in 2026 (\chapref{architecture}).
+
+\subsection{The scenario flags}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXl@{}}
+\toprule
+\thead{Flag} & \thead{What it does} & \thead{Chapter} \\
+\midrule
+\texttt{-{}-fat} & Serves the 38-tool REST mirror & \ref{ch:tools} \\
+\texttt{-{}-poisoned} & Plants the injection in the guidance corpus & \ref{ch:threats} \\
+\texttt{-{}-modern-only} & Refuses \texttt{initialize} & \ref{ch:architecture} \\
+\bottomrule
+\end{tabularx}
+\caption{Each flag reproduces a specific measurement or attack from the book.}
+\label{tab:meridian-flags}
+\end{table}
+
+\section{With Claude Code}
+
+The repository ships a \texttt{.mcp.json}:
+
+\begin{sh}
+claude -p "Assess ACC-1042 for risk, screen it for fraud, and get the 1Y
+and 5Y reference rates." --mcp-config .mcp.json
+\end{sh}
+
+\begin{plain}
+RISK:  55.4 elevated
+FRAUD: watch 1
+CURVE: 1Y=3.96 5Y=3.68
+\end{plain}
+
+Those values come straight from the fixtures. The full transcript, and what is
+\emph{not} verifiable this way and why, is in
+\texttt{meridian/VERIFICATION.md}.
+
+\section{The four servers}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXX@{}}
+\toprule
+\thead{Server} & \thead{Demonstrates} & \thead{Chapters} \\
+\midrule
+\texttt{risk}
+  & Task-shaped tools, MRTR approvals, Tasks, an App template, TTL'd resources
+  & \ref{ch:tools}, \ref{ch:mrtr}, \ref{ch:tasks}, \ref{ch:apps} \\
+\texttt{compliance}
+  & Human-in-the-loop, audit logging, the injection payload
+  & \ref{ch:mrtr}, \ref{ch:threats}, \ref{ch:access-control} \\
+\texttt{fraud}
+  & Fast read-only calls, runtime \texttt{listChanged}
+  & \ref{ch:tools}, \ref{ch:resources} \\
+\texttt{marketdata}
+  & \texttt{cacheScope: public}, pagination
+  & \ref{ch:resources} \\
+\bottomrule
+\end{tabularx}
+\caption{Each server exists to carry specific arguments in the book.}
+\label{tab:meridian-servers}
+\end{table}
+
+\section{The benchmark harness}
+
+\begin{sh}
+make bench                                       # everything
+python3 -m meridian.bench.run cache fanout       # named scenarios
+python3 -m meridian.bench.run --list             # scenario names
+python3 -m meridian.bench.run --json out.json    # machine-readable
+\end{sh}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXl@{}}
+\toprule
+\thead{Scenario} & \thead{Answers} & \thead{Chapter} \\
+\midrule
+\texttt{transport}     & What does each transport cost, minus execution? & \ref{ch:transport} \\
+\texttt{coldstart}     & Spawn per call, or warm pool? & \ref{ch:transport} \\
+\texttt{catalogue}     & What does catalogue bloat cost per turn? & \ref{ch:tools} \\
+\texttt{cache}         & What is honouring \texttt{ttlMs} worth? & \ref{ch:resources} \\
+\texttt{fanout}        & What does parallelism buy, at what latency? & \ref{ch:tools} \\
+\texttt{mrtr}          & What does one elicitation really cost? & \ref{ch:mrtr} \\
+\texttt{loop}          & Where does a whole task's time go? & \ref{ch:measuring} \\
+\texttt{optimization}  & The full pass, attributed change by change & \ref{ch:optimizing} \\
+\texttt{serialisation} & How much of a request is envelope? & \ref{ch:architecture} \\
+\bottomrule
+\end{tabularx}
+\caption{The canonical run lives in \texttt{meridian/bench/results.json}, and
+every figure in this book that plots data reads it.}
+\label{tab:bench-reference}
+\end{table}
+
+\subsection{What is simulated}
+
+Stated here as well as at every point of use.
+
+Model inference latency and token pricing are \textbf{modelled}, from the
+constants in \texttt{meridian/host/model.py}:
+
+\begin{py}
+TTFT_MEAN_MS         = 340.0
+TTFT_STDEV_MS        = 90.0
+MS_PER_OUTPUT_TOKEN  = 7.5
+CHARS_PER_TOKEN      = 4.0
+INPUT_USD_PER_MTOK   = 3.00
+OUTPUT_USD_PER_MTOK  = 15.00
+\end{py}
+
+Everything else is \textbf{measured}: serialisation, transport, server execution,
+cache behaviour, round-trip counts, catalogue token cost, process cold starts.
+
+Transport figures are loopback figures, deliberately, so protocol overhead is
+visible without a network in the way. Chapter~\ref{ch:measuring} explains how to
+add your own.
+
+Edit those constants, rerun \texttt{make bench}, and every number in the book
+moves with you.
+
+\section{The test suite}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lrX@{}}
+\toprule
+\thead{File} & \thead{Tests} & \thead{Covers} \\
+\midrule
+\texttt{test\_protocol.py} & 57
+  & Envelope, \texttt{resultType}, error codes, caching, pagination, schemas,
+    MRTR, \texttt{StateSealer}, \texttt{x-mcp-header} \\
+\texttt{test\_transports.py} & 28
+  & Header encoding and validation, removed endpoints, SSE progress,
+    subscriptions, real stdio subprocesses \\
+\texttt{test\_integration.py} & 33
+  & Host routing, consent, MRTR end to end, Tasks, caching, loop budgets \\
+\texttt{test\_legacy.py} & 16
+  & Era selection, legacy translation, bridge transparency \\
+\bottomrule
+\end{tabularx}
+\caption{134 tests, roughly two seconds, no model required.}
+\label{tab:test-files}
+\end{table}
+
+\section{Reading it in an evening}
+
+If you want to understand the protocol from the code, this order works:
+
+\begin{enumerate}[leftmargin=1.6em, itemsep=3pt]
+\item \texttt{protocol/meta.py} \, The envelope. This is the 2026 change.
+\item \texttt{protocol/jsonrpc.py} \, Framing, and \texttt{resultType}.
+\item \texttt{protocol/server.py} \, \texttt{handle()} is the whole server.
+\item \texttt{protocol/client.py} \, \texttt{call()} is the MRTR loop.
+\item \texttt{protocol/mrtr.py} \, \texttt{StateSealer}, and why each binding
+exists.
+\item \texttt{protocol/http.py} \, Header validation. The security-critical part.
+\item \texttt{servers/risk.py} \, All of it, applied.
+\item \texttt{tests/test\_protocol.py} \, The specification, as assertions.
+\end{enumerate}
+
+Roughly two thousand lines for the first six, and they contain every mechanism
+this book describes.
+
+\section{Using it as a starting point}
+
+You may. It is a teaching implementation, so before production:
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item Replace \texttt{TaskStore} with something shared and durable
+(\chapref{tasks}).
+\item Load the \texttt{StateSealer} secret from a secret manager, fleet-wide
+(\chapref{mrtr}).
+\item Add real authorization; the authenticator hook is a callable and does
+nothing by default (\chapref{authorization}).
+\item Replace \texttt{ThreadingHTTPServer} with a production server.
+\item Add real observability. The built-in counters are deliberately crude
+(\chapref{measuring}).
+\item Consider an SDK instead. By the time you read this they will have caught
+up with \texttt{2026-07-28}, and this exists to show you the wire rather than to
+compete with them.
+\end{itemize}
+
+\section{Reproducing the book itself}
+
+\begin{sh}
+make figures    # regenerate every figure to PDF and SVG
+make book       # the PDF
+make site       # the website
+make lint       # prose rules and reference integrity
+make verify     # tests, benchmarks, and the Claude Code runs
+\end{sh}
+
+The figure pipeline builds each figure to \emph{both} PDF and SVG from one
+source, so the printed book and the website cannot drift. The website is
+generated from the same LaTeX as the PDF, so there is exactly one copy of every
+sentence.
+
+\section{Contributing}
+
+Corrections welcome, and reproduction failures most of all. The entire premise
+is that the numbers are checkable, so a number you cannot reproduce is the most
+useful bug report available. Include your platform, your Python version, and the
+output of \texttt{make bench}.

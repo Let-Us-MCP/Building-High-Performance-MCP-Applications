@@ -1,0 +1,535 @@
+\chapter{Resources: The Context Layer}
+\label{ch:resources}
+
+\epigraph{``Roads? Where we're going, we don't need roads.''}{Doc Brown,
+\emph{Back to the Future} (1985)}
+
+Doc is wrong, of course. They need roads constantly for the rest of the
+trilogy. But the line captures a real feeling, which is the moment you realise
+the constraint you had been designing around is not actually the constraint.
+
+With resources, the constraint people design around is ``how do I get data to
+the model''. The actual constraint is ``how do I get data to the model
+\emph{without} spending the context budget on data it will not read''. Those are
+different problems, and confusing them is how you end up with a 200,000-token
+context window and no room to think in.
+
+\section{What a resource is, and what it is not}
+
+A resource is addressable, readable context, identified by a URI.
+
+The distinction from tools is about control, and it is worth being precise
+because the specification is:
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXX@{}}
+\toprule
+& \thead{Tools} & \thead{Resources} \\
+\midrule
+Controlled by & The model & The application \\
+Invoked when  & The model decides & The host decides \\
+Side effects  & Expected & None \\
+Question      & ``Do something'' & ``Give me something to read'' \\
+\bottomrule
+\end{tabularx}
+\caption{Model-controlled versus application-driven. The row that matters is the
+first one.}
+\label{tab:tools-vs-resources}
+\end{table}
+
+That first row is why resources exist at all. A user picking three documents
+from a file tree is doing something a model should not be doing on their behalf,
+and a host that wants to attach the current file to the conversation should not
+have to persuade a language model to call a tool.
+
+\begin{notebox}{When something could be either}
+It happens constantly. ``Fetch the account summary'' is defensible as either.
+
+The test I use: \emph{who should decide when this happens?} If the answer is
+``the user, from a picker'', it is a resource. If the answer is ``the model,
+while planning'', it is a tool. If the answer is genuinely both, ship both; they
+can share an implementation, and Meridian's account summary is reachable as a
+resource and as part of \texttt{assess\_account\_risk}.
+\end{notebox}
+
+\section{Mechanics}
+
+Four methods, and they should look familiar by now.
+
+\begin{wire}
+resources/list             -> the concrete resources available
+resources/templates/list   -> parameterised families of resources
+resources/read             -> the contents of one URI
+subscriptions/listen       -> tell me when these change
+\end{wire}
+
+A read looks like this:
+
+\begin{wire}
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "resultType": "complete",
+    "contents": [
+      {
+        "uri": "meridian://accounts/ACC-1042/summary",
+        "mimeType": "application/json",
+        "text": "{\"accountId\":\"ACC-1042\",\"tier\":\"B\",...}"
+      }
+    ],
+    "ttlMs": 900000,
+    "cacheScope": "private"
+  }
+}
+\end{wire}
+
+Two rules worth internalising.
+
+\textbf{A read may return several contents.} Reading a directory resource can
+legitimately return every file in it. Useful, and a good way to accidentally put
+four megabytes into a context window.
+
+\textbf{An empty \texttt{contents} array is forbidden for a nonexistent
+resource.} It is ambiguous: does the resource exist and have no content, or not
+exist? Return \texttt{-32602} instead.
+
+\begin{legacybox}{The error code changed}
+Resource-not-found was \texttt{-32002} through \texttt{2025-11-25}. It is
+\texttt{-32602} (Invalid params) now, aligning with plain JSON-RPC.
+
+The asymmetry from Chapter~\ref{ch:transport} applies here specifically: read
+the old code, write only the new one.
+\end{legacybox}
+
+\subsection{Templates}
+
+Enumerating 240 accounts as concrete resources would be silly. A template
+describes the family instead, using RFC 6570 URI templates:
+
+\begin{py}
+@server.template(
+    "meridian://accounts/{account_id}/summary",
+    "Account summary",
+    description="Static profile for one account. Cheap, stable, private.",
+    mime_type="application/json",
+    ttl_ms=900_000,
+    cache_scope="private",
+)
+def account_summary(ctx: RequestContext, uri: str, params: dict):
+    account = ACCOUNTS.get(params["account_id"])
+    if account is None:
+        raise ResourceNotFound(uri)
+    return json.dumps(account.to_json(), separators=(",", ":"))
+\end{py}
+
+Level 1 templates (a variable inside a path segment) cover essentially every
+real case. Meridian compiles them to a regex once, at registration:
+
+\begin{py}
+def __post_init__(self) -> None:
+    # RFC 6570 level 1 is all the book needs: {var} inside a path.
+    pattern = re.escape(self.uri_template)
+    pattern = re.sub(r"\\\{(\w+)\\\}", r"(?P<\1>[^/]+)", pattern)
+    self._regex = re.compile("^" + pattern + "$")
+\end{py}
+
+\section{Designing URIs for machines and humans}
+
+URIs are an interface, and unlike most interfaces this one is read by three
+audiences: your code, the model, and a human staring at an audit log at
+midnight. Design accordingly.
+
+\textbf{Hierarchical and guessable.}
+\texttt{meridian://accounts/ACC-1042/summary} tells you what it is without
+documentation. \texttt{meridian://r/4a7f2b} does not.
+
+\textbf{Stable.} A resource URI ends up in conversation history, in caches, in
+audit logs, and in the model's working memory. Changing the scheme is a breaking
+change even though nothing in the protocol says so.
+
+\textbf{Scoped, so you cannot express a cross-tenant reference.}
+
+\begin{dangerbox}{URIs that can name other people's data}
+\texttt{meridian://accounts/\{id\}/summary} is fine only if the server checks
+authorization on every read. If it does not, the URI space \emph{is} the attack:
+a model that has seen one account id can construct another, and the identifiers
+are sequential.
+
+Two mitigations, and use both. Authorize every read against the caller. And
+prefer identifiers that are not enumerable, so a leaked one does not imply the
+neighbours.
+\end{dangerbox}
+
+\textbf{Pagination is a requirement, not a nicety.} Meridian's market-data
+server has 40 benchmark resources and a page size of 25, which forces the
+pagination path to be exercised rather than theoretical:
+
+\begin{py}
+def test_marketdata_paginates_its_resource_list(self):
+    client = Client(InProcessTransport(marketdata.build_server()))
+    first = client.call("resources/list")
+    self.assertIn("nextCursor", first)
+    everything = client.list_resources()
+    self.assertGreater(len(everything), 25)
+\end{py}
+
+Cursors are opaque. Meridian uses an offset because its catalogue is small and
+stable, and says so in the code, because an offset over a mutable table skips
+and duplicates rows when the underlying set shifts between pages. If your list
+comes from a database, encode a sort key instead.
+
+\section{The 2026 caching model}
+
+Here is the part of the chapter that will pay for the book.
+
+Six operations carry caching hints: \texttt{server/discover},
+\texttt{tools/list}, \texttt{prompts/list}, \texttt{resources/list},
+\texttt{resources/templates/list}, and \texttt{resources/read}. Two fields:
+
+\begin{description}[leftmargin=1.4em, style=nextline, itemsep=3pt]
+\item[\texttt{ttlMs}] How long the client may consider this fresh. Semantically
+identical to HTTP's \texttt{max-age}.
+\item[\texttt{cacheScope}] \texttt{"public"} or \texttt{"private"}. Who may hold
+the cached copy.
+\end{description}
+
+It is HTTP caching, and that is a compliment. HTTP caching is a design that has
+survived thirty years of adversarial contact with reality.
+
+\subsection{TTL is a freshness hint, not a polling interval}
+
+The most common mistake, and it is a self-inflicted denial of service.
+
+\keyidea{Check freshness when you need the data. Do not wake up every
+\texttt{ttlMs} to refetch data nobody asked for. At scale, a fleet of clients
+polling on a shared TTL is a synchronised thundering herd that you built
+yourself, on purpose, out of enthusiasm.}
+
+The correct loop is: need the data, check freshness, refetch only if stale.
+
+\begin{py}
+def get(self, server, method, params, auth_context="anon"):
+    if method not in CACHEABLE_METHODS:
+        self.stats.uncacheable += 1
+        return None
+    # A retry carrying MRTR fields is a different question with the same name.
+    if "inputResponses" in params or "requestState" in params:
+        self.stats.uncacheable += 1
+        return None
+
+    key = cache_key(server, method, params, auth_context)
+    now = self._clock()
+    with self._lock:
+        entry = self._entries.get(key)
+        if entry is None:
+            self.stats.misses += 1
+            return None
+        if not entry.fresh_at(now):
+            self.stats.stale += 1
+            del self._entries[key]
+            return None
+        self.stats.hits += 1
+        return entry.value
+\end{py}
+
+Note the second check. Results produced by an MRTR retry are never cacheable,
+because they depend on \texttt{inputResponses}, which is not part of the cache
+key. Caching one would serve one user's answer to another user's question.
+
+Three edge cases the specification pins down, and Meridian tests all three:
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item \texttt{ttlMs: 0} means immediately stale. Do not store it.
+\item \texttt{ttlMs} absent means assume 0. This should only happen with older
+servers.
+\item Negative \texttt{ttlMs} is ignored, treated as 0.
+\end{itemize}
+
+\subsection{\texttt{cacheScope} is an access-control decision}
+
+\bookfig[0.98]{cache-scope}{The two scopes, and what each permits. The box at
+the bottom is the part that turns a performance field into a security
+field.}{cache-scope}
+
+\texttt{public} means the response contains nothing user-specific, so any
+client, gateway, or proxy may store it and serve it to anybody.
+
+\texttt{private} means it may be reused only within the same authorization
+context. Different token, different cache.
+
+The trap is stated plainly in the specification and is worth repeating:
+\textbf{a \texttt{public} response may be shared even when it came from an
+authenticated endpoint}. Authentication does not make a response private.
+Marking it \texttt{private} does.
+
+So mislabelling a personalised response as \texttt{public} does not merely leak
+it. It instructs a shared gateway to serve one user's data to another and report
+a cache hit while doing so.
+
+Meridian takes the conservative line and keys \emph{every} entry by principal,
+public or not:
+
+\begin{py}
+def cache_key(server, method, params, auth_context):
+    """Method plus the params that affect the answer, plus who is asking.
+
+    `auth_context` is folded in unconditionally rather than only for `private`
+    entries. Doing it the other way round means a single mislabelled response
+    leaks across users, and the cost of being wrong is far higher than the cost
+    of a few duplicate entries.
+    """
+\end{py}
+
+That is a deliberate trade. It gives up gateway-level sharing of public
+resources in exchange for making a mislabelling bug harmless. For a financial
+application that is obviously right. For a public documentation server it may
+not be, and you should make the choice consciously rather than inherit mine.
+
+\subsection{What it is worth}
+
+\bookfig[0.98]{cache-effect}{600 resource reads over 40 URIs with realistic
+repetition. The left bar is what your server sees; the right column is what the
+client experiences.}{cache-effect}
+
+\begin{measurebox}{Honouring \texttt{ttlMs} on a realistic read pattern}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\thead{} & \thead{Ignoring TTL} & \thead{Honouring TTL} \\
+\midrule
+Reads issued by the application & 600 & 600 \\
+Requests reaching the server    & 600 & 23 \\
+Wall clock                      & 12.4\,ms & 1.8\,ms \\
+Cache hit rate                  & 0\,\% & 96.2\,\% \\
+\midrule
+\multicolumn{2}{@{}l}{Speedup} & 6.82$\times$ \\
+\bottomrule
+\end{tabular}
+
+\vspace{6pt}
+\footnotesize
+In-process transport, so this measures the caching logic rather than the
+network. Over a real network the ratio is far larger, because the 577 avoided
+requests each avoid a round trip.
+\end{measurebox}
+
+Read the middle row again. 577 of 600 requests never happened. On loopback that
+saves 10 milliseconds. Across a 68\,ms cross-region hop it saves 39 seconds.
+
+\subsection{Invalidation}
+
+TTL and change notifications are complementary, and the specification is explicit
+that a server may provide either or both.
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item TTL alone: the client refetches when stale. Simple, and it may serve stale
+data for up to \texttt{ttlMs}.
+\item TTL plus \texttt{listChanged}: the notification invalidates immediately,
+and the TTL stops needless refetching in between.
+\end{itemize}
+
+\begin{py}
+def on_notification(self, msg: dict) -> None:
+    """Turn a change notification into a cache invalidation.
+
+    This is the whole reason `listChanged` and `ttlMs` coexist. The TTL
+    stops you refetching while nothing has changed; the notification stops
+    you serving stale data the moment something has.
+    """
+    method = msg.get("method", "")
+    if method == "notifications/tools/list_changed":
+        self.cache.invalidate_method(self.label, "tools/list")
+    elif method == "notifications/resources/updated":
+        uri = (msg.get("params") or {}).get("uri")
+        if uri:
+            self.cache.invalidate_uri(self.label, uri)
+\end{py}
+
+Subscribing is a \texttt{subscriptions/listen} request with a filter:
+
+\begin{wire}
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "subscriptions/listen",
+  "params": {
+    "notifications": {
+      "resourcesListChanged": true,
+      "resourceSubscriptions": ["meridian://accounts/ACC-1042/summary"]
+    }
+  }
+}
+\end{wire}
+
+Two rules govern that stream, and they exist because stdio multiplexes
+everything onto one pipe:
+
+\textbf{The server sends only what was requested.} Not ``everything it might
+like''. A subscriber who asked for tool changes never sees resource updates.
+
+\textbf{The acknowledgement comes first and carries the subscription id.}
+Everything afterwards is tagged with it, so a client with two open subscriptions
+can demultiplex.
+
+\begin{py}
+def test_acknowledged_first_then_only_requested_types(self):
+    ...
+    first = received[0]
+    self.assertEqual(first["method"],
+                     "notifications/subscriptions/acknowledged")
+    self.assertEqual(
+        first["params"]["_meta"]["io.modelcontextprotocol/subscriptionId"], 42)
+
+    # A prompts change was never requested, so it must not be delivered.
+    server.notify_list_changed("prompts")
+    server.notify_list_changed("tools")
+    ...
+    self.assertIn("notifications/tools/list_changed", methods)
+    self.assertNotIn("notifications/prompts/list_changed", methods)
+\end{py}
+
+The acknowledgement also reports the subset the server actually agreed to
+honour, which is how a client learns that the server does not support resource
+subscriptions rather than waiting forever for updates that are never coming.
+
+\begin{legacybox}{\texttt{resources/subscribe} and the GET stream}
+Through \texttt{2025-11-25}, subscribing was a \texttt{resources/subscribe} RPC
+and notifications arrived on a standalone SSE stream opened with HTTP GET.
+
+Both are gone, and for the same reason: they were per-connection state, which is
+the thing this revision deleted. \texttt{subscriptions/listen} replaces them with
+an ordinary request whose response happens to stay open.
+
+On stdio, if the connection drops and is re-established, the client must re-send
+\texttt{subscriptions/listen}. The server holds no subscription state across
+reconnections.
+\end{legacybox}
+
+\section{Who chooses what goes into context}
+
+Three strategies, three cost profiles, and most applications need all three.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXX@{}}
+\toprule
+\thead{Strategy} & \thead{How it works} & \thead{Token cost} \\
+\midrule
+User-driven
+  & A picker, a file tree, an @-mention
+  & Exactly what was chosen. Predictable, and usually right \\
+Model-driven
+  & Resource links in tool results; the model asks for what it wants
+  & One extra round trip per fetch, but only fetches what it needs \\
+Host policy
+  & Always attach the current file, the system prompt, the last N turns
+  & Constant per turn, and the easiest to let grow silently \\
+\bottomrule
+\end{tabularx}
+\caption{Three ways context gets filled. The third one is where the waste
+accumulates, because nobody has to decide anything for it to happen.}
+\label{tab:context-strategies}
+\end{table}
+
+The model-driven route is worth a note. A tool can return a \emph{link} rather
+than the content:
+
+\begin{wire}
+{
+  "type": "resource_link",
+  "uri": "meridian://filings/FIL-2000",
+  "name": "FIL-2000",
+  "description": "10-K, fiscal 2025, 284 pages",
+  "mimeType": "application/json"
+}
+\end{wire}
+
+The model sees that a 284-page filing exists and decides whether it wants it.
+That is one extra round trip if it does, and zero tokens if it does not, which
+is usually the better trade for large documents. Chapter~\ref{ch:agent-loop}
+covers when to embed instead.
+
+\section{Anti-patterns}
+
+Five, in rough order of how often I encounter them.
+
+\textbf{Dumping a database as resources.} One resource per row, ten thousand
+rows. The list response alone exhausts the context window. If your resource list
+is longer than a person would scroll, it should be a template plus a search
+tool.
+
+\textbf{Ignoring pagination.} Both directions. Servers that return everything,
+and clients that read page one and stop. Meridian's client walks to the end and
+caches each page under its own cursor.
+
+\textbf{Cross-tenant URIs.} Covered above. Authorize on every read.
+
+\textbf{\texttt{cacheScope: public} on anything personalised.} Covered above,
+and it is a data breach rather than a performance bug.
+
+\textbf{Returning enormous blobs with no size hint.} The \texttt{size} field
+exists. Populate it. A host that knows a resource is 4\,MB before reading it can
+decide not to, and a host that finds out afterwards has already spent the
+budget.
+
+\section{Meridian's resources}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lXrl@{}}
+\toprule
+\thead{Resource} & \thead{What} & \thead{TTL} & \thead{Scope} \\
+\midrule
+\texttt{accounts/\{id\}/summary} & Account profile & 15\,min & private \\
+\texttt{filings/\{id\}}          & Public regulatory filing & 24\,h & public \\
+\texttt{risk/model-card}         & How the score works & 7\,d & public \\
+\texttt{transactions/\{id\}}     & One transaction & 30\,s & private \\
+\texttt{market/curve}            & Reference rates & 1\,h & public \\
+\texttt{market/benchmark/\{...\}} & 40 sector benchmarks & 2\,h & public \\
+\bottomrule
+\end{tabularx}
+\caption{Every TTL is a claim about how fast the underlying data changes, and
+every scope is a claim about who may see it.}
+\label{tab:meridian-resources}
+\end{table}
+
+The spread of TTLs is the interesting part, and each one is an argument:
+
+\texttt{transactions} gets 30 seconds because a transaction under active review
+changes state and stale data would mislead a compliance officer.
+
+\texttt{filings} gets 24 hours and \texttt{public} because a filed 10-K is
+immutable and identical for everybody. This is the row where a shared gateway
+cache does real work.
+
+\texttt{model-card} gets 7 days because it changes when the model is retrained,
+which is quarterly.
+
+\keyidea{A TTL is not a performance knob you tune until the graph looks nice. It
+is a statement about how quickly the underlying data changes, and the right
+value comes from the domain rather than from the dashboard.}
+
+\section{What to remember}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+\item Resources are application-driven; tools are model-controlled. The question
+is who decides when it happens.
+\item Templates over enumeration. Pagination is required, and cursors are opaque.
+\item Six operations carry \texttt{ttlMs} and \texttt{cacheScope}.
+\item TTL is a freshness hint. Never poll on it.
+\item MRTR retries and interim results are never cacheable.
+\item \texttt{cacheScope: public} may be shared across users even from an
+authenticated endpoint. It is an access-control decision.
+\item Honouring TTL avoided 577 of 600 requests on a realistic read pattern, a
+96.2\,\% hit rate.
+\item Notifications invalidate; TTL prevents needless refetching between them.
+The server sends only the types the client asked for.
+\item Authorize every read. Populate \texttt{size}. Do not dump your database.
+\end{itemize}
+
+Next: prompts, the primitive everybody skips, and the one that quietly
+standardises a workflow across three teams.

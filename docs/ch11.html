@@ -1,0 +1,654 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Building Servers &middot; Building Awesome MCP Apps</title>
+<meta name="description" content="Building Servers. What every AI application developer should know about the Model Context Protocol">
+<meta property="og:title" content="Building Servers">
+<meta property="og:description" content="Building Servers. What every AI application developer should know about the Model Context Protocol">
+<style>
+:root{
+  --ink:#15181D; --muted:#5B6472; --rule:#D8DDE4; --wash:#F5F6F8;
+  --paper:#FFFFFF; --accent:#0F5C8C; --accent-soft:#E7F0F6;
+  --warm:#B4531A; --warm-soft:#FBF0E7; --good:#2C6E49; --good-soft:#E9F2EC;
+  --danger:#9B2226; --danger-soft:#FAECEC;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#E7EAEE; --muted:#98A2B0; --rule:#2C333D; --wash:#171B21;
+    --paper:#0F1216; --accent:#63AEDC; --accent-soft:#14232E;
+    --warm:#E08B4F; --warm-soft:#2A1D13; --good:#6FBF8E; --good-soft:#13221A;
+    --danger:#E4796F; --danger-soft:#291516;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--serif);font-size:18px;line-height:1.62;
+  -webkit-text-size-adjust:100%}
+.layout{display:grid;grid-template-columns:288px minmax(0,1fr);
+  max-width:1280px;margin:0 auto;gap:0}
+nav.toc{position:sticky;top:0;height:100vh;overflow-y:auto;padding:26px 20px 60px;
+  border-right:1px solid var(--rule);font-family:var(--sans);font-size:14px}
+nav.toc .brand{display:block;font-weight:700;font-size:16px;color:var(--ink);
+  text-decoration:none;line-height:1.3;margin-bottom:4px}
+nav.toc .tagline{color:var(--muted);font-size:12.5px;margin:0 0 18px;line-height:1.45}
+nav.toc .part{margin:18px 0 6px;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);font-weight:700}
+nav.toc a{display:block;padding:4px 8px;margin-left:-8px;border-radius:5px;
+  color:var(--muted);text-decoration:none}
+nav.toc a:hover{background:var(--wash);color:var(--ink)}
+nav.toc a.current{background:var(--accent-soft);color:var(--accent);font-weight:600}
+main{padding:44px 52px 120px;min-width:0;max-width:78ch}
+h1,h2,h3,h4{font-family:var(--sans);line-height:1.25;color:var(--ink)}
+h1{font-size:2.05em;margin:0 0 .55em;letter-spacing:-.015em}
+h2{font-size:1.42em;margin:2em 0 .5em;padding-top:.35em}
+h3{font-size:1.14em;margin:1.7em 0 .4em}
+h4{font-size:1em;margin:1.4em 0 .3em;color:var(--muted)}
+p{margin:0 0 1.05em}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.855em;background:var(--wash);
+  padding:.12em .36em;border-radius:4px;word-break:break-word}
+pre{background:var(--wash);border-left:3px solid var(--rule);
+  border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+  font-size:13.5px;line-height:1.5;margin:1.3em 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+pre.json,pre.http{background:var(--accent-soft);border-left-color:var(--accent)}
+aside.box{border-left:3px solid var(--rule);background:var(--wash);
+  padding:14px 18px;margin:1.5em 0;border-radius:0 6px 6px 0;font-size:.955em}
+aside.box .box-title{font-family:var(--sans);font-weight:700;font-size:12px;
+  letter-spacing:.07em;text-transform:uppercase;margin:0 0 .55em}
+aside.box.legacy{border-left-color:var(--warm);background:var(--warm-soft)}
+aside.box.legacy .box-title{color:var(--warm)}
+aside.box.measured{border-left-color:var(--good);background:var(--good-soft)}
+aside.box.measured .box-title{color:var(--good)}
+aside.box.threat{border-left-color:var(--danger);background:var(--danger-soft)}
+aside.box.threat .box-title{color:var(--danger)}
+aside.box.note .box-title{color:var(--muted)}
+aside.keyidea{border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:14px 18px;margin:1.6em 0;border-radius:0 6px 6px 0;
+  font-family:var(--sans);font-style:italic;font-size:.97em}
+aside.keyidea p:last-child,aside.box p:last-child{margin-bottom:0}
+aside.keyidea pre,aside.keyidea code,aside.keyidea table{font-style:normal}
+aside.epigraph{border:0;margin:0 0 2em;padding:0 0 0 clamp(0px,7%,52px);
+  color:var(--muted);font-size:.97em}
+aside.epigraph p{margin:0 0 .3em}
+main figure{margin:2em 0;text-align:center}
+main figure img{max-width:100%;height:auto;border-radius:6px}
+@media (prefers-color-scheme: dark){
+  main figure img{background:#fff;padding:10px;border-radius:8px}
+}
+figcaption{font-family:var(--sans);font-size:13.5px;color:var(--muted);
+  margin-top:.7em;text-align:left;line-height:1.5}
+.table-wrap{overflow-x:auto;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:14.5px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+thead th{border-bottom:2px solid var(--rule);font-weight:700}
+caption{caption-side:bottom;font-size:13.5px;color:var(--muted);
+  text-align:left;padding-top:.7em;line-height:1.5}
+ul,ol{padding-left:1.35em;margin:0 0 1.05em}
+li{margin-bottom:.32em}
+dl{margin:0 0 1.05em}
+dt{font-weight:700;font-family:var(--sans);font-size:.95em;margin-top:.75em}
+dd{margin:.15em 0 0 1.35em}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
+.pager{display:flex;justify-content:space-between;gap:16px;margin-top:4em;
+  padding-top:1.5em;border-top:1px solid var(--rule);font-family:var(--sans);
+  font-size:14px}
+.pager a{text-decoration:none;max-width:46%}
+.pager .dir{display:block;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted)}
+.masthead{border-bottom:1px solid var(--rule);padding-bottom:1.8em;margin-bottom:2.2em}
+.masthead .kicker{font-family:var(--sans);font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);font-weight:700}
+.lede{font-size:1.12em;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:14px;margin:1.8em 0}
+.card{border:1px solid var(--rule);border-radius:9px;padding:15px 17px;
+  font-family:var(--sans);font-size:14px}
+.card h3{margin:0 0 .35em;font-size:15px}
+.card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+.menu-btn{display:none}
+@media (max-width:940px){
+  body{font-size:17px}
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:0;
+    border-bottom:1px solid var(--rule);max-height:none}
+  nav.toc.collapsed .toc-body{display:none}
+  main{padding:28px 20px 90px}
+  .menu-btn{display:inline-block;font-family:var(--sans);font-size:13px;
+    background:var(--wash);border:1px solid var(--rule);color:var(--ink);
+    border-radius:6px;padding:6px 11px;cursor:pointer;margin-bottom:10px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc"><button class="menu-btn" type="button">Contents</button>
+<div class="toc-body">
+<a class="brand" href="index.html">Building Awesome MCP Apps</a>
+<p class="tagline">What every AI application developer should know about the Model Context Protocol</p>
+<a href="preface.html">Preface</a>
+<a href="how-to-read.html">How to read this book</a>
+<div class="part">Part I. Protocol Fundamentals</div>
+<a href="ch01.html">A Primer on Latency, Tokens, and Context</a>
+<a href="ch02.html">The MCP Architectural Model</a>
+<a href="ch03.html">Building Blocks of the Transport</a>
+<a href="ch04.html">Authorization on the Wire</a>
+<div class="part">Part II. The Primitives</div>
+<a href="ch05.html">Tools: The Execution Layer</a>
+<a href="ch06.html">Resources: The Context Layer</a>
+<a href="ch07.html">Prompts: Workflow Blueprints</a>
+<a href="ch08.html">Multi Round-Trip Requests</a>
+<a href="ch09.html">Extensions and Tasks</a>
+<a href="ch10.html">MCP Apps: Interactive Interfaces</a>
+<div class="part">Part III. Building MCP Applications</div>
+<a href="ch11.html" class="current">Building Servers</a>
+<a href="ch12.html">Building Hosts and Clients</a>
+<a href="ch13.html">The Agent Loop, State, and Memory</a>
+<a href="ch14.html">Multi-Agent Topologies</a>
+<div class="part">Part IV. Performance Engineering</div>
+<a href="ch15.html">Testing and Debugging</a>
+<a href="ch16.html">Measuring MCP Applications</a>
+<a href="ch17.html">Optimizing for Latency, Tokens, and Cost</a>
+<a href="ch18.html">Deployment and Operations</a>
+<div class="part">Part V. Security and Trust</div>
+<a href="ch19.html">Threat Modeling Agentic Applications</a>
+<a href="ch20.html">Access Control, Audit, and MCP in the Enterprise</a>
+<div class="part">Back matter</div>
+<a href="epilogue.html">Epilogue: The Evolving Protocol</a>
+<div class="part">Appendices</div>
+<a href="appendix-a.html">A. Method and Message Reference</a>
+<a href="appendix-b.html">B. Transport Decision Matrix</a>
+<a href="appendix-c.html">C. Performance Checklist</a>
+<a href="appendix-d.html">D. Security Hardening Checklist</a>
+<a href="appendix-e.html">E. The Meridian Companion Repository</a>
+<a href="about.html">About the author</a>
+</div></nav>
+<main>
+<section id="ch:building-servers" class="level1">
+<h1>Building Servers</h1>
+<aside class="epigraph">
+<p><em>“Do, or do not. There is no try.”</em></p>
+<p>Yoda, <em>The Empire Strikes Back</em> (1980)</p>
+</aside>
+<p>Yoda is talking about commitment, and he is also, accidentally, describing error handling. A tool either did the thing or it did not, and the worst possible outcome is a response that leaves the model unsure which. Half the craft of building a good server is making sure every response says unambiguously which of those two happened.</p>
+<p>This chapter builds one from an empty directory. Not a toy. The risk server that ships with this book, with everything real: MRTR approvals, TTL’d resources, Tasks, a dual-era bridge, and contract tests that pass.</p>
+<section id="anatomy-of-a-2026-server" class="level2">
+<h2>Anatomy of a 2026 server</h2>
+<p>Start with what is <em>not</em> here, because it is more than you expect.</p>
+<ul>
+<li><p>No <code>initialize</code> handler.</p></li>
+<li><p>No session object.</p></li>
+<li><p>No connection state.</p></li>
+<li><p>No <code>ping</code>.</p></li>
+<li><p>No <code>logging/setLevel</code>.</p></li>
+<li><p>No <code>resources/subscribe</code>.</p></li>
+</ul>
+<p>What remains is a router:</p>
+<pre class="python" data-language="python"><code>class Server:
+    &quot;&quot;&quot;A stateless MCP server.
+
+    Note what this class does not have. No `initialize`. No session object.
+    No per-connection state of any kind. A `Server` is a pure function from
+    request to response, which is why you can run twenty of them behind a
+    round-robin load balancer and never think about stickiness again.
+    &quot;&quot;&quot;</code></pre>
+<p>The whole dispatch path fits on a page, and it is worth reading closely because four of its decisions come straight from the specification:</p>
+<pre class="python" data-language="python"><code>def handle(self, message, *, auth=None, emit_progress=None):
+    try:
+        jsonrpc.validate_request(message)
+    except errors.McpError as exc:
+        return jsonrpc.error_response(message.get(&quot;id&quot;), exc)
+
+    method = message[&quot;method&quot;]
+    params = message.get(&quot;params&quot;) or {}
+    req_id = message.get(&quot;id&quot;)
+
+    if jsonrpc.is_notification(message):
+        self.handle_notification(method, params)
+        return None                                    # (1)
+
+    try:
+        ctx = parse_request_context(                   # (2)
+            method, params, request_id=req_id, auth=auth,
+            supported_versions=self.supported_versions)
+        ctx.emit_progress = emit_progress
+        handler = self._methods.get(method)
+        if handler is None:
+            raise errors.MethodNotFound(method)
+
+        result = handler(ctx)
+        result.setdefault(&quot;resultType&quot;, jsonrpc.RESULT_COMPLETE)   # (3)
+        meta = result.setdefault(&quot;_meta&quot;, {})
+        meta.setdefault(KEY_SERVER_INFO, self.info.to_json())      # (4)
+        return jsonrpc.result_response(req_id, result)
+
+    except errors.McpError as exc:
+        return jsonrpc.error_response(req_id, exc)
+    except Exception as exc:  # a handler bug must not take the process down
+        return jsonrpc.error_response(
+            req_id, errors.InternalError(f&quot;{type(exc).__name__}: {exc}&quot;))</code></pre>
+<ol>
+<li><p>Notifications get no response. Returning one is a protocol violation and some clients will treat the unexpected message as a fatal error.</p></li>
+<li><p>Every request is validated against <code>_meta</code> before anything else happens. No handshake means no other opportunity.</p></li>
+<li><p><code>resultType</code> defaults to <code>complete</code> so handlers never have to think about it.</p></li>
+<li><p>The server identifies itself in every result, as the specification recommends.</p></li>
+</ol>
+<p>And the bare <code>except</code> at the bottom is deliberate. A handler that raises <code>KeyError</code> should produce a <code>-32603</code> for that one request, not take down a process serving forty others.</p>
+</section>
+<section id="registering-the-surface" class="level2">
+<h2>Registering the surface</h2>
+<p>Meridian uses decorators, because they keep the tool next to its schema and its description, which is where they belong.</p>
+<pre class="python" data-language="python"><code>@server.tool(
+    &quot;assess_account_risk&quot;,
+    &quot;Score one commercial account for credit risk. Returns a 1-99 score, a &quot;
+    &quot;band, and the weighted factors behind it.&quot;,
+    {
+        &quot;type&quot;: &quot;object&quot;,
+        &quot;properties&quot;: {
+            &quot;accountId&quot;: {
+                &quot;type&quot;: &quot;string&quot;,
+                &quot;description&quot;: &quot;Account identifier, e.g. ACC-1042&quot;,
+                &quot;pattern&quot;: &quot;^ACC-[0-9]{4}$&quot;,
+            },
+            &quot;exposureUsd&quot;: {
+                &quot;type&quot;: &quot;number&quot;, &quot;minimum&quot;: 0,
+                &quot;description&quot;: &quot;Proposed exposure. Above 5,000,000 an &quot;
+                               &quot;approver is required before scoring.&quot;,
+            },
+            &quot;region&quot;: {
+                &quot;type&quot;: &quot;string&quot;,
+                &quot;enum&quot;: [&quot;us-east&quot;, &quot;us-west&quot;, &quot;eu-central&quot;, &quot;eu-west&quot;,
+                         &quot;apac-south&quot;],
+                &quot;description&quot;: &quot;Routing hint. Mirrored into an HTTP header &quot;
+                               &quot;so gateways can route without reading the body.&quot;,
+                &quot;x-mcp-header&quot;: &quot;Region&quot;,
+            },
+        },
+        &quot;required&quot;: [&quot;accountId&quot;],
+    },
+    output_schema={ ... },
+    annotations={&quot;readOnlyHint&quot;: True, &quot;idempotentHint&quot;: True},
+    ui_resource_uri=&quot;ui://meridian/risk-dashboard&quot;,
+)
+def assess_account_risk(ctx: RequestContext):
+    ...</code></pre>
+<p>Four things in that declaration earn their place, and each connects to an earlier chapter.</p>
+<p>The <code>pattern</code> catches a malformed id at the boundary, so the handler never sees it. The <code>description</code> on <code>exposureUsd</code> tells the model about the approval threshold, so it can warn the user <em>before</em> triggering an MRTR round trip that costs 375 milliseconds. The <code>x-mcp-header</code> lets a gateway route by region without parsing the body. And the annotations let a host auto-approve, because scoring an account changes nothing.</p>
+<section id="validate-at-the-edge-then-trust" class="level3">
+<h3>Validate at the edge, then trust</h3>
+<p>Meridian validates arguments against the input schema before calling the handler:</p>
+<pre class="python" data-language="python"><code>def _tools_call(self, ctx: RequestContext) -&gt; dict:
+    name = ctx.params.get(&quot;name&quot;)
+    tool = self._tools.get(name)
+    if tool is None:
+        raise errors.InvalidParams(f&quot;Unknown tool: {name}&quot;)
+
+    validate_against_schema(ctx.arguments, tool.input_schema,
+                            where=f&quot;{name} arguments&quot;)
+    result = tool.handler(ctx)
+    return normalise_tool_result(result, tool)</code></pre>
+<p>Which means handlers can write <code>ctx.arguments["accountId"]</code> without a guard, because a request that got this far has one. That is a small quality-of- life thing that compounds across forty tools.</p>
+</section>
+<section id="let-handlers-return-whatever-is-natural" class="level3">
+<h3>Let handlers return whatever is natural</h3>
+<p>A handler returning a string, a dict, or a full envelope should all work. That is one function:</p>
+<pre class="python" data-language="python"><code>def normalise_tool_result(result, tool) -&gt; dict:
+    &quot;&quot;&quot;Let handlers return a string, a dict, or a full result envelope.&quot;&quot;&quot;
+    if isinstance(result, str):
+        return text_result(result)
+    # Already an InputRequiredResult or a full envelope: pass it through.
+    if &quot;resultType&quot; in result or &quot;content&quot; in result:
+        return result
+    # A bare dict is structured content. Mirror it into text for the model,
+    # per the backwards-compatibility guidance in the spec.
+    return text_result(json.dumps(result, separators=(&quot;,&quot;, &quot;:&quot;)),
+                       structured=result)</code></pre>
+<p>That last branch implements a specification recommendation quietly: a tool returning structured content should also return the serialised JSON as text, so clients that do not read <code>structuredContent</code> still work.</p>
+</section>
+</section>
+<section id="state-without-sessions" class="level2">
+<h2>State without sessions</h2>
+<p>The pattern from Chapter <a href="ch02.html#ch:architecture">2</a>, built properly.</p>
+<pre class="python" data-language="python"><code># --&gt; tools/call
+{ &quot;name&quot;: &quot;create_basket&quot;, &quot;arguments&quot;: {} }
+
+# &lt;-- result
+{ &quot;structuredContent&quot;: { &quot;basket_id&quot;: &quot;bsk_a1b2c3&quot; } }
+
+# --&gt; tools/call, later, possibly to a different replica
+{ &quot;name&quot;: &quot;add_item&quot;, &quot;arguments&quot;: { &quot;basket_id&quot;: &quot;bsk_a1b2c3&quot;, &quot;sku&quot;: &quot;...&quot; } }</code></pre>
+<p>From the wire’s point of view, <code>basket_id</code> is a string argument. There is no protocol concept of a handle, which is exactly why it works on every client and every transport with no negotiation.</p>
+<p>Four rules, and each of them is somebody’s incident report:</p>
+<table id="tab:handle-rules">
+<caption>Handle design. The first row is the one that turns a convenience into a vulnerability.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Rule</strong></td>
+<td style="text-align: left;"><strong>What goes wrong without it</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Authorize on every call</td>
+<td style="text-align: left;">A handle becomes a bearer token. Anyone who sees one owns the object</td>
+</tr>
+<tr>
+<td style="text-align: left;">Keep it opaque</td>
+<td style="text-align: left;"><code>basket_user42_20260728</code> invites enumeration of user 43</td>
+</tr>
+<tr>
+<td style="text-align: left;">State the lifetime in the creation tool’s description</td>
+<td style="text-align: left;">The model cannot see your retention policy anywhere else</td>
+</tr>
+<tr>
+<td style="text-align: left;">Return a clear expiry error</td>
+<td style="text-align: left;">The model retries a dead handle forever instead of making a new one</td>
+</tr>
+</tbody>
+</table>
+<aside class="keyidea">
+<p>For an authenticated server, a handle is a name, not a capability. Re-check authorization against it on every single call. For an unauthenticated server the handle <em>is</em> a bearer token, so give it real entropy and a bounded life.</p>
+</aside>
+</section>
+<section id="idempotency-because-retries-are-routine-now" class="level2">
+<h2>Idempotency, because retries are routine now</h2>
+<p>Chapter <a href="ch03.html#ch:transport">3</a> removed stream resumability. A broken response stream means the client re-issues with a new id, and it has no way to know whether the first attempt reached you.</p>
+<p>So retries are normal operation. Which means any tool with side effects needs an idempotency key, and the protocol will not provide one. It is an ordinary argument:</p>
+<pre class="python" data-language="python"><code>{
+    &quot;type&quot;: &quot;object&quot;,
+    &quot;properties&quot;: {
+        &quot;accountId&quot;: {&quot;type&quot;: &quot;string&quot;},
+        &quot;amountUsd&quot;: {&quot;type&quot;: &quot;number&quot;},
+        &quot;idempotencyKey&quot;: {
+            &quot;type&quot;: &quot;string&quot;,
+            &quot;description&quot;: &quot;Client-generated unique id. Repeating a key &quot;
+                           &quot;within 24 hours returns the original result &quot;
+                           &quot;rather than performing the action again.&quot;,
+        },
+    },
+    &quot;required&quot;: [&quot;accountId&quot;, &quot;amountUsd&quot;, &quot;idempotencyKey&quot;],
+}</code></pre>
+<p>Server side, the shape is always the same: look up the key, return the stored result if present, otherwise do the work and store it before returning. The description matters as much as the mechanism, because the model has to know to generate a fresh key per intent and reuse it per retry.</p>
+</section>
+<section id="configuration" class="level2">
+<h2>Configuration</h2>
+<p>Environment variables for secrets. Nothing exotic, but two details that bite.</p>
+<pre class="python" data-language="python"><code>SEALER = StateSealer(
+    secret=os.environ[&quot;MERIDIAN_STATE_SECRET&quot;].encode(),
+    ttl_seconds=900,
+)</code></pre>
+<p><strong>The signing secret must be fleet-wide.</strong> Meridian’s default generates a random one per process, which is correct for a single-process demo and catastrophic behind a load balancer: a retry landing on replica B cannot open state sealed by replica A, and the user sees an approval that mysteriously fails about half the time.</p>
+<p><strong>Declare extensions honestly.</strong> Advertising <code>tasks</code> without implementing <code>tasks/get</code> produces a client that polls a method that returns <code>-32601</code> forever.</p>
+<pre class="python" data-language="python"><code>def declare_extension(self, ident: str, settings: dict | None = None) -&gt; None:
+    &quot;&quot;&quot;Advertise an extension. Declaring one you do not implement is lying,
+    and the client will believe you.&quot;&quot;&quot;</code></pre>
+</section>
+<section id="capabilities-should-be-derived-not-declared" class="level2">
+<h2>Capabilities should be derived, not declared</h2>
+<p>A small design decision that removes a whole class of bug. Meridian computes its capabilities from what is actually registered:</p>
+<pre class="python" data-language="python"><code>def capabilities(self) -&gt; ServerCapabilities:
+    caps = ServerCapabilities(extensions=dict(self._extensions))
+    if self._tools:
+        caps.tools = {&quot;listChanged&quot;: True} if self.list_changed else {}
+    if self._resources or self._templates:
+        res = {}
+        if self.list_changed:
+            res[&quot;listChanged&quot;] = True
+        if self.subscribe:
+            res[&quot;subscribe&quot;] = True
+        caps.resources = res
+    if self._prompts:
+        caps.prompts = {&quot;listChanged&quot;: True} if self.list_changed else {}
+    return caps</code></pre>
+<p>A hand-maintained capability list drifts from reality the first time somebody deletes the last prompt and forgets the declaration. A derived one cannot.</p>
+</section>
+<section id="filtering-by-authorization-not-by-connection" class="level2">
+<h2>Filtering by authorization, not by connection</h2>
+<p>The specification draws a line here that is easy to misread. A server’s tool list <strong>must not</strong> vary per connection. It <strong>may</strong> vary by the authorization presented on the request.</p>
+<p>Those sound similar and are opposites. Credentials arrive with each request, so filtering on them is stateless. Connection identity is exactly the thing this revision deleted.</p>
+<pre class="python" data-language="python"><code>def visible_tools(self, ctx: RequestContext) -&gt; list[Tool]:
+    &quot;&quot;&quot;Override to filter by scope. The set may vary by authorization,
+    never by connection.&quot;&quot;&quot;
+    return sorted(self._tools.values(), key=lambda t: t.name)</code></pre>
+<p>A scope-aware subclass:</p>
+<pre class="python" data-language="python"><code>class ScopedRiskServer(Server):
+    def visible_tools(self, ctx):
+        scopes = set((ctx.auth or {}).get(&quot;scopes&quot;, []))
+        return [t for t in super().visible_tools(ctx)
+                if not REQUIRED_SCOPE.get(t.name)
+                or REQUIRED_SCOPE[t.name] in scopes]</code></pre>
+<p>Note that <code>super()</code> sorts first, so the filtered list is still deterministic, which keeps the prompt-cache property from Chapter <a href="ch05.html#ch:tools">5</a>. Filtering after sorting preserves order; sorting after filtering would too, but doing it in the wrong place is how people lose it.</p>
+</section>
+<section id="wiring-the-transports" class="level2">
+<h2>Wiring the transports</h2>
+<p>The server is transport-agnostic. The transports are thin.</p>
+<pre class="python" data-language="python"><code>def main(argv=None) -&gt; int:
+    ap = argparse.ArgumentParser(description=&quot;Meridian risk server&quot;)
+    ap.add_argument(&quot;--http&quot;, type=int, metavar=&quot;PORT&quot;)
+    ap.add_argument(&quot;--fat&quot;, action=&quot;store_true&quot;)
+    args = ap.parse_args(argv)
+
+    server = build_server(fat_catalogue=args.fat)
+    tasks_ext.install(server)
+
+    if args.http:
+        http = StreamableHttpServer(server, port=args.http)
+        print(f&quot;meridian-risk on {http.url}&quot;, file=sys.stderr, flush=True)
+        http.start()
+        ...
+    StdioServerTransport(server).serve_forever()</code></pre>
+<p>That <code>file=sys.stderr</code> is not decoration. On stdio, <code>stdout</code> carries MCP messages and nothing else, and a startup banner on <code>stdout</code> corrupts the stream before the first request. It is the single most common way a new stdio server fails, and the error the client reports gives no hint of the cause.</p>
+<section id="serving-both-eras" class="level3">
+<h3>Serving both eras</h3>
+<p>Chapter <a href="ch02.html#ch:architecture">2</a> explained why you need this in 2026. The wiring is one wrapper:</p>
+<pre class="python" data-language="python"><code>server = build(args.server, **kwargs)
+endpoint = server if args.modern_only else LegacyBridge(server)
+
+if args.http:
+    http = StreamableHttpServer(endpoint, port=args.http)
+    ...
+StdioServerTransport(endpoint).serve_forever()</code></pre>
+<p>Dual-era is the default because that is what actually connects to shipping clients. <code>--modern-only</code> exists so you can watch a strict server refuse a handshake, which is a useful thing to see once.</p>
+</section>
+</section>
+<section id="contract-tests" class="level2">
+<h2>Contract tests</h2>
+<p>A server without contract tests is a server that conforms to the specification today.</p>
+<p>Meridian has 134 tests, and the ones in this section are the ones I would write first for any new server. They assert on the wire, not on convenience objects, because the wire is what another implementation has to interoperate with.</p>
+<section id="the-envelope" class="level3">
+<h3>The envelope</h3>
+<pre class="python" data-language="python"><code>def test_request_without_protocol_version_is_rejected(self):
+    resp = self.server.handle({
+        &quot;jsonrpc&quot;: &quot;2.0&quot;, &quot;id&quot;: 1, &quot;method&quot;: &quot;tools/list&quot;,
+        &quot;params&quot;: {&quot;_meta&quot;: {KEY_CLIENT_CAPABILITIES: {}}},
+    })
+    self.assertEqual(resp[&quot;error&quot;][&quot;code&quot;], errors.INVALID_PARAMS)
+    self.assertIn(&quot;protocolVersion&quot;, resp[&quot;error&quot;][&quot;message&quot;])
+
+def test_unsupported_version_lists_what_is_supported(self):
+    resp = self.server.handle(request(&quot;tools/list&quot;, version=&quot;1999-01-01&quot;))
+    self.assertEqual(resp[&quot;error&quot;][&quot;code&quot;], errors.UNSUPPORTED_PROTOCOL_VERSION)
+    self.assertIn(PROTOCOL_VERSION, resp[&quot;error&quot;][&quot;data&quot;][&quot;supported&quot;])</code></pre>
+<p>That second one matters more than it looks. The error must carry a <code>supported</code> list, because that list is how a client renegotiates without a handshake. An error that just says “unsupported” leaves the client with nothing to do.</p>
+</section>
+<section id="statelessness-itself" class="level3">
+<h3>Statelessness itself</h3>
+<pre class="python" data-language="python"><code>def test_two_requests_share_no_state(self):
+    &quot;&quot;&quot;The second request must not benefit from the first having happened.&quot;&quot;&quot;
+    first = self.server.handle(request(&quot;tools/list&quot;, req_id=1))
+    second = self.server.handle(request(&quot;tools/list&quot;, req_id=2))
+    self.assertEqual(first[&quot;result&quot;][&quot;tools&quot;], second[&quot;result&quot;][&quot;tools&quot;])
+    # And a request with no _meta still fails, even after a good one.
+    third = self.server.handle(
+        {&quot;jsonrpc&quot;: &quot;2.0&quot;, &quot;id&quot;: 3, &quot;method&quot;: &quot;tools/list&quot;, &quot;params&quot;: {}})
+    self.assertIn(&quot;error&quot;, third)</code></pre>
+<p>The second half is the real test. It catches a server that “helpfully” remembers the last known-good capabilities, which is a plausible optimisation and a specification violation.</p>
+</section>
+<section id="caching-hints-on-all-six-operations" class="level3">
+<h3>Caching hints on all six operations</h3>
+<pre class="python" data-language="python"><code>def test_all_six_cacheable_methods_carry_hints(self):
+    for method, params in [
+        (&quot;server/discover&quot;, {}), (&quot;tools/list&quot;, {}), (&quot;prompts/list&quot;, {}),
+        (&quot;resources/list&quot;, {}), (&quot;resources/templates/list&quot;, {}),
+        (&quot;resources/read&quot;, {&quot;uri&quot;: &quot;test://doc&quot;}),
+    ]:
+        with self.subTest(method=method):
+            result = server.handle(request(method, params))[&quot;result&quot;]
+            self.assertIn(&quot;ttlMs&quot;, result, f&quot;{method} is missing ttlMs&quot;)
+            self.assertIn(&quot;cacheScope&quot;, result)
+            self.assertGreaterEqual(result[&quot;ttlMs&quot;], 0)
+            self.assertIn(result[&quot;cacheScope&quot;], (&quot;public&quot;, &quot;private&quot;))</code></pre>
+<p><code>subTest</code> means one failing method reports as one failure rather than aborting the loop, so you see all six.</p>
+</section>
+<section id="pagination-that-actually-terminates" class="level3">
+<h3>Pagination that actually terminates</h3>
+<pre class="python" data-language="python"><code>def test_pages_cover_everything_exactly_once(self):
+    server = tiny_server(page_size=7)
+    for i in range(30):
+        server.add_tool(_noop_tool(f&quot;t{i:02d}&quot;))
+
+    seen, cursor, pages = [], None, 0
+    while True:
+        params = {&quot;cursor&quot;: cursor} if cursor else {}
+        result = server.handle(request(&quot;tools/list&quot;, params))[&quot;result&quot;]
+        seen.extend(t[&quot;name&quot;] for t in result[&quot;tools&quot;])
+        pages += 1
+        cursor = result.get(&quot;nextCursor&quot;)
+        if not cursor:
+            break
+        self.assertLess(pages, 20, &quot;pagination did not terminate&quot;)
+
+    self.assertEqual(len(seen), 31)              # 30 plus the built-in `add`
+    self.assertEqual(len(seen), len(set(seen)))  # no duplicates</code></pre>
+<p>Three properties in one test: it terminates, it covers everything, and it duplicates nothing. Off-by-one cursor bugs fail one of the three and are otherwise invisible.</p>
+</section>
+<section id="the-error-taxonomy" class="level3">
+<h3>The error taxonomy</h3>
+<pre class="python" data-language="python"><code>def test_unknown_tool_is_a_protocol_error(self):
+    resp = tiny_server().handle(request(&quot;tools/call&quot;, {&quot;name&quot;: &quot;nope&quot;}))
+    self.assertIn(&quot;error&quot;, resp)
+
+def test_bad_business_input_is_a_tool_execution_error(self):
+    resp = build_server().handle(request(
+        &quot;tools/call&quot;,
+        {&quot;name&quot;: &quot;assess_account_risk&quot;, &quot;arguments&quot;: {&quot;accountId&quot;: &quot;ACC-9999&quot;}}))
+    self.assertNotIn(&quot;error&quot;, resp)
+    self.assertTrue(resp[&quot;result&quot;][&quot;isError&quot;])
+    # And it must be actionable, not just &quot;invalid&quot;.
+    self.assertIn(&quot;ACC-1000&quot;, resp[&quot;result&quot;][&quot;content&quot;][0][&quot;text&quot;])</code></pre>
+<p>That last assertion is unusual and I recommend it. It tests the <em>quality</em> of an error message, which is normally the kind of thing nobody tests and everybody regrets. If a refactor turns your helpful message into “not found”, the test fails.</p>
+</section>
+</section>
+<section id="the-build-start-to-finish" class="level2">
+<h2>The build, start to finish</h2>
+<p>Meridian’s risk server, in order:</p>
+<ol>
+<li><p><strong>Construct</strong>, with instructions written for a model rather than for a README.</p></li>
+<li><p><strong>Three tools</strong>, task-shaped: one account, many accounts, and the long-running one.</p></li>
+<li><p><strong>MRTR approval</strong> above the exposure threshold, with sealed state.</p></li>
+<li><p><strong>Resources</strong>: templated account summaries (private, 15 min), public filings (public, 24 h), a model card (public, 7 d), and the App template.</p></li>
+<li><p><strong>A versioned prompt.</strong></p></li>
+<li><p><strong>Tasks</strong>, installed as an extension.</p></li>
+<li><p><strong>Transports</strong>, dual-era by default.</p></li>
+</ol>
+<p>The whole file is around 500 lines including the HTML template, and the <code>instructions</code> string is worth calling out because it is the one piece of prose the model reads before deciding anything:</p>
+<pre class="python" data-language="python"><code>instructions=(
+    &quot;Credit risk scoring for commercial accounts. Start with &quot;
+    &quot;`assess_account_risk`; it returns a score, a band, and the factors &quot;
+    &quot;that drove it. For a portfolio view use `rank_portfolio_risk` &quot;
+    &quot;rather than calling the per-account tool in a loop.&quot;
+),</code></pre>
+<p>Two sentences, and the second one prevents the most expensive mistake a model can make against this server. That is a good return on 30 tokens.</p>
+</section>
+<section id="common-mistakes" class="level2">
+<h2>Common mistakes</h2>
+<table id="tab:server-mistakes">
+<caption>Everything here has happened. Most of them fail silently or intermittently, which is why they are worth a checklist.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Mistake</strong></td>
+<td style="text-align: left;"><strong>Symptom</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Printing to <code>stdout</code> on stdio</td>
+<td style="text-align: left;">Client reports a parse error it cannot attribute</td>
+</tr>
+<tr>
+<td style="text-align: left;">Per-process signing secret</td>
+<td style="text-align: left;">MRTR retries fail intermittently behind a load balancer</td>
+</tr>
+<tr>
+<td style="text-align: left;">Non-deterministic <code>tools/list</code> order</td>
+<td style="text-align: left;">Prompt-cache hit rate silently collapses</td>
+</tr>
+<tr>
+<td style="text-align: left;">Hand-maintained capability list</td>
+<td style="text-align: left;">Advertises prompts you deleted last quarter</td>
+</tr>
+<tr>
+<td style="text-align: left;">Protocol error for bad business input</td>
+<td style="text-align: left;">Model gives up instead of retrying with a valid id</td>
+</tr>
+<tr>
+<td style="text-align: left;">Advertising an unimplemented extension</td>
+<td style="text-align: left;">Client polls a <code>-32601</code> forever</td>
+</tr>
+<tr>
+<td style="text-align: left;">In-memory task store behind a balancer</td>
+<td style="text-align: left;">“Unknown task” on roughly <span class="math inline">1 − 1/<em>N</em></span> of polls</td>
+</tr>
+<tr>
+<td style="text-align: left;">No idempotency key on a mutating tool</td>
+<td style="text-align: left;">A retried stream charges the card twice</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="what-to-remember" class="level2">
+<h2>What to remember</h2>
+<ul>
+<li><p>A server is a pure function from request to response. No handshake, no session, no connection state.</p></li>
+<li><p>Validate <code>_meta</code> first, validate arguments at the edge, then let handlers trust their inputs.</p></li>
+<li><p>Identify yourself in every result. Default <code>resultType</code> centrally.</p></li>
+<li><p>Cross-call state is an opaque handle passed as an ordinary argument, and authorized on every use.</p></li>
+<li><p>Retries are routine. Mutating tools need an idempotency key.</p></li>
+<li><p>Derive capabilities from what is registered. Declare extensions only when you implement them.</p></li>
+<li><p>Filter by authorization, never by connection, and sort before you filter.</p></li>
+<li><p>On stdio, <code>stdout</code> is for MCP messages only.</p></li>
+<li><p>Sign MRTR state with a fleet-wide secret.</p></li>
+<li><p>Write contract tests that assert on the wire, including one that checks your error messages are actually helpful.</p></li>
+</ul>
+<p>Next: the other side of the connection, where the trust boundary lives.</p>
+</section>
+</section>
+<div class="pager">
+<a href="ch10.html"><span class="dir">Previous</span>MCP Apps: Interactive Interfaces</a>
+<a href="ch12.html" style="text-align:right"><span class="dir">Next</span>Building Hosts and Clients</a>
+</div>
+</main>
+</div>
+<script>
+(function(){
+  var nav = document.querySelector('nav.toc');
+  var btn = document.querySelector('.menu-btn');
+  if(btn && nav){
+    if(window.innerWidth <= 940) nav.classList.add('collapsed');
+    btn.addEventListener('click', function(){ nav.classList.toggle('collapsed'); });
+  }
+  // Wrap tables so wide ones scroll rather than overflowing the page.
+  document.querySelectorAll('main table').forEach(function(t){
+    if(t.parentElement.classList.contains('table-wrap')) return;
+    var w = document.createElement('div');
+    w.className = 'table-wrap';
+    t.parentNode.insertBefore(w, t);
+    w.appendChild(t);
+  });
+})();
+</script>
+</body>
+</html>
