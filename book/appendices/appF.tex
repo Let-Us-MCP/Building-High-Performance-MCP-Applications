@@ -1,0 +1,120 @@
+\chapter{Sources and Further Reading}
+\label{app:sources}
+
+Everything this book borrowed, and where to go next.
+
+\section{The specification itself}
+
+The normative source for everything in Part~I, and the thing to check when this
+book and your memory disagree.
+
+\begin{description}[leftmargin=1.4em, style=nextline, itemsep=4pt]
+\item[The MCP specification] \texttt{modelcontextprotocol.io/specification}.
+This book targets revision \texttt{2026-07-28} throughout. Older revisions stay
+published, which is useful when you meet a server that speaks one of them.
+\item[The schema] \texttt{schema/draft/schema.ts} in the specification
+repository. TypeScript declarations with the field-level comments that explain
+the defaults, and the fastest way to answer ``what exactly does this field
+mean''. Several tables in this book were built by reading it directly.
+\item[Extensions] \texttt{github.com/modelcontextprotocol/ext-apps} and
+\texttt{ext-auth}. Extensions version independently of core, so their
+repositories are the current source rather than the core specification.
+\item[The SEP archive] Specification Enhancement Proposals, in
+\texttt{docs/seps/}. These carry the \emph{reasoning}: SEP 2663 for the Tasks
+extension and SEP 1865 for MCP Apps both explain rejected alternatives, which is
+usually the part you want when a design looks arbitrary.
+\end{description}
+
+\section{The books this one is shaped by}
+
+\begin{description}[leftmargin=1.4em, style=nextline, itemsep=4pt]
+\item[\emph{High Performance Browser Networking}, Ilya Grigorik] O'Reilly, 2013,
+and free at \texttt{hpbn.co}. The structural model for this book: motivate with
+a measurement, define the terms properly, build the mechanism, then say what it
+costs. Chapter~\ref{ch:primer}'s ``speed is a feature'' framing is lifted
+directly, and the latency-and-bandwidth primer is still the clearest explanation
+of why round trips dominate.
+\item[\emph{Designing Data-Intensive Applications}, Martin Kleppmann] O'Reilly,
+2017. The reference for the distributed-systems half of Part~V: idempotency,
+retries, and why exactly-once delivery is a phrase to be suspicious of.
+\item[\emph{Release It!}, Michael Nygard] Pragmatic Bookshelf, 2nd edition 2018.
+Circuit breakers, bulkheads, and the failure patterns Chapter~\ref{ch:multi-agent}
+applies to agent delegation.
+\end{description}
+
+\section{Specific ideas this book borrows}
+
+Credit where it is owed, and where to read the original.
+
+\begin{description}[leftmargin=1.4em, style=nextline, itemsep=4pt]
+\item[The lethal trifecta] Simon Willison. Private data, untrusted content, and
+an exfiltration channel; any two are survivable and all three is a breach.
+Chapter~\ref{ch:threats} is organised around it because nothing else turns
+prompt-injection risk into questions with yes-or-no answers.
+\item[The confused deputy] Norm Hardy, ``The Confused Deputy'', ACM SIGOPS
+Operating Systems Review, 1988. The original is four pages about a compiler and
+a billing file, and it is worth reading precisely because the setting is so
+different from ours while the problem is identical.
+\item[Little's Law] John Little, 1961. $L = \lambda W$, used in
+Chapter~\ref{ch:operations} to size pools. It holds for any stable system
+regardless of distribution, which is why it survives contact with real traffic.
+\item[Full jitter] The AWS Architecture Blog's ``Exponential Backoff and
+Jitter'', which is where the specific variant in Chapter~\ref{ch:building-hosts}
+comes from, along with the measurements showing why the obvious alternatives are
+worse.
+\end{description}
+
+\section{The RFCs, and which parts you actually need}
+
+Chapter~\ref{ch:authorization} profiles a stack of these. In rough order of how
+often you will need to look one up:
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}llX@{}}
+\toprule
+\thead{RFC} & \thead{Subject} & \thead{Read it for} \\
+\midrule
+7636 & PKCE                        & Why an authorization code alone is not enough \\
+8707 & Resource indicators         & Audience binding, the confused-deputy fix \\
+9207 & Issuer identification       & The \texttt{iss} check that stops mix-up attacks \\
+9728 & Protected resource metadata & The one document your server must publish \\
+8693 & Token exchange              & Delegated authorization across agents \\
+6570 & URI templates               & Level 1 is all you need \\
+7591 & Dynamic client registration & Deprecated; read it to migrate off it \\
+\bottomrule
+\end{tabularx}
+\caption{The OAuth stack MCP profiles. None needs reading end to end.}
+\label{tab:rfcs}
+\end{table}
+
+Also load-bearing and not an RFC: \emph{W3C Trace Context}, which defines the
+\texttt{traceparent} format in Chapter~\ref{ch:building-hosts}, and \emph{JSON
+Schema 2020-12}, whose composition keywords are the reason
+Chapter~\ref{ch:tools} tells you to bound validation depth.
+
+\section{Tools worth having}
+
+\begin{description}[leftmargin=1.4em, style=nextline, itemsep=4pt]
+\item[The MCP Inspector] The official interactive client. First move when a
+server misbehaves and you cannot say why. Chapter~\ref{ch:testing} makes the
+case for turning everything you learn in it into a contract test.
+\item[The MCP Registry] \texttt{registry.modelcontextprotocol.io}. Public
+discovery, and a reminder that public means untrusted.
+\item[The official SDKs] TypeScript, Python, Go, Rust, Kotlin, and more. Meridian
+deliberately uses none of them, because the point was to show the wire. For
+anything real, use an SDK.
+\end{description}
+
+\section{On the prose}
+
+The writing owes a debt to Steve Yegge's blog, which established that technical
+writing can be long, opinionated, funny, and rigorous at the same time, and that
+the reader is a colleague rather than a student.
+
+The quality gates in \texttt{tools/} came out of trying to hold that line
+mechanically: \texttt{check\_contrastive.py} exists because a first draft leaned
+on ``X is not Y, it is Z'' 244 times, and \texttt{check\_listings.py} exists
+because the claim that every listing is real code deserved enforcement rather
+than good intentions. Appendix~\ref{ch:companion} covers running them.

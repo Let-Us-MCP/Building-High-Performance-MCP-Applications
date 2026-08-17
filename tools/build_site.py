@@ -103,6 +103,8 @@ def structure() -> list[Page]:
              None, "appendix"),
         Page("appendix-e", ap / "appE.tex", "E. The Meridian Companion Repository",
              None, "appendix"),
+        Page("appendix-f", ap / "appF.tex", "F. Sources and Further Reading",
+             None, "appendix"),
         Page("about", fm / "author.tex", "About the author", None, "front"),
     ]
 

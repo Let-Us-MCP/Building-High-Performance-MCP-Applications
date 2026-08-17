@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Contents &middot; Building Awesome MCP Apps</title>
-<meta name="description" content="What every AI application developer should know about the Model Context Protocol">
-<meta property="og:title" content="Contents">
-<meta property="og:description" content="What every AI application developer should know about the Model Context Protocol">
+<title>F. Sources and Further Reading &middot; Building Awesome MCP Apps</title>
+<meta name="description" content="F. Sources and Further Reading. What every AI application developer should know about the Model Context Protocol">
+<meta property="og:title" content="F. Sources and Further Reading">
+<meta property="og:description" content="F. Sources and Further Reading. What every AI application developer should know about the Model Context Protocol">
 <style>
 :root{
   --ink:#15181D; --muted:#5B6472; --rule:#D8DDE4; --wash:#F5F6F8;
@@ -168,58 +168,151 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <a href="appendix-c.html">C. Performance Checklist</a>
 <a href="appendix-d.html">D. Security Hardening Checklist</a>
 <a href="appendix-e.html">E. The Meridian Companion Repository</a>
-<a href="appendix-f.html">F. Sources and Further Reading</a>
+<a href="appendix-f.html" class="current">F. Sources and Further Reading</a>
 <a href="about.html">About the author</a>
 </div></nav>
 <main>
-
-<div class="masthead">
-  <p class="kicker">Protocol revision 2026-07-28</p>
-  <h1>Building Awesome MCP Apps</h1>
-  <p class="lede">What every AI application developer should know about the Model Context Protocol</p>
+<section id="app:sources" class="level1">
+<h1>Sources and Further Reading</h1>
+<p>Everything this book borrowed, and where to go next.</p>
+<section id="the-specification-itself" class="level2">
+<h2>The specification itself</h2>
+<p>The normative source for everything in Part I, and the thing to check when this book and your memory disagree.</p>
+<dl>
+<dt>The MCP specification</dt>
+<dd>
+<p><code>modelcontextprotocol.io/specification</code>. This book targets revision <code>2026-07-28</code> throughout. Older revisions stay published, which is useful when you meet a server that speaks one of them.</p>
+</dd>
+<dt>The schema</dt>
+<dd>
+<p><code>schema/draft/schema.ts</code> in the specification repository. TypeScript declarations with the field-level comments that explain the defaults, and the fastest way to answer “what exactly does this field mean”. Several tables in this book were built by reading it directly.</p>
+</dd>
+<dt>Extensions</dt>
+<dd>
+<p><code>github.com/modelcontextprotocol/ext-apps</code> and <code>ext-auth</code>. Extensions version independently of core, so their repositories are the current source rather than the core specification.</p>
+</dd>
+<dt>The SEP archive</dt>
+<dd>
+<p>Specification Enhancement Proposals, in <code>docs/seps/</code>. These carry the <em>reasoning</em>: SEP 2663 for the Tasks extension and SEP 1865 for MCP Apps both explain rejected alternatives, which is usually the part you want when a design looks arbitrary.</p>
+</dd>
+</dl>
+</section>
+<section id="the-books-this-one-is-shaped-by" class="level2">
+<h2>The books this one is shaped by</h2>
+<dl>
+<dt><em>High Performance Browser Networking</em>, Ilya Grigorik</dt>
+<dd>
+<p>O’Reilly, 2013, and free at <code>hpbn.co</code>. The structural model for this book: motivate with a measurement, define the terms properly, build the mechanism, then say what it costs. Chapter <a href="ch01.html#ch:primer">1</a>’s “speed is a feature” framing is lifted directly, and the latency-and-bandwidth primer is still the clearest explanation of why round trips dominate.</p>
+</dd>
+<dt><em>Designing Data-Intensive Applications</em>, Martin Kleppmann</dt>
+<dd>
+<p>O’Reilly, 2017. The reference for the distributed-systems half of Part V: idempotency, retries, and why exactly-once delivery is a phrase to be suspicious of.</p>
+</dd>
+<dt><em>Release It!</em>, Michael Nygard</dt>
+<dd>
+<p>Pragmatic Bookshelf, 2nd edition 2018. Circuit breakers, bulkheads, and the failure patterns Chapter <a href="ch14.html#ch:multi-agent">14</a> applies to agent delegation.</p>
+</dd>
+</dl>
+</section>
+<section id="specific-ideas-this-book-borrows" class="level2">
+<h2>Specific ideas this book borrows</h2>
+<p>Credit where it is owed, and where to read the original.</p>
+<dl>
+<dt>The lethal trifecta</dt>
+<dd>
+<p>Simon Willison. Private data, untrusted content, and an exfiltration channel; any two are survivable and all three is a breach. Chapter <a href="ch19.html#ch:threats">19</a> is organised around it because nothing else turns prompt-injection risk into questions with yes-or-no answers.</p>
+</dd>
+<dt>The confused deputy</dt>
+<dd>
+<p>Norm Hardy, “The Confused Deputy”, ACM SIGOPS Operating Systems Review, 1988. The original is four pages about a compiler and a billing file, and it is worth reading precisely because the setting is so different from ours while the problem is identical.</p>
+</dd>
+<dt>Little’s Law</dt>
+<dd>
+<p>John Little, 1961. <span class="math inline"><em>L</em> = <em>λ</em><em>W</em></span>, used in Chapter <a href="ch18.html#ch:operations">18</a> to size pools. It holds for any stable system regardless of distribution, which is why it survives contact with real traffic.</p>
+</dd>
+<dt>Full jitter</dt>
+<dd>
+<p>The AWS Architecture Blog’s “Exponential Backoff and Jitter”, which is where the specific variant in Chapter <a href="ch12.html#ch:building-hosts">12</a> comes from, along with the measurements showing why the obvious alternatives are worse.</p>
+</dd>
+</dl>
+</section>
+<section id="the-rfcs-and-which-parts-you-actually-need" class="level2">
+<h2>The RFCs, and which parts you actually need</h2>
+<p>Chapter <a href="ch04.html#ch:authorization">4</a> profiles a stack of these. In rough order of how often you will need to look one up:</p>
+<table id="tab:rfcs">
+<caption>The OAuth stack MCP profiles. None needs reading end to end.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>RFC</strong></td>
+<td style="text-align: left;"><strong>Subject</strong></td>
+<td style="text-align: left;"><strong>Read it for</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">7636</td>
+<td style="text-align: left;">PKCE</td>
+<td style="text-align: left;">Why an authorization code alone is not enough</td>
+</tr>
+<tr>
+<td style="text-align: left;">8707</td>
+<td style="text-align: left;">Resource indicators</td>
+<td style="text-align: left;">Audience binding, the confused-deputy fix</td>
+</tr>
+<tr>
+<td style="text-align: left;">9207</td>
+<td style="text-align: left;">Issuer identification</td>
+<td style="text-align: left;">The <code>iss</code> check that stops mix-up attacks</td>
+</tr>
+<tr>
+<td style="text-align: left;">9728</td>
+<td style="text-align: left;">Protected resource metadata</td>
+<td style="text-align: left;">The one document your server must publish</td>
+</tr>
+<tr>
+<td style="text-align: left;">8693</td>
+<td style="text-align: left;">Token exchange</td>
+<td style="text-align: left;">Delegated authorization across agents</td>
+</tr>
+<tr>
+<td style="text-align: left;">6570</td>
+<td style="text-align: left;">URI templates</td>
+<td style="text-align: left;">Level 1 is all you need</td>
+</tr>
+<tr>
+<td style="text-align: left;">7591</td>
+<td style="text-align: left;">Dynamic client registration</td>
+<td style="text-align: left;">Deprecated; read it to migrate off it</td>
+</tr>
+</tbody>
+</table>
+<p>Also load-bearing and not an RFC: <em>W3C Trace Context</em>, which defines the <code>traceparent</code> format in Chapter <a href="ch12.html#ch:building-hosts">12</a>, and <em>JSON Schema 2020-12</em>, whose composition keywords are the reason Chapter <a href="ch05.html#ch:tools">5</a> tells you to bound validation depth.</p>
+</section>
+<section id="tools-worth-having" class="level2">
+<h2>Tools worth having</h2>
+<dl>
+<dt>The MCP Inspector</dt>
+<dd>
+<p>The official interactive client. First move when a server misbehaves and you cannot say why. Chapter <a href="ch15.html#ch:testing">15</a> makes the case for turning everything you learn in it into a contract test.</p>
+</dd>
+<dt>The MCP Registry</dt>
+<dd>
+<p><code>registry.modelcontextprotocol.io</code>. Public discovery, and a reminder that public means untrusted.</p>
+</dd>
+<dt>The official SDKs</dt>
+<dd>
+<p>TypeScript, Python, Go, Rust, Kotlin, and more. Meridian deliberately uses none of them, because the point was to show the wire. For anything real, use an SDK.</p>
+</dd>
+</dl>
+</section>
+<section id="on-the-prose" class="level2">
+<h2>On the prose</h2>
+<p>The writing owes a debt to Steve Yegge’s blog, which established that technical writing can be long, opinionated, funny, and rigorous at the same time, and that the reader is a colleague rather than a student.</p>
+<p>The quality gates in <code>tools/</code> came out of trying to hold that line mechanically: <code>check_contrastive.py</code> exists because a first draft leaned on “X is not Y, it is Z” 244 times, and <code>check_listings.py</code> exists because the claim that every listing is real code deserved enforcement rather than good intentions. Appendix <a href="appendix-e.html#ch:companion">E</a> covers running them.</p>
+</section>
+</section>
+<div class="pager">
+<a href="appendix-e.html"><span class="dir">Previous</span>E. The Meridian Companion Repository</a>
+<a href="about.html" style="text-align:right"><span class="dir">Next</span>About the author</a>
 </div>
-
-<p>This is a protocol book that is secretly a performance book. It teaches the
-Model Context Protocol down to the bytes on the wire, then cashes that
-understanding out into the three budgets every agentic application spends:
-<strong>latency</strong>, <strong>context</strong>, and <strong>cost</strong>.</p>
-
-<p>Every listing comes from <a href="https://github.com/krimler/Building-Awesome-MCP-Apps">Meridian</a>, the instrumented
-reference application that ships with the book. Every number comes from its
-measurement harness. Both are reproducible with <code>make bench</code>.</p>
-
-<div class="cards">
-  <div class="card"><h3>20 chapters</h3>
-    <p>Five parts, from the physics of agent loops to threat modelling.</p></div>
-  <div class="card"><h3>134 tests</h3>
-    <p>A complete 2026-07-28 implementation with no third-party dependencies.</p></div>
-  <div class="card"><h3>Measured, not asserted</h3>
-    <p>Nine benchmark scenarios. Model inference is simulated and labelled.</p></div>
-  <div class="card"><h3>Runs with Claude Code</h3>
-    <p>A dual-era bridge, so it works with clients shipping today.</p></div>
-</div>
-
-<h2>Start here</h2>
-<ul>
-  <li><a href="preface.html">Preface</a>, for why this book exists.</li>
-  <li><a href="how-to-read.html">How to read this book</a>, for three routes through.</li>
-  <li><a href="ch01.html">Chapter 1</a>, the physics everything else rests on.</li>
-</ul>
-
-<h2>Contents</h2>
-<ul><li><a href="preface.html">Preface</a></li><li><a href="how-to-read.html">How to read this book</a></li></ul><h3>Part I. Protocol Fundamentals</h3><ul><li><a href="ch01.html">A Primer on Latency, Tokens, and Context</a></li><li><a href="ch02.html">The MCP Architectural Model</a></li><li><a href="ch03.html">Building Blocks of the Transport</a></li><li><a href="ch04.html">Authorization on the Wire</a></li></ul><h3>Part II. The Primitives</h3><ul><li><a href="ch05.html">Tools: The Execution Layer</a></li><li><a href="ch06.html">Resources: The Context Layer</a></li><li><a href="ch07.html">Prompts: Workflow Blueprints</a></li><li><a href="ch08.html">Multi Round-Trip Requests</a></li><li><a href="ch09.html">Extensions and Tasks</a></li><li><a href="ch10.html">MCP Apps: Interactive Interfaces</a></li></ul><h3>Part III. Building MCP Applications</h3><ul><li><a href="ch11.html">Building Servers</a></li><li><a href="ch12.html">Building Hosts and Clients</a></li><li><a href="ch13.html">The Agent Loop, State, and Memory</a></li><li><a href="ch14.html">Multi-Agent Topologies</a></li></ul><h3>Part IV. Performance Engineering</h3><ul><li><a href="ch15.html">Testing and Debugging</a></li><li><a href="ch16.html">Measuring MCP Applications</a></li><li><a href="ch17.html">Optimizing for Latency, Tokens, and Cost</a></li><li><a href="ch18.html">Deployment and Operations</a></li></ul><h3>Part V. Security and Trust</h3><ul><li><a href="ch19.html">Threat Modeling Agentic Applications</a></li><li><a href="ch20.html">Access Control, Audit, and MCP in the Enterprise</a></li></ul><h3>Back matter</h3><ul><li><a href="epilogue.html">Epilogue: The Evolving Protocol</a></li></ul><h3>Appendices</h3><ul><li><a href="appendix-a.html">A. Method and Message Reference</a></li><li><a href="appendix-b.html">B. Transport Decision Matrix</a></li><li><a href="appendix-c.html">C. Performance Checklist</a></li><li><a href="appendix-d.html">D. Security Hardening Checklist</a></li><li><a href="appendix-e.html">E. The Meridian Companion Repository</a></li><li><a href="appendix-f.html">F. Sources and Further Reading</a></li><li><a href="about.html">About the author</a></li></ul>
-
-<h2>The companion repository</h2>
-<pre class="text"><code>git clone https://github.com/krimler/Building-Awesome-MCP-Apps
-cd Building-Awesome-MCP-Apps
-
-make test      # 134 tests, about two seconds
-make bench     # every measurement printed in the book
-make book      # build the PDF</code></pre>
-
-<p><a href="https://github.com/krimler/Building-Awesome-MCP-Apps">Source on GitHub</a>
-&middot; <a href="Building-Awesome-MCP-Apps.pdf">Download the PDF</a></p>
-
 </main>
 </div>
 <script>

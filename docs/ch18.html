@@ -168,6 +168,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <a href="appendix-c.html">C. Performance Checklist</a>
 <a href="appendix-d.html">D. Security Hardening Checklist</a>
 <a href="appendix-e.html">E. The Meridian Companion Repository</a>
+<a href="appendix-f.html">F. Sources and Further Reading</a>
 <a href="about.html">About the author</a>
 </div></nav>
 <main>
@@ -440,6 +441,25 @@ CMD [&quot;python3&quot;, &quot;-m&quot;, &quot;meridian.serve&quot;, &quot;risk
 requests/second (mean)          x  fan-out width
                                 =  concurrent requests at the burst</code></pre>
 <p>Meridian at 100 tasks/second: 3 round trips each is 300 requests/second mean, and a fan-out of 3 means bursts of up to 900 concurrent. Provisioning for the mean gives you a service that falls over during every parallel fan-out, which is to say during every task.</p>
+<section id="littles-law-which-sizes-your-pools" class="level3">
+<h3>Little’s Law, which sizes your pools</h3>
+<p>That arithmetic has a name, and knowing it turns capacity planning from guesswork into a division.</p>
+<p>Little’s Law says that for any stable system, the average number of items inside it equals the arrival rate multiplied by the average time each spends inside:</p>
+<pre class="text" data-language="text"><code>L = lambda * W
+
+L       concurrent requests in flight
+lambda  arrival rate, requests per second
+W       average time in the system, seconds</code></pre>
+<p>It holds regardless of the arrival distribution, the service-time distribution, or the scheduling order. The only requirement is that the system is stable, which is to say arrivals are not outrunning departures. That generality is what makes it worth memorising.</p>
+<p>Now use it. Meridian’s compliance server handles 300 requests per second with a mean service time of 8 milliseconds:</p>
+<pre class="text" data-language="text"><code>L = 300 * 0.008 = 2.4 concurrent requests</code></pre>
+<p>Two and a half. A thread pool of 8 looks generous, and this is precisely how people arrive at a pool that collapses under a fan-out, because the mean is the wrong input. Substitute the burst instead: 900 concurrent arrivals at 8 milliseconds needs <span class="math inline">900 × 0.008 = 7.2</span>, and if a downstream dependency degrades and service time goes to 200 milliseconds, the same arrival rate needs <span class="math inline">900 × 0.2 = 180</span>.</p>
+<p>That last calculation is the important one, and it is why the “slow dependency” row in the load-test table exists. Concurrency requirements scale linearly with service time, so a dependency that gets 25 times slower needs 25 times the in-flight capacity to sustain the same throughput. A pool sized for the healthy case starts queueing, queueing adds latency, added latency raises <span class="math inline"><em>W</em></span>, and a higher <span class="math inline"><em>W</em></span> needs a bigger <span class="math inline"><em>L</em></span> than you have. That loop is what a congestion collapse looks like from the inside.</p>
+<p>Run the same division for every bounded resource in the path: worker threads, the HTTP connection pool from Chapter <a href="ch17.html#ch:optimizing">17</a>, database connections, and the file descriptors all three consume. The one you did not size is the one that fails first.</p>
+<aside class="keyidea">
+<p>Size pools with <span class="math inline"><em>L</em> = <em>λ</em><em>W</em></span>, using your burst arrival rate and your <em>degraded</em> service time. Sizing for the mean of both is how a service that looks comfortably provisioned falls over the first time something downstream gets slow.</p>
+</aside>
+</section>
 </section>
 <section id="load-testing-to-failure" class="level2">
 <h2>Load testing to failure</h2>

@@ -357,6 +357,59 @@ and a fan-out of 3 means bursts of up to 900 concurrent. Provisioning for the
 mean gives you a service that falls over during every parallel fan-out, which is
 to say during every task.
 
+\subsection{Little's Law, which sizes your pools}
+
+That arithmetic has a name, and knowing it turns capacity planning from
+guesswork into a division.
+
+Little's Law says that for any stable system, the average number of items inside
+it equals the arrival rate multiplied by the average time each spends inside:
+
+\begin{plain}
+L = lambda * W
+
+L       concurrent requests in flight
+lambda  arrival rate, requests per second
+W       average time in the system, seconds
+\end{plain}
+
+It holds regardless of the arrival distribution, the service-time distribution,
+or the scheduling order. The only requirement is that the system is stable, which
+is to say arrivals are not outrunning departures. That generality is what makes
+it worth memorising.
+
+Now use it. Meridian's compliance server handles 300 requests per second with a
+mean service time of 8 milliseconds:
+
+\begin{plain}
+L = 300 * 0.008 = 2.4 concurrent requests
+\end{plain}
+
+Two and a half. A thread pool of 8 looks generous, and this is precisely how
+people arrive at a pool that collapses under a fan-out, because the mean is the
+wrong input. Substitute the burst instead: 900 concurrent arrivals at 8
+milliseconds needs $900 \times 0.008 = 7.2$, and if a downstream dependency
+degrades and service time goes to 200 milliseconds, the same arrival rate needs
+$900 \times 0.2 = 180$.
+
+That last calculation is the important one, and it is why the ``slow dependency''
+row in the load-test table exists. Concurrency requirements scale linearly with
+service time, so a dependency that gets 25 times slower needs 25 times the
+in-flight capacity to sustain the same throughput. A pool sized for the healthy
+case starts queueing, queueing adds latency, added latency raises $W$, and a
+higher $W$ needs a bigger $L$ than you have. That loop is what a congestion
+collapse looks like from the inside.
+
+Run the same division for every bounded resource in the path: worker threads,
+the HTTP connection pool from Chapter~\ref{ch:optimizing}, database connections,
+and the file descriptors all three consume. The one you did not size is the one
+that fails first.
+
+\keyidea{Size pools with $L = \lambda W$, using your burst arrival rate and your
+\emph{degraded} service time. Sizing for the mean of both is how a service that
+looks comfortably provisioned falls over the first time something downstream
+gets slow.}
+
 \section{Load testing to failure}
 
 Do it before production does it for you, and test the right thing.
