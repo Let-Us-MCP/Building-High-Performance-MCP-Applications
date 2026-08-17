@@ -188,6 +188,7 @@ class Server:
         self._templates: list[ResourceTemplate] = []
         self._prompts: dict[str, Prompt] = {}
         self._extensions: dict[str, dict] = {}
+        self._completers: dict[tuple[str, str, str], Callable] = {}
         self._methods: dict[str, Callable[[RequestContext], Any]] = {}
         self._subscribers: list[Any] = []
         self._lock = threading.RLock()
@@ -252,6 +253,18 @@ class Server:
             self._prompts[prompt.name] = prompt
         return prompt
 
+    def completer(self, ref_type: str, ref_name: str, argument: str):
+        """Register an argument completer.
+
+        `ref_type` is "prompt" or "resource"; `ref_name` is the prompt name or
+        the URI template. The callable receives the partial value the user has
+        typed and the arguments already filled in, and returns candidates.
+        """
+        def deco(fn):
+            self._completers[(ref_type, ref_name, argument)] = fn
+            return fn
+        return deco
+
     def declare_extension(self, ident: str, settings: dict | None = None) -> None:
         """Advertise an extension. Declaring one you do not implement is lying,
         and the client will believe you."""
@@ -279,6 +292,8 @@ class Server:
             caps.resources = res
         if self._prompts:
             caps.prompts = {"listChanged": True} if self.list_changed else {}
+        if self._completers:
+            caps.completions = {}
         return caps
 
     # -- core methods -------------------------------------------------------
@@ -293,6 +308,7 @@ class Server:
             "resources/read": self._resources_read,
             "prompts/list": self._prompts_list,
             "prompts/get": self._prompts_get,
+            "completion/complete": self._completion_complete,
         })
 
     def _discover(self, ctx: RequestContext) -> dict:
@@ -437,6 +453,46 @@ class Server:
         if isinstance(result, dict) and "messages" in result:
             return result
         return {"description": prompt.description, "messages": result}
+
+    # -- completion ---------------------------------------------------------
+
+    MAX_COMPLETION_VALUES = 100
+
+    def _completion_complete(self, ctx: RequestContext) -> dict:
+        """Argument autocompletion for prompts and resource templates.
+
+        The response caps `values` at 100 by protocol rule and reports `total`
+        and `hasMore` separately, so a client can say "showing 100 of 4,312"
+        rather than implying the list is complete.
+        """
+        ref = ctx.params.get("ref") or {}
+        argument = ctx.params.get("argument") or {}
+        ref_type = str(ref.get("type", ""))
+        name = argument.get("name")
+        if ref_type not in ("ref/prompt", "ref/resource") or not name:
+            raise errors.InvalidParams(
+                "completion/complete needs a ref/prompt or ref/resource and an "
+                "argument name")
+
+        key = (ref_type.split("/", 1)[1],
+               ref.get("name") if ref_type == "ref/prompt" else ref.get("uri"),
+               name)
+        completer = self._completers.get(key)
+        if completer is None:
+            # An unknown argument is not an error. A client asks about
+            # everything the user types, and a server that raises here turns
+            # ordinary typing into a stream of error dialogs.
+            return {"completion": {"values": [], "total": 0, "hasMore": False}}
+
+        # Previously-filled arguments, so a completer can narrow on them.
+        context = (ctx.params.get("context") or {}).get("arguments") or {}
+        values = list(completer(str(argument.get("value", "")), context))
+        page = values[:self.MAX_COMPLETION_VALUES]
+        return {"completion": {
+            "values": page,
+            "total": len(values),
+            "hasMore": len(values) > len(page),
+        }}
 
     # -- dispatch -----------------------------------------------------------
 

@@ -15,7 +15,9 @@ simple. The interesting content is organisational.
 
 \section{Mechanics}
 
-Two methods, and you can guess both.
+Two methods for the primitive itself, and you can guess both. A third,
+\texttt{completion/complete}, exists to make them usable by a human, and
+\secref{prompt-completion} covers it.
 
 \begin{wire}
 {
@@ -66,13 +68,56 @@ And \texttt{prompts/get} returns messages, not a string:
 }
 \end{wire}
 
-Messages, plural, with roles. That matters more than it looks. A prompt is a conversation prefix. You can seed it with a user turn, an assistant turn demonstrating the desired shape, and another user turn,
-which is few-shot prompting delivered as a protocol primitive.
+Messages, plural, with roles. That matters more than it looks, and it is the
+first thing people leave on the table.
+
+A prompt is a conversation prefix. The host takes the messages you return and
+places them at the front of the model's context, exactly as though that
+conversation had already happened. Which means you can put words in the
+assistant's mouth. Return a user turn, an assistant turn showing precisely the
+shape of answer you want, and a second user turn with the real request, and you
+have delivered a few-shot example as a protocol primitive:
+
+\begin{wire}
+"messages": [
+  { "role": "user",
+    "content": { "type": "text", "text": "Review ACC-1001." } },
+  { "role": "assistant",
+    "content": { "type": "text", "text":
+      "Score 41 (moderate). Drivers: utilisation 0.62, 2 late payments in 12m.
+       Recommendation: renew at current limit." } },
+  { "role": "user",
+    "content": { "type": "text", "text": "Review ACC-1042." } }
+]
+\end{wire}
+
+The model has now seen the format, the length, the tone, and the fact that
+drivers get quoted numerically, without a single sentence of instructions
+describing any of that. Demonstration is denser than description, and it fails
+in gentler ways: a model that misreads an instruction produces something
+arbitrary, while a model that misreads an example produces something close to
+the example.
 
 Content blocks can be text, images, audio, resource links, or embedded
-resources. A prompt that embeds a resource is handing the model reference
-material and instructions in one round trip, which is a genuinely good use of
-the primitive.
+resources. That last one is worth a look, because it collapses two round trips
+into one:
+
+\begin{wire}
+{ "role": "user",
+  "content": {
+    "type": "resource",
+    "resource": {
+      "uri": "meridian://risk/model-card",
+      "mimeType": "text/markdown",
+      "text": "# Risk model v4.2\n\nScores are 1-99..."
+    } } }
+\end{wire}
+
+The alternative is a \texttt{resource\_link}, which names the resource and makes
+the model ask for it: cheaper if it does not want it, one extra round trip and
+one extra model turn if it does. Embed when the material is small and the
+workflow always needs it. Link when it is large or optional. A model card the
+prompt exists to apply is the first case; a 284-page filing is the second.
 
 \subsection{Prompts are user-controlled}
 
@@ -94,6 +139,97 @@ separate, and conflating them leads to the mistake of letting users edit prompt
 text, at which point you no longer have a standardised workflow, you have 40
 divergent ones and no way to tell which is in use.
 \end{notebox}
+
+\subsection{Completion, or: the slash command that fills itself in}
+\label{sec:prompt-completion}
+
+Here is the third method, and it is the difference between a prompt somebody
+uses and a prompt somebody abandons.
+
+Consider what \texttt{credit-review} demands of a user. It takes an
+\texttt{accountId}, and account ids look like \texttt{ACC-1042}. A user typing
+\texttt{/credit-review} has to know which account they want, in the server's
+identifier space, from memory. Most will go and look it up somewhere else, and
+some will give up.
+
+\texttt{completion/complete} closes that gap. As the user types, the client asks
+the server what the value could be:
+
+\begin{wire}
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "method": "completion/complete",
+  "params": {
+    "ref": { "type": "ref/prompt", "name": "credit-review" },
+    "argument": { "name": "accountId", "value": "ACC-10" }
+  }
+}
+\end{wire}
+
+\begin{wire}
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "result": {
+    "resultType": "complete",
+    "completion": {
+      "values": ["ACC-1000", "ACC-1001", "ACC-1002", "..."],
+      "total": 43,
+      "hasMore": true
+    }
+  }
+}
+\end{wire}
+
+Three fields in that response, and each does a job. \texttt{values} is capped at
+100 by the specification. \texttt{total} is how many there really are.
+\texttt{hasMore} says the cap was hit. Together they let a client render
+``showing 100 of 4,312'' rather than presenting a truncated list as though it
+were the whole world, which is the difference between a user narrowing their
+search and a user concluding their account does not exist.
+
+\texttt{ref} is either \texttt{ref/prompt} with a name, as above, or
+\texttt{ref/resource} with a URI template, which completes the variables in a
+template from Chapter~\ref{ch:resources}. Servers that offer any of this must
+declare the \texttt{completions} capability.
+
+Meridian's completer for account ids is four lines, and the comment is the part
+worth copying:
+
+\begin{py}
+@server.completer("prompt", "credit-review", "accountId")
+def complete_account_id(value: str, filled: dict) -> list[str]:
+    """Autocomplete account ids as the user types the slash command.
+
+    Prefix-matched and case-insensitive, because a user typing `acc-10`
+    means the same thing as `ACC-10` and being pedantic about it is how
+    completion menus end up empty.
+    """
+    prefix = value.strip().upper()
+    return sorted(a for a in ACCOUNTS if a.startswith(prefix))
+\end{py}
+
+Two implementation notes that are not obvious until the first user complains.
+
+\textbf{An unknown argument is not an error.} The client fires a completion
+request for whatever the user is typing, including arguments you never
+registered a completer for. Raising there converts ordinary typing into a stream
+of error dialogs. Return an empty list:
+
+\begin{py}
+if completer is None:
+    # An unknown argument is not an error. A client asks about
+    # everything the user types, and a server that raises here turns
+    # ordinary typing into a stream of error dialogs.
+    return {"completion": {"values": [], "total": 0, "hasMore": False}}
+\end{py}
+
+\textbf{Later arguments can narrow on earlier ones.} The request may carry a
+\texttt{context.arguments} object holding what the user has already filled in,
+so a completer for \texttt{facility} can offer only the facilities belonging to
+the account already chosen. Meridian passes it through to every completer, and
+a completer that does not care simply ignores it.
 
 \section{Why bother?}
 
@@ -167,11 +303,41 @@ which serialises as:
 }
 \end{wire}
 
-Note the prefix. \texttt{com.meridian/} is legal because its second label is
-\texttt{meridian}. Prefixes
-whose second label is either of those are reserved, so
-\texttt{com.mcp.tools/} is off limits and \texttt{com.example.mcp/} is fine. It
-is a rule that trips people, and Meridian encodes it:
+Note the prefix, because the rule governing it is precise and counter-intuitive.
+
+A \texttt{\_meta} key is an optional prefix followed by a name. The prefix is a
+series of dot-separated labels ending in a slash, conventionally reverse DNS, so
+\texttt{com.example/} rather than \texttt{example.com/}. Each label starts with
+a letter and ends with a letter or digit, with hyphens allowed inside.
+
+The reservation rule is this: any prefix whose \textbf{second label} is
+\texttt{modelcontextprotocol} or \texttt{mcp} belongs to the specification.
+Second label, counting from the left, which is the part people misread. Work
+through the examples:
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}llX@{}}
+\toprule
+\thead{Prefix} & \thead{Second label} & \thead{Verdict} \\
+\midrule
+\texttt{io.modelcontextprotocol/} & \texttt{modelcontextprotocol} & Reserved \\
+\texttt{dev.mcp/}                 & \texttt{mcp}                  & Reserved \\
+\texttt{org.modelcontextprotocol.api/} & \texttt{modelcontextprotocol} & Reserved \\
+\texttt{com.mcp.tools/}           & \texttt{mcp}                  & Reserved \\
+\texttt{com.example.mcp/}         & \texttt{example}              & Yours \\
+\texttt{com.meridian/}            & \texttt{meridian}             & Yours \\
+\bottomrule
+\end{tabularx}
+\caption{The reservation looks at the second label and nothing else. The last
+two rows contain \texttt{mcp} and are still yours.}
+\label{tab:meta-prefix-rule}
+\end{table}
+
+So \texttt{com.mcp.tools/} is off limits and \texttt{com.example.mcp/} is fine,
+which is exactly backwards from how most people guess. It is a rule that trips
+people, and Meridian encodes it:
 
 \begin{py}
 def test_second_label_is_what_counts(self):
@@ -371,6 +537,8 @@ Arguments are free; questions are not.
 
 \begin{itemize}[leftmargin=1.6em, itemsep=3pt]
 \item Prompts are user-controlled, usually surfaced as slash commands.
+\item \texttt{completion/complete} fills in their arguments. Unknown arguments
+return an empty list, never an error.
 \item They return \emph{messages} with roles, so few-shot examples are natural.
 \item Server-owned puts the workflow next to the expertise. That is the real
 argument.

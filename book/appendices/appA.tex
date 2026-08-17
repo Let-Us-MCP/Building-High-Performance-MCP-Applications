@@ -21,6 +21,7 @@ chapter covers something properly, it is cross-referenced rather than repeated.
 \texttt{resources/read}           & Resource contents                & no  & yes & \textbf{yes} \\
 \texttt{prompts/list}             & Available prompts                & yes & yes & no \\
 \texttt{prompts/get}              & Render a prompt                  & no  & no  & \textbf{yes} \\
+\texttt{completion/complete}      & Autocomplete an argument         & no  & no  & no \\
 \texttt{subscriptions/listen}     & Long-lived notification stream   & no  & no  & no \\
 \bottomrule
 \end{tabularx}
@@ -31,7 +32,7 @@ cursor pagination; ``Cache'' means results carry \texttt{ttlMs} and
 \label{tab:all-methods}
 \end{table}
 
-Nine methods. That is the entire core protocol.
+Ten methods. That is the entire core protocol.
 
 \subsection{Tasks extension (\texttt{io.modelcontextprotocol/tasks})}
 

@@ -181,7 +181,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <p>It is also the shortest chapter in Part II, because the mechanics really are simple. The interesting content is organisational.</p>
 <section id="mechanics" class="level2">
 <h2>Mechanics</h2>
-<p>Two methods, and you can guess both.</p>
+<p>Two methods for the primitive itself, and you can guess both. A third, <code>completion/complete</code>, exists to make them usable by a human, and <a href="#sec:prompt-completion">§7.1.2</a> covers it.</p>
 <pre class="json" data-language="json"><code>{
   &quot;jsonrpc&quot;: &quot;2.0&quot;,
   &quot;id&quot;: 1,
@@ -224,8 +224,29 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
     ]
   }
 }</code></pre>
-<p>Messages, plural, with roles. That matters more than it looks. A prompt is a conversation prefix. You can seed it with a user turn, an assistant turn demonstrating the desired shape, and another user turn, which is few-shot prompting delivered as a protocol primitive.</p>
-<p>Content blocks can be text, images, audio, resource links, or embedded resources. A prompt that embeds a resource is handing the model reference material and instructions in one round trip, which is a genuinely good use of the primitive.</p>
+<p>Messages, plural, with roles. That matters more than it looks, and it is the first thing people leave on the table.</p>
+<p>A prompt is a conversation prefix. The host takes the messages you return and places them at the front of the model’s context, exactly as though that conversation had already happened. Which means you can put words in the assistant’s mouth. Return a user turn, an assistant turn showing precisely the shape of answer you want, and a second user turn with the real request, and you have delivered a few-shot example as a protocol primitive:</p>
+<pre class="json" data-language="json"><code>&quot;messages&quot;: [
+  { &quot;role&quot;: &quot;user&quot;,
+    &quot;content&quot;: { &quot;type&quot;: &quot;text&quot;, &quot;text&quot;: &quot;Review ACC-1001.&quot; } },
+  { &quot;role&quot;: &quot;assistant&quot;,
+    &quot;content&quot;: { &quot;type&quot;: &quot;text&quot;, &quot;text&quot;:
+      &quot;Score 41 (moderate). Drivers: utilisation 0.62, 2 late payments in 12m.
+       Recommendation: renew at current limit.&quot; } },
+  { &quot;role&quot;: &quot;user&quot;,
+    &quot;content&quot;: { &quot;type&quot;: &quot;text&quot;, &quot;text&quot;: &quot;Review ACC-1042.&quot; } }
+]</code></pre>
+<p>The model has now seen the format, the length, the tone, and the fact that drivers get quoted numerically, without a single sentence of instructions describing any of that. Demonstration is denser than description, and it fails in gentler ways: a model that misreads an instruction produces something arbitrary, while a model that misreads an example produces something close to the example.</p>
+<p>Content blocks can be text, images, audio, resource links, or embedded resources. That last one is worth a look, because it collapses two round trips into one:</p>
+<pre class="json" data-language="json"><code>{ &quot;role&quot;: &quot;user&quot;,
+  &quot;content&quot;: {
+    &quot;type&quot;: &quot;resource&quot;,
+    &quot;resource&quot;: {
+      &quot;uri&quot;: &quot;meridian://risk/model-card&quot;,
+      &quot;mimeType&quot;: &quot;text/markdown&quot;,
+      &quot;text&quot;: &quot;# Risk model v4.2\n\nScores are 1-99...&quot;
+    } } }</code></pre>
+<p>The alternative is a <code>resource_link</code>, which names the resource and makes the model ask for it: cheaper if it does not want it, one extra round trip and one extra model turn if it does. Embed when the material is small and the workflow always needs it. Link when it is large or optional. A model card the prompt exists to apply is the first case; a 284-page filing is the second.</p>
 <section id="prompts-are-user-controlled" class="level3">
 <h3>Prompts are user-controlled</h3>
 <p>The third control axis, and the one that completes the set:</p>
@@ -238,6 +259,54 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <aside class="box note"><p class="box-title">“User-controlled” refers to invocation</p>
 <p>The server writes the prompt. The user chooses when to fire it. Those are separate, and conflating them leads to the mistake of letting users edit prompt text, at which point you no longer have a standardised workflow, you have 40 divergent ones and no way to tell which is in use.</p>
 </aside>
+</section>
+<section id="sec:prompt-completion" class="level3">
+<h3>Completion, or: the slash command that fills itself in</h3>
+<p>Here is the third method, and it is the difference between a prompt somebody uses and a prompt somebody abandons.</p>
+<p>Consider what <code>credit-review</code> demands of a user. It takes an <code>accountId</code>, and account ids look like <code>ACC-1042</code>. A user typing <code>/credit-review</code> has to know which account they want, in the server’s identifier space, from memory. Most will go and look it up somewhere else, and some will give up.</p>
+<p><code>completion/complete</code> closes that gap. As the user types, the client asks the server what the value could be:</p>
+<pre class="json" data-language="json"><code>{
+  &quot;jsonrpc&quot;: &quot;2.0&quot;,
+  &quot;id&quot;: 7,
+  &quot;method&quot;: &quot;completion/complete&quot;,
+  &quot;params&quot;: {
+    &quot;ref&quot;: { &quot;type&quot;: &quot;ref/prompt&quot;, &quot;name&quot;: &quot;credit-review&quot; },
+    &quot;argument&quot;: { &quot;name&quot;: &quot;accountId&quot;, &quot;value&quot;: &quot;ACC-10&quot; }
+  }
+}</code></pre>
+<pre class="json" data-language="json"><code>{
+  &quot;jsonrpc&quot;: &quot;2.0&quot;,
+  &quot;id&quot;: 7,
+  &quot;result&quot;: {
+    &quot;resultType&quot;: &quot;complete&quot;,
+    &quot;completion&quot;: {
+      &quot;values&quot;: [&quot;ACC-1000&quot;, &quot;ACC-1001&quot;, &quot;ACC-1002&quot;, &quot;...&quot;],
+      &quot;total&quot;: 43,
+      &quot;hasMore&quot;: true
+    }
+  }
+}</code></pre>
+<p>Three fields in that response, and each does a job. <code>values</code> is capped at 100 by the specification. <code>total</code> is how many there really are. <code>hasMore</code> says the cap was hit. Together they let a client render “showing 100 of 4,312” rather than presenting a truncated list as though it were the whole world, which is the difference between a user narrowing their search and a user concluding their account does not exist.</p>
+<p><code>ref</code> is either <code>ref/prompt</code> with a name, as above, or <code>ref/resource</code> with a URI template, which completes the variables in a template from Chapter <a href="ch06.html#ch:resources">6</a>. Servers that offer any of this must declare the <code>completions</code> capability.</p>
+<p>Meridian’s completer for account ids is four lines, and the comment is the part worth copying:</p>
+<pre class="python" data-language="python"><code>@server.completer(&quot;prompt&quot;, &quot;credit-review&quot;, &quot;accountId&quot;)
+def complete_account_id(value: str, filled: dict) -&gt; list[str]:
+    &quot;&quot;&quot;Autocomplete account ids as the user types the slash command.
+
+    Prefix-matched and case-insensitive, because a user typing `acc-10`
+    means the same thing as `ACC-10` and being pedantic about it is how
+    completion menus end up empty.
+    &quot;&quot;&quot;
+    prefix = value.strip().upper()
+    return sorted(a for a in ACCOUNTS if a.startswith(prefix))</code></pre>
+<p>Two implementation notes that are not obvious until the first user complains.</p>
+<p><strong>An unknown argument is not an error.</strong> The client fires a completion request for whatever the user is typing, including arguments you never registered a completer for. Raising there converts ordinary typing into a stream of error dialogs. Return an empty list:</p>
+<pre class="python" data-language="python"><code>if completer is None:
+    # An unknown argument is not an error. A client asks about
+    # everything the user types, and a server that raises here turns
+    # ordinary typing into a stream of error dialogs.
+    return {&quot;completion&quot;: {&quot;values&quot;: [], &quot;total&quot;: 0, &quot;hasMore&quot;: False}}</code></pre>
+<p><strong>Later arguments can narrow on earlier ones.</strong> The request may carry a <code>context.arguments</code> object holding what the user has already filled in, so a completer for <code>facility</code> can offer only the facilities belonging to the account already chosen. Meridian passes it through to every completer, and a completer that does not care simply ignores it.</p>
 </section>
 </section>
 <section id="why-bother" class="level2">
@@ -285,7 +354,50 @@ def credit_review(ctx: RequestContext, args: dict):
   &quot;arguments&quot;: [...],
   &quot;_meta&quot;: { &quot;com.meridian/promptVersion&quot;: &quot;3.2.0&quot; }
 }</code></pre>
-<p>Note the prefix. <code>com.meridian/</code> is legal because its second label is <code>meridian</code>. Prefixes whose second label is either of those are reserved, so <code>com.mcp.tools/</code> is off limits and <code>com.example.mcp/</code> is fine. It is a rule that trips people, and Meridian encodes it:</p>
+<p>Note the prefix, because the rule governing it is precise and counter-intuitive.</p>
+<p>A <code>_meta</code> key is an optional prefix followed by a name. The prefix is a series of dot-separated labels ending in a slash, conventionally reverse DNS, so <code>com.example/</code> rather than <code>example.com/</code>. Each label starts with a letter and ends with a letter or digit, with hyphens allowed inside.</p>
+<p>The reservation rule is this: any prefix whose <strong>second label</strong> is <code>modelcontextprotocol</code> or <code>mcp</code> belongs to the specification. Second label, counting from the left, which is the part people misread. Work through the examples:</p>
+<table id="tab:meta-prefix-rule">
+<caption>The reservation looks at the second label and nothing else. The last two rows contain <code>mcp</code> and are still yours.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Prefix</strong></td>
+<td style="text-align: left;"><strong>Second label</strong></td>
+<td style="text-align: left;"><strong>Verdict</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>io.modelcontextprotocol/</code></td>
+<td style="text-align: left;"><code>modelcontextprotocol</code></td>
+<td style="text-align: left;">Reserved</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>dev.mcp/</code></td>
+<td style="text-align: left;"><code>mcp</code></td>
+<td style="text-align: left;">Reserved</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>org.modelcontextprotocol.api/</code></td>
+<td style="text-align: left;"><code>modelcontextprotocol</code></td>
+<td style="text-align: left;">Reserved</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>com.mcp.tools/</code></td>
+<td style="text-align: left;"><code>mcp</code></td>
+<td style="text-align: left;">Reserved</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>com.example.mcp/</code></td>
+<td style="text-align: left;"><code>example</code></td>
+<td style="text-align: left;">Yours</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>com.meridian/</code></td>
+<td style="text-align: left;"><code>meridian</code></td>
+<td style="text-align: left;">Yours</td>
+</tr>
+</tbody>
+</table>
+<p>So <code>com.mcp.tools/</code> is off limits and <code>com.example.mcp/</code> is fine, which is exactly backwards from how most people guess. It is a rule that trips people, and Meridian encodes it:</p>
 <pre class="python" data-language="python"><code>def test_second_label_is_what_counts(self):
     self.assertFalse(is_reserved_meta_key(&quot;com.example.mcp/x&quot;))
     self.assertFalse(is_reserved_meta_key(&quot;com.example/x&quot;))</code></pre>
@@ -430,6 +542,7 @@ Good:  &quot;[800 tokens of standing policy...] Now review ACC-1042.&quot;</code
 <h2>What to remember</h2>
 <ul>
 <li><p>Prompts are user-controlled, usually surfaced as slash commands.</p></li>
+<li><p><code>completion/complete</code> fills in their arguments. Unknown arguments return an empty list, never an error.</p></li>
 <li><p>They return <em>messages</em> with roles, so few-shot examples are natural.</p></li>
 <li><p>Server-owned puts the workflow next to the expertise. That is the real argument.</p></li>
 <li><p>Version them with a vendor-prefixed <code>_meta</code> key. Note the rule about which prefixes are reserved.</p></li>

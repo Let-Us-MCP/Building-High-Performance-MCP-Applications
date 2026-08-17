@@ -414,6 +414,24 @@ def build_server(*, fat_catalogue: bool = False) -> Server:
             }
         ]
 
+    # ---------------------------------------------------------- completions
+
+    @server.completer("prompt", "credit-review", "accountId")
+    def complete_account_id(value: str, filled: dict) -> list[str]:
+        """Autocomplete account ids as the user types the slash command.
+
+        Prefix-matched and case-insensitive, because a user typing `acc-10`
+        means the same thing as `ACC-10` and being pedantic about it is how
+        completion menus end up empty.
+        """
+        prefix = value.strip().upper()
+        return sorted(a for a in ACCOUNTS if a.startswith(prefix))
+
+    @server.completer("prompt", "credit-review", "audience")
+    def complete_audience(value: str, filled: dict) -> list[str]:
+        return [a for a in ("committee", "relationship-manager")
+                if a.startswith(value.lower())]
+
     return server
 
 

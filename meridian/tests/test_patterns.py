@@ -299,5 +299,69 @@ class TestOps(unittest.TestCase):
         self.assertEqual(cap.burst_concurrency, 900)
 
 
+class TestCompletions(unittest.TestCase):
+    """completion/complete: the method that makes slash commands usable."""
+
+    def setUp(self):
+        self.server = risk.build_server()
+
+    def complete(self, argument, value, context=None):
+        params = {
+            "ref": {"type": "ref/prompt", "name": "credit-review"},
+            "argument": {"name": argument, "value": value},
+            "_meta": build_request_meta(ClientCapabilities()),
+        }
+        if context is not None:
+            params["context"] = {"arguments": context}
+        resp = self.server.handle({"jsonrpc": "2.0", "id": 1,
+                                   "method": "completion/complete",
+                                   "params": params})
+        return resp["result"]["completion"]
+
+    def test_capability_is_declared_when_completers_exist(self):
+        caps = self.server.capabilities().to_json()
+        self.assertIn("completions", caps)
+
+    def test_prefix_match(self):
+        out = self.complete("accountId", "ACC-10")
+        self.assertTrue(out["values"])
+        self.assertTrue(all(v.startswith("ACC-10") for v in out["values"]))
+
+    def test_matching_is_case_insensitive(self):
+        self.assertEqual(self.complete("accountId", "acc-10")["values"],
+                         self.complete("accountId", "ACC-10")["values"])
+
+    def test_unknown_argument_is_empty_not_an_error(self):
+        """A client asks about everything the user types."""
+        out = self.complete("nosuchargument", "x")
+        self.assertEqual(out["values"], [])
+        self.assertFalse(out["hasMore"])
+
+    def test_values_are_capped_and_total_is_honest(self):
+        """A capped list must not look like a complete one."""
+        server = self.server
+        server._completers[("prompt", "credit-review", "many")] = (
+            lambda value, filled: [f"v{i}" for i in range(250)])
+        out = self.complete("many", "")
+        self.assertEqual(len(out["values"]), server.MAX_COMPLETION_VALUES)
+        self.assertEqual(out["total"], 250)
+        self.assertTrue(out["hasMore"])
+
+    def test_context_is_passed_to_the_completer(self):
+        seen = {}
+        self.server._completers[("prompt", "credit-review", "probe")] = (
+            lambda value, filled: seen.update(filled) or ["ok"])
+        self.complete("probe", "", context={"accountId": "ACC-1000"})
+        self.assertEqual(seen, {"accountId": "ACC-1000"})
+
+    def test_bad_ref_type_is_invalid_params(self):
+        resp = self.server.handle({
+            "jsonrpc": "2.0", "id": 1, "method": "completion/complete",
+            "params": {"ref": {"type": "ref/nonsense"},
+                       "argument": {"name": "accountId", "value": ""},
+                       "_meta": build_request_meta(ClientCapabilities())}})
+        self.assertEqual(resp["error"]["code"], -32602)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
