@@ -224,7 +224,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
     ]
   }
 }</code></pre>
-<p>Messages, plural, with roles. That matters more than it looks. A prompt is a conversation prefix, not a string you interpolate. You can seed it with a user turn, an assistant turn demonstrating the desired shape, and another user turn, which is few-shot prompting delivered as a protocol primitive.</p>
+<p>Messages, plural, with roles. That matters more than it looks. A prompt is a conversation prefix. You can seed it with a user turn, an assistant turn demonstrating the desired shape, and another user turn, which is few-shot prompting delivered as a protocol primitive.</p>
 <p>Content blocks can be text, images, audio, resource links, or embedded resources. A prompt that embeds a resource is handing the model reference material and instructions in one round trip, which is a genuinely good use of the primitive.</p>
 <section id="prompts-are-user-controlled" class="level3">
 <h3>Prompts are user-controlled</h3>
@@ -235,7 +235,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <li><p>Prompts are <strong>user</strong>-controlled. A person picks one.</p></li>
 </ul>
 <p>In practice that usually means slash commands. The user types <code>/</code> and gets a list of the prompts every connected server offers. That is the whole UX pattern, and it is why prompt names should read like commands.</p>
-<aside class="box note"><p class="box-title">“User-controlled” is about invocation, not authorship</p>
+<aside class="box note"><p class="box-title">“User-controlled” refers to invocation</p>
 <p>The server writes the prompt. The user chooses when to fire it. Those are separate, and conflating them leads to the mistake of letting users edit prompt text, at which point you no longer have a standardised workflow, you have 40 divergent ones and no way to tell which is in use.</p>
 </aside>
 </section>
@@ -285,7 +285,7 @@ def credit_review(ctx: RequestContext, args: dict):
   &quot;arguments&quot;: [...],
   &quot;_meta&quot;: { &quot;com.meridian/promptVersion&quot;: &quot;3.2.0&quot; }
 }</code></pre>
-<p>Note the prefix. <code>com.meridian/</code> is legal because the second label is <code>meridian</code>, not <code>modelcontextprotocol</code> or <code>mcp</code>. Prefixes whose second label is either of those are reserved, so <code>com.mcp.tools/</code> is off limits and <code>com.example.mcp/</code> is fine. It is a rule that trips people, and Meridian encodes it:</p>
+<p>Note the prefix. <code>com.meridian/</code> is legal because its second label is <code>meridian</code>. Prefixes whose second label is either of those are reserved, so <code>com.mcp.tools/</code> is off limits and <code>com.example.mcp/</code> is fine. It is a rule that trips people, and Meridian encodes it:</p>
 <pre class="python" data-language="python"><code>def test_second_label_is_what_counts(self):
     self.assertFalse(is_reserved_meta_key(&quot;com.example.mcp/x&quot;))
     self.assertFalse(is_reserved_meta_key(&quot;com.example/x&quot;))</code></pre>
@@ -378,7 +378,7 @@ def credit_review(ctx: RequestContext, args: dict):
 </tr>
 </tbody>
 </table>
-<p>Measured with the character-based estimator in <code>meridian/host/model.py</code>. Small, which is the point: unlike tool descriptions, a rendered prompt is paid once per invocation rather than on every turn.</p>
+<p>Measured with the character-based estimator in <code>meridian/host/model.py</code>. Small, which is the point. A rendered prompt is paid for once, at the moment somebody invokes it, and tool descriptions are paid for on every turn.</p>
 </aside>
 <p>That asymmetry is worth stating clearly, because it changes the advice.</p>
 <p>Tool descriptions are in context on <em>every turn</em> of <em>every task</em>, whether used or not. A rendered prompt enters context once, when the user asks for it. So the pressure to compress is far lower, and a prompt that spends 200 tokens buying a more reliable workflow is usually a good trade.</p>
@@ -409,13 +409,13 @@ Good:  &quot;[800 tokens of standing policy...] Now review ACC-1042.&quot;</code
     },
 }]</code></pre>
 <p>Four things it does, each deliberate:</p>
-<p><strong>Names the tool to call.</strong> Not “review the transaction” but “call <code>review_transaction</code>”. Removes a planning step and a chance to guess wrong.</p>
+<p><strong>Names the tool to call.</strong> It says “call <code>review_transaction</code>”, with the exact identifier. That removes a planning step and a chance to guess wrong.</p>
 <p><strong>Says “exactly”.</strong> Compliance outcomes must not be paraphrased. This is a domain constraint the host could not know.</p>
-<p><strong>Inoculates against injection.</strong> That sentence about guidance being data rather than instructions is defence in depth, sitting in the blueprint where it belongs. It is not sufficient on its own (Chapter <a href="ch19.html#ch:threats">19</a> is emphatic about that) but it is free and it raises the bar.</p>
+<p><strong>Inoculates against injection.</strong> That sentence about treating guidance as data is defence in depth, sitting in the blueprint where it belongs. It is not sufficient on its own (Chapter <a href="ch19.html#ch:threats">19</a> is emphatic about that) but it is free and it raises the bar.</p>
 <p><strong>Bounds the output.</strong> “Three sentences.” Predictable length, predictable cost, and a report somebody will actually read.</p>
 <section id="anti-patterns" class="level3">
 <h3>Anti-patterns</h3>
-<p><strong>Prompt sprawl.</strong> Twelve prompts that differ in one clause each. Use arguments. Meridian’s <code>credit-review</code> takes an <code>audience</code> argument rather than shipping <code>credit-review-committee</code> and <code>credit-review-rm</code>.</p>
+<p><strong>Prompt sprawl.</strong> Twelve prompts that differ in one clause each. Use arguments. Meridian’s <code>credit-review</code> takes an <code>audience</code> argument, which collapses <code>credit-review-committee</code> and <code>credit-review-rm</code> into one entry.</p>
 <p><strong>Business logic buried in prose.</strong> If the prompt says “if exposure is over five million, require approval”, that threshold now lives in an English sentence where it cannot be tested, audited, or changed with confidence. Put it in the tool, where Meridian has it, and let the tool enforce it via MRTR.</p>
 <p><strong>Unversioned templates.</strong> Covered above. Cheap to fix, painful to retrofit.</p>
 <p><strong>Prompts that duplicate tool descriptions.</strong> If your prompt explains what <code>assess_account_risk</code> does, you are paying for that explanation twice and the two copies will diverge.</p>
@@ -424,7 +424,7 @@ Good:  &quot;[800 tokens of standing policy...] Now review ACC-1042.&quot;</code
 <section id="mrtr-in-promptsget" class="level2">
 <h2>MRTR in <code>prompts/get</code></h2>
 <p>One mechanical detail before we move on. <code>prompts/get</code> is one of the three methods that may return <code>resultType: "input_required"</code>, alongside <code>tools/call</code> and <code>resources/read</code>.</p>
-<p>So a prompt can ask a question before it renders. “Which fiscal year?” before producing a review template. Chapter <a href="ch08.html#ch:mrtr">8</a> covers the mechanism in full, and the cost analysis there applies unchanged: an elicitation here costs a round trip plus a model turn, so gathering it as a prompt <em>argument</em> is nearly always better. Arguments are free; questions are not.</p>
+<p>So a prompt can ask a question before it renders. “Which fiscal year?” before producing a review template. The exchange runs the way it runs everywhere else: the server answers with a question and a token identifying the paused work, the client puts the question to the user, the client repeats its <code>prompts/get</code> with the answer attached. Chapter <a href="ch08.html#ch:mrtr">8</a> builds that end to end. The cost is the same too, a round trip plus a model turn, so gathering the value as a prompt <em>argument</em> is nearly always better. Arguments are free; questions are not.</p>
 </section>
 <section id="what-to-remember" class="level2">
 <h2>What to remember</h2>
@@ -434,9 +434,9 @@ Good:  &quot;[800 tokens of standing policy...] Now review ACC-1042.&quot;</code
 <li><p>Server-owned puts the workflow next to the expertise. That is the real argument.</p></li>
 <li><p>Version them with a vendor-prefixed <code>_meta</code> key. Note the rule about which prefixes are reserved.</p></li>
 <li><p>Test structurally first, deterministically second, with evals last.</p></li>
-<li><p>Rendered prompts cost once per invocation, unlike tool descriptions. Compress the list response, not the template.</p></li>
+<li><p>Rendered prompts cost once per invocation, and tool descriptions cost every turn. Compress the list response; leave the template alone.</p></li>
 <li><p>Stable content first, variable content last, for prompt-cache hits.</p></li>
-<li><p>Name the tools, bound the output, and keep thresholds in code rather than in prose.</p></li>
+<li><p>Name the tools, bound the output, and keep thresholds in code where they can be tested.</p></li>
 </ul>
 <p>Next: multi round-trip requests, which is the largest single change in the 2026 revision and the one with the clearest price tag.</p>
 </section>

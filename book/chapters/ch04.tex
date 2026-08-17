@@ -25,8 +25,8 @@ around it, taking a deliberately small subset. The roles map cleanly:
 validates them. It does not issue them.
 \item[The MCP client is an OAuth client.] It obtains tokens on behalf of a user.
 \item[The authorization server is somebody else's problem.] Entra ID, Okta,
-Keycloak, or your own. MCP specifies how a client \emph{finds} it, not how it
-works.
+Keycloak, or your own. MCP specifies how a client \emph{finds} it and says nothing about its
+internals.
 \end{description}
 
 Two scoping rules before we go further.
@@ -106,8 +106,8 @@ Token exchange                       & 1 & 80\,ms \\
 
 \vspace{6pt}
 \footnotesize
-Modelled at 40\,ms per hop, not measured; Meridian's benchmark auth is local and
-would flatter these badly. The number that matters is the round-trip count,
+Modelled at 40\,ms per hop. Meridian's benchmark auth runs locally and would
+flatter these badly, so these are estimates. The number that matters is the round-trip count,
 which is exact.
 \end{measurebox}
 
@@ -116,9 +116,9 @@ built something unusable. If you pay it once per session and cache aggressively,
 it disappears. That is the entire performance content of this chapter, and it is
 worth stating as a rule:
 
-\keyidea{Steps 1 through 3 are properties of the server, not of the request.
-Cache them per origin, for hours. The token is a property of the user and the
-scope set. Cache it until it expires, and refresh it before it does, not after.}
+\keyidea{Steps 1 through 3 are properties of the server, so cache them per
+origin, for hours. The token is a property of the user and the scope set, so
+cache it until it expires. Refresh it while it still works.}
 
 \section{Client identity in 2026}
 
@@ -207,7 +207,8 @@ and it fails in confusing ways.
 
 \section{Two validations that stop real attacks}
 
-Most of OAuth's complexity is scar tissue. Two pieces of it are worth understanding, not merely implementing.
+Most of OAuth's complexity is scar tissue. Two pieces of it are worth understanding in detail, because both fail silently
+when you get them wrong.
 
 \subsection{Audience binding, or: do not be a confused deputy}
 
@@ -354,9 +355,8 @@ def call_with_reauth(self, name, arguments, *, max_attempts=2):
     raise Unauthorized("re-authentication did not help")
 \end{py}
 
-Better still, do not get there. Refresh proactively when a token is within some
-margin of expiry, so the refresh happens between loop iterations rather than
-inside one.
+Better still, do not get there. Refresh proactively when a token is within some margin of expiry, so the
+refresh happens between loop iterations and never in the middle of one.
 
 \begin{table}[htbp]
 \centering
@@ -499,8 +499,7 @@ accept or forward a token issued for somebody else.
 comparison and no normalisation, including on error responses.
 \item Challenge with all the scopes an operation needs at once; step up with the
 union, never the difference.
-\item Expired tokens are a recoverable interruption, not a failed task. Bound
-your retries.
+\item Treat an expired token as a recoverable interruption. Bound your retries.
 \item Tool visibility may vary by authorization, never by connection.
 \end{itemize}
 

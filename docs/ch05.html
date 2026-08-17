@@ -204,7 +204,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
     &quot;cacheScope&quot;: &quot;public&quot;
   }
 }</code></pre>
-<p>Three fields at the bottom that did not exist in 2025 and matter a great deal. <code>nextCursor</code> means catalogues paginate. <code>ttlMs</code> and <code>cacheScope</code> mean the client can stop asking. Chapter <a href="ch06.html#ch:resources">6</a> covers the caching model; here the relevant fact is that a well-behaved client fetches your catalogue once per TTL, not once per task.</p>
+<p>Three fields at the bottom that did not exist in 2025 and matter a great deal. <code>nextCursor</code> means catalogues paginate. <code>ttlMs</code> and <code>cacheScope</code> mean the client can stop asking. Chapter <a href="ch06.html#ch:resources">6</a> covers the caching model; here the relevant fact is that a well-behaved client fetches your catalogue once per TTL and reuses it across every task in that window.</p>
 <p>There is also a requirement that reads like a footnote and is not:</p>
 <aside class="keyidea">
 <p>Return tools in a deterministic order. The same order, every time, when the underlying set has not changed. Unstable ordering silently destroys the provider’s prompt cache, and nothing in your telemetry will tell you.</p>
@@ -300,11 +300,11 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </table>
 <p>Meridian, four servers, measured by <code>make bench</code>. The task-shaped catalogue does strictly more useful work.</p>
 </aside>
-<p>Twenty-six dollars per thousand tasks, for nothing. And that is only the money. The real damage is upstream: the model now chooses among 38 similar options instead of 10 distinct ones, and selection accuracy falls, and a wrong choice costs a whole extra loop iteration to detect and recover from.</p>
+<p>Twenty-six dollars per thousand tasks, for nothing. And that is only the money. The real damage is upstream: the model now chooses among 38 similar options where it used to choose among 10 distinct ones, selection accuracy falls, and a wrong choice costs a whole extra loop iteration to detect and recover from.</p>
 <p>Why does the REST shape fail? Because REST is organised around <em>resources and verbs</em>, and a planner reasons in <em>tasks and outcomes</em>. To answer “is this account risky”, a model given a REST mirror must plan: get the account, list its exposures, list its covenants, fetch the rating, then combine. Five round trips, five model turns, five chances to go wrong.</p>
 <p>Given a task-shaped tool it calls <code>assess_account_risk</code> once.</p>
 <aside class="keyidea">
-<p>Design tools for the plan, not for the database. The right question is not “what are my entities”, it is “what does the user want done, and what is the smallest number of calls that does it.”</p>
+<p>Design tools for the plan. The right question is “what does the user want done, and what is the smallest number of calls that does it”, and the answer almost never looks like your entity list.</p>
 </aside>
 </section>
 <section id="the-three-rewrites-that-fix-most-catalogues" class="level3">
@@ -322,7 +322,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </section>
 <section id="descriptions-are-prompt-engineering" class="level3">
 <h3>Descriptions are prompt engineering</h3>
-<p>The description is not documentation. It is the only thing the model sees when deciding, and it is charged per turn. So it should be short and it should contain the information that distinguishes this tool from its neighbours.</p>
+<p>The description is the only thing the model sees when it decides, and you pay for it on every turn. So it should be short and it should contain the information that distinguishes this tool from its neighbours.</p>
 <p>Bad:</p>
 <pre class="text" data-language="text"><code>Get a account record via the core banking API. Wraps GET /v2/accounts.
 Accepts an optional id, an optional body, and standard pagination
@@ -336,7 +336,7 @@ band, and the weighted factors behind it.</code></pre>
 <p>Twenty-three tokens, all of them about what the model gets back.</p>
 <p>Three rules that survive contact with reality:</p>
 <ol>
-<li><p><strong>Lead with the outcome</strong>, not the mechanism. The model is choosing between outcomes.</p></li>
+<li><p><strong>Lead with the outcome.</strong> The model is choosing between outcomes, so give it the one this tool produces in the first six words.</p></li>
 <li><p><strong>Name the discriminator</strong> when tools are adjacent. “Prefer this over calling X repeatedly” is worth its tokens.</p></li>
 <li><p><strong>Do not document your transport.</strong> The model cannot use “wraps GET /v2/accounts” and you pay for it forever.</p></li>
 </ol>
@@ -353,7 +353,7 @@ band, and the weighted factors behind it.</code></pre>
 </aside>
 <pre class="python" data-language="python"><code>if &quot;$ref&quot; in schema and str(schema[&quot;$ref&quot;]).startswith((&quot;http://&quot;, &quot;https://&quot;)):
     raise errors.InvalidParams(f&quot;{where}: remote $ref is not dereferenced&quot;)</code></pre>
-<p>A schema that fails to validate because of an unresolved external <code>$ref</code> must be <em>rejected</em>, not silently treated as permissive. Failing open here means an attacker can disable your validation by pointing at a URL you will not fetch.</p>
+<p>A schema that fails to validate because of an unresolved external <code>$ref</code> must be <em>rejected</em>. Treating it as permissive fails open, which means an attacker can disable your validation by pointing at a URL you will not fetch.</p>
 </section>
 <section id="the-composition-rule-which-is-a-denial-of-service-rule" class="level3">
 <h3>The composition rule, which is a denial-of-service rule</h3>
@@ -398,7 +398,7 @@ band, and the weighted factors behind it.</code></pre>
 <h2>Errors: the distinction that decides whether a model recovers</h2>
 <p>This is the most consequential paragraph in the chapter, so here it is plainly.</p>
 <p>There are two error mechanisms, they are not interchangeable, and mislabelling one as the other either burns tokens or kills tasks.</p>
-<p><strong>Protocol errors</strong> are JSON-RPC errors. They mean the request was structurally wrong: unknown tool, malformed parameters, server on fire. Models are unlikely to recover from these, because the problem is not in the arguments, it is in the shape.</p>
+<p><strong>Protocol errors</strong> are JSON-RPC errors. They mean the request was structurally wrong: unknown tool, malformed parameters, server on fire. Models are unlikely to recover from these, because the problem lies in the shape of the request and the model can only vary its arguments.</p>
 <pre class="json" data-language="json"><code>{ &quot;jsonrpc&quot;: &quot;2.0&quot;, &quot;id&quot;: 3,
   &quot;error&quot;: { &quot;code&quot;: -32602, &quot;message&quot;: &quot;Unknown tool: invalid_tool_name&quot; } }</code></pre>
 <p><strong>Tool execution errors</strong> are <em>successful</em> results with <code>isError: true</code>. They mean the call was well-formed and the work failed for a reason the model can understand and act on.</p>
@@ -496,11 +496,11 @@ if account is None:
 </dd>
 <dt>Consent</dt>
 <dd>
-<p>Show the user the arguments, not just the tool name. “Call <code>send_email</code>?” is not consent. “Send email to <code>whom</code>, saying <code>what</code>?” is.</p>
+<p>Show the user the arguments alongside the tool name. “Call <code>send_email</code>?” is not consent. “Send email to <code>whom</code>, saying <code>what</code>?” is.</p>
 </dd>
 <dt>Audit</dt>
 <dd>
-<p>Who, what, when, with which arguments, and what came back. Designed for a regulator, not for your debugger. Chapter <a href="ch20.html#ch:access-control">20</a> covers what that means concretely.</p>
+<p>Who, what, when, with which arguments, and what came back. Designed for a regulator reading it a year later. Chapter <a href="ch20.html#ch:access-control">20</a> covers what that means concretely.</p>
 </dd>
 <dt>Authorization</dt>
 <dd>
@@ -608,7 +608,7 @@ if account is None:
 <ul>
 <li><p>Two methods total. The design work is all in what you put in them.</p></li>
 <li><p>Deterministic ordering, or you silently lose the provider’s prompt cache.</p></li>
-<li><p>Task-shaped, not REST-shaped. Meridian’s REST mirror cost 4,371 extra tokens per turn and $26 per thousand tasks in pure waste.</p></li>
+<li><p>Task-shaped. Meridian’s REST mirror cost 4,371 extra tokens per turn and $26 per thousand tasks in pure waste.</p></li>
 <li><p>Descriptions lead with the outcome, name the discriminator, and never mention your transport.</p></li>
 <li><p>Never dereference remote <code>$ref</code>s. Bound schema depth.</p></li>
 <li><p>Output schemas eliminate parse-retry loops. Use <code>enum</code> generously.</p></li>

@@ -202,18 +202,20 @@ code review.}{xkcd-context}
 
 Dollars per task.
 
-It deserves to be a first-class metric rather than something finance discovers
-in the quarterly review. And it is nearly a linear function of context: input
-tokens times the input price, plus output tokens times the output price, summed
+It deserves a place on the same dashboard as latency, watched daily. Most
+teams meet it for the first time in a quarterly finance review. And it is
+nearly a linear function of context: input tokens times the input price, plus output tokens times the output price, summed
 over every turn in the loop.
 
-Which means context bloat is not merely a memory problem. It is a recurring
-bill, and it scales with your traffic, which is exactly the direction you were
-hoping your traffic would scale.
+Which makes context bloat a recurring bill. It scales with your traffic,
+which is exactly the direction you were hoping your traffic would scale.
+A prompt that carries 4,000 tokens of unused tool descriptions costs that
+much on every turn, of every task, of every user, for as long as it ships.
 
 \keyidea{Latency, context, and cost are one resource wearing three hats. Every
 optimisation in this book is a trade among them, and the good ones attack all
-three at once, because they remove work rather than moving it.}
+three at once, because they remove work. Moved work still has to happen
+somewhere.}
 
 \section{Anatomy of one loop iteration}
 \label{sec:anatomy}
@@ -383,8 +385,9 @@ milliseconds. That is the number your server-side monitoring will show you, and
 it is true, and it is the wrong number.
 
 The honest number is 375, because the round trip dragged a model turn along
-behind it. Ten times larger, and invisible to every dashboard that watches
-servers rather than tasks.
+behind it. Ten times larger, and invisible to any dashboard whose unit of
+measurement is the server. The expensive part happened in somebody else's
+process.
 
 This is why Chapter~\ref{ch:mrtr} spends so much energy on gathering inputs up
 front, and why ``we should just add a confirmation prompt there'' is a much more
@@ -499,7 +502,7 @@ Framework tool abstractions
   & \textbf{A protocol to learn, and a host to run} \\
 A2A and agent-to-agent protocols
   & Agents negotiating with peer agents
-  & Different problem; composes with MCP rather than replacing it \\
+  & Different problem; composes with MCP \\
 \bottomrule
 \end{tabularx}
 \caption{Where each approach earns its keep. If you are one team, one language,
@@ -645,8 +648,8 @@ Streamable HTTP        & 0.161\,ms & +0.130\,ms \\
 
 \vspace{6pt}
 \footnotesize
-The in-process transport still serialises and deserialises, so this is a fair
-comparison rather than a flattering one.
+The in-process transport still serialises and deserialises, so the comparison
+is fair; none of the encoding cost has been hidden.
 \end{measurebox}
 
 The first row is a control: the same request and response, encoded and decoded,

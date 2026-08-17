@@ -193,7 +193,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </dd>
 <dt>The authorization server is somebody else’s problem.</dt>
 <dd>
-<p>Entra ID, Okta, Keycloak, or your own. MCP specifies how a client <em>finds</em> it, not how it works.</p>
+<p>Entra ID, Okta, Keycloak, or your own. MCP specifies how a client <em>finds</em> it and says nothing about its internals.</p>
 </dd>
 </dl>
 <p>Two scoping rules before we go further.</p>
@@ -266,11 +266,11 @@ WWW-Authenticate: Bearer resource_metadata=&quot;https://mcp.meridian.example/.w
 </tr>
 </tbody>
 </table>
-<p>Modelled at 40 ms per hop, not measured; Meridian’s benchmark auth is local and would flatter these badly. The number that matters is the round-trip count, which is exact.</p>
+<p>Modelled at 40 ms per hop. Meridian’s benchmark auth runs locally and would flatter these badly, so these are estimates. The number that matters is the round-trip count, which is exact.</p>
 </aside>
 <p>Four machine round trips, plus a human. If you pay that per request you have built something unusable. If you pay it once per session and cache aggressively, it disappears. That is the entire performance content of this chapter, and it is worth stating as a rule:</p>
 <aside class="keyidea">
-<p>Steps 1 through 3 are properties of the server, not of the request. Cache them per origin, for hours. The token is a property of the user and the scope set. Cache it until it expires, and refresh it before it does, not after.</p>
+<p>Steps 1 through 3 are properties of the server, so cache them per origin, for hours. The token is a property of the user and the scope set, so cache it until it expires. Refresh it while it still works.</p>
 </aside>
 </section>
 <section id="client-identity-in-2026" class="level2">
@@ -319,7 +319,7 @@ WWW-Authenticate: Bearer resource_metadata=&quot;https://mcp.meridian.example/.w
 </section>
 <section id="two-validations-that-stop-real-attacks" class="level2">
 <h2>Two validations that stop real attacks</h2>
-<p>Most of OAuth’s complexity is scar tissue. Two pieces of it are worth understanding, not merely implementing.</p>
+<p>Most of OAuth’s complexity is scar tissue. Two pieces of it are worth understanding in detail, because both fail silently when you get them wrong.</p>
 <section id="audience-binding-or-do-not-be-a-confused-deputy" class="level3">
 <h3>Audience binding, or: do not be a confused deputy</h3>
 <p>RFC 8707. The client must send a <code>resource</code> parameter naming the server the token is for, on both the authorization request and the token request:</p>
@@ -417,7 +417,7 @@ WWW-Authenticate: Bearer error=&quot;insufficient_scope&quot;,
             if not self.refresh_token():
                 raise            # refresh failed; a human is needed
     raise Unauthorized(&quot;re-authentication did not help&quot;)</code></pre>
-<p>Better still, do not get there. Refresh proactively when a token is within some margin of expiry, so the refresh happens between loop iterations rather than inside one.</p>
+<p>Better still, do not get there. Refresh proactively when a token is within some margin of expiry, so the refresh happens between loop iterations and never in the middle of one.</p>
 <table id="tab:auth-failures">
 <caption>Auth failure modes and their handling. Only the last one should ever lose the task.</caption>
 <tbody>
@@ -511,7 +511,7 @@ return input_required(
 <li><p>Audience binding via RFC 8707 is what stops the confused deputy. Never accept or forward a token issued for somebody else.</p></li>
 <li><p>Validate <code>iss</code> before redeeming a code, with simple string comparison and no normalisation, including on error responses.</p></li>
 <li><p>Challenge with all the scopes an operation needs at once; step up with the union, never the difference.</p></li>
-<li><p>Expired tokens are a recoverable interruption, not a failed task. Bound your retries.</p></li>
+<li><p>Treat an expired token as a recoverable interruption. Bound your retries.</p></li>
 <li><p>Tool visibility may vary by authorization, never by connection.</p></li>
 </ul>
 <p>That closes Part I. You now know the physics, the architecture, the wire, and the credentials. Part II is what you actually build with them, starting with the primitive that does the work.</p>

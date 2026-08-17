@@ -219,7 +219,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </section>
 <section id="error-codes-and-the-range-you-must-not-touch" class="level3">
 <h3>Error codes, and the range you must not touch</h3>
-<p>When something goes wrong, the response carries an error instead of a result:</p>
+<p>When something goes wrong, the response carries an <code>error</code> member in place of <code>result</code>. A response has exactly one of the two:</p>
 <pre class="json" data-language="json"><code>{ &quot;jsonrpc&quot;: &quot;2.0&quot;, &quot;id&quot;: 1,
   &quot;error&quot;: { &quot;code&quot;: -32602, &quot;message&quot;: &quot;Unknown tool: nope&quot; } }</code></pre>
 <p>Those negative numbers are not arbitrary. JSON-RPC reserves the range <code>-32768</code> to <code>-32000</code> for itself, and within that leaves <code>-32000</code> to <code>-32099</code> for implementations to use as they see fit.</p>
@@ -254,7 +254,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </tr>
 </tbody>
 </table>
-<p>Three codes are currently defined in the reserved range, and each one is designed so the client can recover automatically rather than merely reporting failure:</p>
+<p>Three codes are currently defined in the reserved range. Each carries enough information for the client to fix the request and try again on its own:</p>
 <table id="tab:mcp-errors">
 <caption>Every one of these carries enough information for the client to fix itself. That is not an accident, it is the design goal.</caption>
 <tbody>
@@ -325,7 +325,7 @@ data: {&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;result&quot;:{
 <figcaption>Everything that happens on a Streamable HTTP connection. Three shapes, and the third is still request-and-response no matter how long it stays open.</figcaption>
 </figure>
 <p>The first shape is an ordinary request and a single JSON response. The second is a request whose response is an SSE stream, used when the server wants to report progress before delivering the answer. Both are unremarkable.</p>
-<p>The third deserves attention, because it is where the elegance is. A long-lived notification stream is not a special connection type with its own lifecycle. It is an ordinary POST, to the same endpoint, whose response happens to be a stream that stays open. Its state belongs to that request rather than to the connection underneath, which is why it survived the deletion of sessions without needing a replacement concept.</p>
+<p>The third deserves attention, because it is where the elegance is. A long-lived notification stream is an ordinary POST, to the same endpoint, whose response happens to be a stream that stays open. Its state belongs to that one request. Nothing about it is remembered by the connection underneath, which is why it survived the deletion of sessions without needing a replacement concept.</p>
 </section>
 <section id="sec:required-headers" class="level3">
 <h3>Required headers, and why they exist</h3>
@@ -355,13 +355,13 @@ Mcp-Name: assess_account_risk
 <ul>
 <li><p>A load balancer routes <code>tools/call</code> to a compute pool and <code>tools/list</code> to a cache tier, using a header rule it already knows how to write.</p></li>
 <li><p>A web application firewall applies a strict policy to one tool name and a relaxed one to another.</p></li>
-<li><p>Rate limiting works per method rather than per connection, which is the only granularity that means anything now that connections are meaningless.</p></li>
+<li><p>Rate limiting works per method, which is the only granularity that means anything now that connections carry no state worth counting.</p></li>
 <li><p>Your access logs become useful without a JSON parser in the log pipeline.</p></li>
 </ul>
 <p>That is a real gain. It also creates a real hazard.</p>
 <aside class="box threat"><p class="box-title">Threat: Two sources of truth is a smuggling primitive</p>
 <p>If a gateway routes on <code>Mcp-Name: read_only_tool</code> and the body says <code>"name": "wire_transfer"</code>, then the gateway has approved one thing and the server has executed another. The attacker’s whole job is finding two components that disagree.</p>
-<p>So validation is mandatory, not advisory. Any server that processes the body <strong>must</strong> reject a mismatch with <code>400</code> and error code <code>-32020</code>.</p>
+<p>So validation is mandatory. Any server that processes the body <strong>must</strong> reject a mismatch with <code>400</code> and error code <code>-32020</code>.</p>
 </aside>
 <pre class="python" data-language="python"><code>def _validate_headers(self, headers, message: dict) -&gt; None:
     &quot;&quot;&quot;Reject any disagreement between headers and body.&quot;&quot;&quot;
@@ -510,9 +510,9 @@ Mcp-Name: assess_account_risk
 <p>That is gone. A broken response stream loses the request. The client re-issues it with a <em>new</em> request id and starts over.</p>
 <p>This is a real simplification for server authors, and it quietly moves a burden onto you.</p>
 <aside class="keyidea">
-<p>Design your servers to be idempotent, because retries are now a normal part of operation rather than an exception. If re-issuing <code>transfer_funds</code> twice moves money twice, the transport will eventually find that out for you, at a time of its choosing.</p>
+<p>Design your servers to be idempotent, because retries are now a normal part of operation. If re-issuing <code>transfer_funds</code> twice moves money twice, the transport will eventually find that out for you, at a time of its choosing.</p>
 </aside>
-<p><em>Idempotent</em> here means what it usually means: performing the operation twice has the same effect as performing it once. The usual mechanism is an idempotency key, a unique value supplied by the caller and remembered by the server for some window. It is not a protocol feature. It is an ordinary tool argument, and Chapter <a href="ch11.html#ch:building-servers">11</a> builds one.</p>
+<p><em>Idempotent</em> here means what it usually means: performing the operation twice has the same effect as performing it once. The usual mechanism is an idempotency key, a unique value supplied by the caller and remembered by the server for some window. It is an ordinary tool argument with a name you choose, and Chapter <a href="ch11.html#ch:building-servers">11</a> builds one.</p>
 </section>
 <section id="cancellation" class="level3">
 <h3>Cancellation</h3>
@@ -602,7 +602,7 @@ Mcp-Name: assess_account_risk
             self._proc.wait(timeout=2.0)
         except subprocess.TimeoutExpired:
             self._proc.kill()</code></pre>
-<p>Closing stdin is the primary graceful-shutdown signal and the only portable one, so servers should exit promptly when they see end-of-file. If yours does not, every client that talks to it will eventually kill it outright, and your cleanup handlers will never run. Meridian tests that its servers exit cleanly rather than needing to be killed.</p>
+<p>Closing stdin is the primary graceful-shutdown signal and the only portable one, so servers should exit promptly when they see end-of-file. If yours does not, every client that talks to it will eventually kill it outright, and your cleanup handlers will never run. Meridian has a test that closes stdin and asserts the process is gone within a second.</p>
 </section>
 <section id="cancellation-on-stdio" class="level3">
 <h3>Cancellation on stdio</h3>
@@ -651,7 +651,7 @@ Mcp-Name: assess_account_risk
 </tr>
 </tbody>
 </table>
-<p>The control still serialises and deserialises, so this compares transport mechanics rather than flattering the in-process case.</p>
+<p>The control still serialises and deserialises, so what these numbers compare is transport mechanics and nothing else.</p>
 </aside>
 <p>Read the right-hand chart carefully, because it is the point of the whole section. Streamable HTTP costs 0.13 ms more than in-process on loopback. A same-region network hop costs around 1.2 ms. A cross-region hop costs around 68 ms.</p>
 <p>So the transport you choose changes your latency by a tenth of a millisecond, and where you put the server changes it by sixty-eight.</p>

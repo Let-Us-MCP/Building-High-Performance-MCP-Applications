@@ -290,10 +290,10 @@ iteration 2   model reads the question + the catalogue + both results
 <section id="cost" class="level3">
 <h3>Cost</h3>
 <p>Dollars per task.</p>
-<p>It deserves to be a first-class metric rather than something finance discovers in the quarterly review. And it is nearly a linear function of context: input tokens times the input price, plus output tokens times the output price, summed over every turn in the loop.</p>
-<p>Which means context bloat is not merely a memory problem. It is a recurring bill, and it scales with your traffic, which is exactly the direction you were hoping your traffic would scale.</p>
+<p>It deserves a place on the same dashboard as latency, watched daily. Most teams meet it for the first time in a quarterly finance review. And it is nearly a linear function of context: input tokens times the input price, plus output tokens times the output price, summed over every turn in the loop.</p>
+<p>Which makes context bloat a recurring bill. It scales with your traffic, which is exactly the direction you were hoping your traffic would scale. A prompt that carries 4,000 tokens of unused tool descriptions costs that much on every turn, of every task, of every user, for as long as it ships.</p>
 <aside class="keyidea">
-<p>Latency, context, and cost are one resource wearing three hats. Every optimisation in this book is a trade among them, and the good ones attack all three at once, because they remove work rather than moving it.</p>
+<p>Latency, context, and cost are one resource wearing three hats. Every optimisation in this book is a trade among them, and the good ones attack all three at once, because they remove work. Moved work still has to happen somewhere.</p>
 </aside>
 </section>
 </section>
@@ -418,7 +418,7 @@ iteration 2   model reads the question + the catalogue + both results
 <p>Measured at 12 ms simulated per-call latency. The transport half is measured; the model turn is the stated TTFT mean from <a href="#sec:simulated">§1.8.2</a>.</p>
 </aside>
 <p>Read the first two rows and you would conclude an elicitation costs 34 milliseconds. That is the number your server-side monitoring will show you, and it is true, and it is the wrong number.</p>
-<p>The honest number is 375, because the round trip dragged a model turn along behind it. Ten times larger, and invisible to every dashboard that watches servers rather than tasks.</p>
+<p>The honest number is 375, because the round trip dragged a model turn along behind it. Ten times larger, and invisible to any dashboard whose unit of measurement is the server. The expensive part happened in somebody else’s process.</p>
 <p>This is why Chapter <a href="ch08.html#ch:mrtr">8</a> spends so much energy on gathering inputs up front, and why “we should just add a confirmation prompt there” is a much more expensive suggestion in a design review than it sounds.</p>
 </section>
 <section id="the-same-arithmetic-running-the-other-way" class="level3">
@@ -512,7 +512,7 @@ iteration 2   model reads the question + the catalogue + both results
 <tr>
 <td style="text-align: left;">A2A and agent-to-agent protocols</td>
 <td style="text-align: left;">Agents negotiating with peer agents</td>
-<td style="text-align: left;">Different problem; composes with MCP rather than replacing it</td>
+<td style="text-align: left;">Different problem; composes with MCP</td>
 </tr>
 </tbody>
 </table>
@@ -639,7 +639,7 @@ CURVE: 1Y=3.96 5Y=3.68</code></pre>
 </tr>
 </tbody>
 </table>
-<p>The in-process transport still serialises and deserialises, so this is a fair comparison rather than a flattering one.</p>
+<p>The in-process transport still serialises and deserialises, so the comparison is fair; none of the encoding cost has been hidden.</p>
 </aside>
 <p>The first row is a control: the same request and response, encoded and decoded, but handed directly to the server in the same process. Subtract it from the other two and what remains is transport cost with server execution removed.</p>
 <p>That subtraction is the single most useful trick in Chapter <a href="ch16.html#ch:measuring">16</a>, because it is the only honest way to answer “is my server slow, or is my transport slow”. It takes about ten minutes to set up and it will save you an argument.</p>

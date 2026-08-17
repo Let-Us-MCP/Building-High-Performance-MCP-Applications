@@ -66,8 +66,7 @@ And \texttt{prompts/get} returns messages, not a string:
 }
 \end{wire}
 
-Messages, plural, with roles. That matters more than it looks. A prompt is a conversation prefix, not a string you interpolate. You can seed it with a user
-turn, an assistant turn demonstrating the desired shape, and another user turn,
+Messages, plural, with roles. That matters more than it looks. A prompt is a conversation prefix. You can seed it with a user turn, an assistant turn demonstrating the desired shape, and another user turn,
 which is few-shot prompting delivered as a protocol primitive.
 
 Content blocks can be text, images, audio, resource links, or embedded
@@ -89,7 +88,7 @@ In practice that usually means slash commands. The user types \texttt{/} and
 gets a list of the prompts every connected server offers. That is the whole UX
 pattern, and it is why prompt names should read like commands.
 
-\begin{notebox}{``User-controlled'' is about invocation, not authorship}
+\begin{notebox}{``User-controlled'' refers to invocation}
 The server writes the prompt. The user chooses when to fire it. Those are
 separate, and conflating them leads to the mistake of letting users edit prompt
 text, at which point you no longer have a standardised workflow, you have 40
@@ -168,8 +167,8 @@ which serialises as:
 }
 \end{wire}
 
-Note the prefix. \texttt{com.meridian/} is legal because the second label is
-\texttt{meridian}, not \texttt{modelcontextprotocol} or \texttt{mcp}. Prefixes
+Note the prefix. \texttt{com.meridian/} is legal because its second label is
+\texttt{meridian}. Prefixes
 whose second label is either of those are reserved, so
 \texttt{com.mcp.tools/} is off limits and \texttt{com.example.mcp/} is fine. It
 is a rule that trips people, and Meridian encodes it:
@@ -269,9 +268,8 @@ prompt is not free.
 \vspace{6pt}
 \footnotesize
 Measured with the character-based estimator in
-\texttt{meridian/host/model.py}. Small, which is the point: unlike tool
-descriptions, a rendered prompt is paid once per invocation rather than on every
-turn.
+\texttt{meridian/host/model.py}. Small, which is the point. A rendered prompt is paid for once, at the moment
+somebody invokes it, and tool descriptions are paid for on every turn.
 \end{measurebox}
 
 That asymmetry is worth stating clearly, because it changes the advice.
@@ -321,15 +319,14 @@ return [{
 
 Four things it does, each deliberate:
 
-\textbf{Names the tool to call.} Not ``review the transaction'' but ``call
-\texttt{review\_transaction}''. Removes a planning step and a chance to guess
+\textbf{Names the tool to call.} It says ``call \texttt{review\_transaction}'',
+with the exact identifier. That removes a planning step and a chance to guess
 wrong.
 
 \textbf{Says ``exactly''.} Compliance outcomes must not be paraphrased. This is
 a domain constraint the host could not know.
 
-\textbf{Inoculates against injection.} That sentence about guidance being data
-rather than instructions is defence in depth, sitting in the blueprint where it
+\textbf{Inoculates against injection.} That sentence about treating guidance as data is defence in depth, sitting in the blueprint where it
 belongs. It is not sufficient on its own (Chapter~\ref{ch:threats} is emphatic
 about that) but it is free and it raises the bar.
 
@@ -339,9 +336,9 @@ cost, and a report somebody will actually read.
 \subsection{Anti-patterns}
 
 \textbf{Prompt sprawl.} Twelve prompts that differ in one clause each. Use
-arguments. Meridian's \texttt{credit-review} takes an \texttt{audience} argument
-rather than shipping \texttt{credit-review-committee} and
-\texttt{credit-review-rm}.
+arguments. Meridian's \texttt{credit-review} takes an \texttt{audience} argument, which
+collapses \texttt{credit-review-committee} and \texttt{credit-review-rm} into
+one entry.
 
 \textbf{Business logic buried in prose.} If the prompt says ``if exposure is
 over five million, require approval'', that threshold now lives in an English
@@ -362,10 +359,13 @@ three methods that may return \texttt{resultType: "input\_required"}, alongside
 \texttt{tools/call} and \texttt{resources/read}.
 
 So a prompt can ask a question before it renders. ``Which fiscal year?'' before
-producing a review template. Chapter~\ref{ch:mrtr} covers the mechanism in full,
-and the cost analysis there applies unchanged: an elicitation here costs a round
-trip plus a model turn, so gathering it as a prompt \emph{argument} is nearly
-always better. Arguments are free; questions are not.
+producing a review template. The exchange runs the way it runs everywhere else:
+the server answers with a question and a token identifying the paused work, the
+client puts the question to the user, the client repeats its
+\texttt{prompts/get} with the answer attached. Chapter~\ref{ch:mrtr} builds
+that end to end. The cost is the same too, a round trip plus a model turn, so
+gathering the value as a prompt \emph{argument} is nearly always better.
+Arguments are free; questions are not.
 
 \section{What to remember}
 
@@ -377,11 +377,11 @@ argument.
 \item Version them with a vendor-prefixed \texttt{\_meta} key. Note the rule
 about which prefixes are reserved.
 \item Test structurally first, deterministically second, with evals last.
-\item Rendered prompts cost once per invocation, unlike tool descriptions.
-Compress the list response, not the template.
+\item Rendered prompts cost once per invocation, and tool descriptions cost
+every turn. Compress the list response; leave the template alone.
 \item Stable content first, variable content last, for prompt-cache hits.
-\item Name the tools, bound the output, and keep thresholds in code rather than
-in prose.
+\item Name the tools, bound the output, and keep thresholds in code where they
+can be tested.
 \end{itemize}
 
 Next: multi round-trip requests, which is the largest single change in the 2026

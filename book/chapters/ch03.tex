@@ -92,7 +92,8 @@ That is the whole extension. Everything interesting lives in the payloads.
 
 \subsection{Error codes, and the range you must not touch}
 
-When something goes wrong, the response carries an error instead of a result:
+When something goes wrong, the response carries an \texttt{error} member in
+place of \texttt{result}. A response has exactly one of the two:
 
 \begin{wire}
 { "jsonrpc": "2.0", "id": 1,
@@ -131,8 +132,8 @@ usually by picking a nice round number like \texttt{-32050}.}
 \label{tab:error-ranges}
 \end{table}
 
-Three codes are currently defined in the reserved range, and each one is designed
-so the client can recover automatically rather than merely reporting failure:
+Three codes are currently defined in the reserved range. Each carries enough
+information for the client to fix the request and try again on its own:
 
 \begin{table}[htbp]
 \centering
@@ -234,12 +235,11 @@ The first shape is an ordinary request and a single JSON response. The second is
 a request whose response is an SSE stream, used when the server wants to report
 progress before delivering the answer. Both are unremarkable.
 
-The third deserves attention, because it is where the elegance is. A long-lived
-notification stream is not a special connection type with its own lifecycle. It
-is an ordinary POST, to the same endpoint, whose response happens to be a stream
-that stays open. Its state belongs to that request rather than to the connection
-underneath, which is why it survived the deletion of sessions without needing a
-replacement concept.
+The third deserves attention, because it is where the elegance is. A long-lived notification stream is an ordinary POST, to the same endpoint,
+whose response happens to be a stream that stays open. Its state belongs to
+that one request. Nothing about it is remembered by the connection underneath,
+which is why it survived the deletion of sessions without needing a replacement
+concept.
 
 \subsection{Required headers, and why they exist}
 \label{sec:required-headers}
@@ -285,8 +285,8 @@ without parsing JSON.
 write.
 \item A web application firewall applies a strict policy to one tool name and a
 relaxed one to another.
-\item Rate limiting works per method rather than per connection, which is the
-only granularity that means anything now that connections are meaningless.
+\item Rate limiting works per method, which is the only granularity that means
+anything now that connections carry no state worth counting.
 \item Your access logs become useful without a JSON parser in the log pipeline.
 \end{itemize}
 
@@ -298,7 +298,7 @@ If a gateway routes on \texttt{Mcp-Name: read\_only\_tool} and the body says
 the server has executed another. The attacker's whole job is finding two
 components that disagree.
 
-So validation is mandatory, not advisory. Any server that processes the body
+So validation is mandatory. Any server that processes the body
 \textbf{must} reject a mismatch with \texttt{400} and error code
 \texttt{-32020}.
 \end{dangerbox}
@@ -471,16 +471,15 @@ it with a \emph{new} request id and starts over.
 This is a real simplification for server authors, and it quietly moves a burden
 onto you.
 
-\keyidea{Design your servers to be idempotent, because retries are now a normal
-part of operation rather than an exception. If re-issuing \texttt{transfer\_funds}
+\keyidea{Design your servers to be idempotent, because retries are now a normal part of operation. If re-issuing \texttt{transfer\_funds}
 twice moves money twice, the transport will eventually find that out for you, at
 a time of its choosing.}
 
 \emph{Idempotent} here means what it usually means: performing the operation
 twice has the same effect as performing it once. The usual mechanism is an
 idempotency key, a unique value supplied by the caller and remembered by the
-server for some window. It is not a protocol feature. It is an ordinary tool
-argument, and Chapter~\ref{ch:building-servers} builds one.
+server for some window. It is an ordinary tool argument with a name you choose,
+and Chapter~\ref{ch:building-servers} builds one.
 
 \subsection{Cancellation}
 
@@ -619,8 +618,8 @@ def close(self, timeout: float = 5.0) -> None:
 Closing stdin is the primary graceful-shutdown signal and the only portable one,
 so servers should exit promptly when they see end-of-file. If yours does not,
 every client that talks to it will eventually kill it outright, and your cleanup
-handlers will never run. Meridian tests that its servers exit cleanly rather than
-needing to be killed.
+handlers will never run. Meridian has a test that closes stdin and asserts the process is gone within a
+second.
 
 \subsection{Cancellation on stdio}
 
@@ -664,8 +663,8 @@ Streamable HTTP      & 0.161\,ms & 0.203\,ms & +0.130\,ms \\
 
 \vspace{6pt}
 \footnotesize
-The control still serialises and deserialises, so this compares transport
-mechanics rather than flattering the in-process case.
+The control still serialises and deserialises, so what these numbers compare is
+transport mechanics and nothing else.
 \end{measurebox}
 
 Read the right-hand chart carefully, because it is the point of the whole

@@ -46,7 +46,8 @@ Two methods. That is the entire surface.
 Three fields at the bottom that did not exist in 2025 and matter a great deal.
 \texttt{nextCursor} means catalogues paginate. \texttt{ttlMs} and
 \texttt{cacheScope} mean the client can stop asking. Chapter~\ref{ch:resources}
-covers the caching model; here the relevant fact is that a well-behaved client fetches your catalogue once per TTL, not once per task.
+covers the caching model; here the relevant fact is that a well-behaved client fetches your catalogue
+once per TTL and reuses it across every task in that window.
 
 There is also a requirement that reads like a footnote and is not:
 
@@ -161,7 +162,7 @@ catalogue does strictly more useful work.
 
 Twenty-six dollars per thousand tasks, for nothing. And that is only the money.
 The real damage is upstream: the model now chooses among 38 similar options
-instead of 10 distinct ones, and selection accuracy falls, and a wrong choice
+where it used to choose among 10 distinct ones, selection accuracy falls, and a wrong choice
 costs a whole extra loop iteration to detect and recover from.
 
 Why does the REST shape fail? Because REST is organised around \emph{resources
@@ -172,9 +173,9 @@ round trips, five model turns, five chances to go wrong.
 
 Given a task-shaped tool it calls \texttt{assess\_account\_risk} once.
 
-\keyidea{Design tools for the plan, not for the database. The right question is
-not ``what are my entities'', it is ``what does the user want done, and what is
-the smallest number of calls that does it.''}
+\keyidea{Design tools for the plan. The right question is ``what does the user
+want done, and what is the smallest number of calls that does it'', and the
+answer almost never looks like your entity list.}
 
 \subsection{The three rewrites that fix most catalogues}
 
@@ -206,8 +207,8 @@ existing, not about the tool existing, and those are different things.
 
 \subsection{Descriptions are prompt engineering}
 
-The description is not documentation. It is the only thing the model sees when
-deciding, and it is charged per turn. So it should be short and it should
+The description is the only thing the model sees when it decides, and you pay
+for it on every turn. So it should be short and it should
 contain the information that distinguishes this tool from its neighbours.
 
 Bad:
@@ -235,8 +236,8 @@ Twenty-three tokens, all of them about what the model gets back.
 Three rules that survive contact with reality:
 
 \begin{enumerate}[leftmargin=1.6em, itemsep=3pt]
-\item \textbf{Lead with the outcome}, not the mechanism. The model is choosing
-between outcomes.
+\item \textbf{Lead with the outcome.} The model is choosing between outcomes,
+so give it the one this tool produces in the first six words.
 \item \textbf{Name the discriminator} when tools are adjacent. ``Prefer this
 over calling X repeatedly'' is worth its tokens.
 \item \textbf{Do not document your transport.} The model cannot use
@@ -268,7 +269,7 @@ if "$ref" in schema and str(schema["$ref"]).startswith(("http://", "https://")):
 \end{py}
 
 A schema that fails to validate because of an unresolved external \texttt{\$ref}
-must be \emph{rejected}, not silently treated as permissive. Failing open here
+must be \emph{rejected}. Treating it as permissive fails open, which
 means an attacker can disable your validation by pointing at a URL you will not
 fetch.
 
@@ -351,9 +352,8 @@ There are two error mechanisms, they are not interchangeable, and mislabelling
 one as the other either burns tokens or kills tasks.
 
 \textbf{Protocol errors} are JSON-RPC errors. They mean the request was
-structurally wrong: unknown tool, malformed parameters, server on fire. Models
-are unlikely to recover from these, because the problem is not in the arguments,
-it is in the shape.
+structurally wrong: unknown tool, malformed parameters, server on fire. Models are unlikely to recover from these, because the problem lies in the
+shape of the request and the model can only vary its arguments.
 
 \begin{wire}
 { "jsonrpc": "2.0", "id": 3,
@@ -439,11 +439,10 @@ Four outbound hooks and one inbound one:
 \begin{description}[leftmargin=1.4em, style=nextline, itemsep=3pt]
 \item[Schema validation] Reject malformed arguments before they reach a server.
 Cheap, and it turns a class of server bug into a client-side error.
-\item[Consent] Show the user the arguments, not just the tool name. ``Call
+\item[Consent] Show the user the arguments alongside the tool name. ``Call
 \texttt{send\_email}?'' is not consent. ``Send email to \texttt{whom}, saying
 \texttt{what}?'' is.
-\item[Audit] Who, what, when, with which arguments, and what came back. Designed
-for a regulator, not for your debugger. Chapter~\ref{ch:access-control} covers
+\item[Audit] Who, what, when, with which arguments, and what came back. Designed for a regulator reading it a year later. Chapter~\ref{ch:access-control} covers
 what that means concretely.
 \item[Authorization] Scope checks and row-level policy, on the server side,
 where the data is.
@@ -538,8 +537,7 @@ arithmetic is done by a computer, which is generally better at it.
 \begin{itemize}[leftmargin=1.6em, itemsep=3pt]
 \item Two methods total. The design work is all in what you put in them.
 \item Deterministic ordering, or you silently lose the provider's prompt cache.
-\item Task-shaped, not REST-shaped. Meridian's REST mirror cost 4,371 extra
-tokens per turn and \$26 per thousand tasks in pure waste.
+\item Task-shaped. Meridian's REST mirror cost 4,371 extra tokens per turn and \$26 per thousand tasks in pure waste.
 \item Descriptions lead with the outcome, name the discriminator, and never
 mention your transport.
 \item Never dereference remote \texttt{\$ref}s. Bound schema depth.
