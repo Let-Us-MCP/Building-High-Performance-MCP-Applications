@@ -31,7 +31,7 @@ book/           LaTeX source, one .tex per chapter (multi-file setup)
   book.tex        master document
   preamble.tex    packages, macros, theorem-ish environments (legacybox, xkcdfig, ...)
   chapters/       ch01..ch20, epilogue
-  appendices/     appA..appE
+  appendices/     appA..appF
   frontmatter/    cover, title, copyright, preface, about the author
   figures/        GENERATED — do not hand-edit
 figures-src/    figure sources: TikZ (.tex) and matplotlib xkcd (.py)
@@ -79,7 +79,7 @@ Legend: `[ ]` not started · `[~]` drafted · `[x]` drafted + prose-linted + bui
 - [x] `servers/risk`, `servers/compliance`, `servers/fraud`, `servers/marketdata`
 - [x] `host/` — client, connection pool, capability cache, agent loop
 - [x] `bench/` — measurement harness
-- [x] `tests/` — 208 tests, all passing
+- [x] `tests/` — 208 tests, all passing (`tools/check_counts.py` keeps the book's claim honest)
 - [x] Verified end-to-end with Claude Code (`.mcp.json` + transcript in `meridian/VERIFICATION.md`)
 
 ### Part I — Protocol Fundamentals
@@ -119,6 +119,7 @@ Legend: `[ ]` not started · `[~]` drafted · `[x]` drafted + prose-linted + bui
 - [x] App C  Performance checklist
 - [x] App D  Security hardening checklist
 - [x] App E  The Meridian companion repository
+- [x] App F  Sources and further reading
 
 ### Publish
 - [x] Full PDF builds clean
@@ -169,12 +170,44 @@ Legend: `[ ]` not started · `[~]` drafted · `[x]` drafted + prose-linted + bui
 - **Define before use, never defer.** The first draft used "elicitation" in a table
   before defining it anywhere, and waved at concepts with "Chapter 8 covers the
   mechanism properly". `tools/audit_style.py --deferrals` catches that; it is now 0.
-- **Density over sparseness.** HPBN builds a concept fully before spending it. Ch 1-3
-  were rewritten on that model and roughly doubled: ch01 1,584 -> 3,790 words of prose.
+- **Density over sparseness.** HPBN builds a concept fully before spending it. Every
+  chapter was rewritten on that model. Chapters used to run 1,600-2,600 words; they now
+  run 2,000-4,900, and the additions are all mechanism rather than padding.
 - **Every listing must trace to real code.** `tools/check_listings.py` proved ~15
   listings were sketches the book presented as extracted. Fixed by implementing them
-  (`host/delegation.py`, `servers/scoped.py`, `ops.py`, `client.call_with_reauth`) and
-  marking the genuinely elided ones `# sketch:`. Now 151/151 trace.
+  rather than weakening the claim, and the same rule then drove most of the second pass:
+  every gap the audit found in the prose was closed by writing the code first.
+- **Facts about the companion code go stale silently.** `tools/check_counts.py` runs
+  unittest discovery and compares the result with what the book claims. It found the
+  book saying "134 tests" in twelve places, having been true about sixty tests earlier,
+  and has caught the number four more times since.
+
+## What the define-before-use pass added
+
+Each of these was a concept the prose used as though the reader already had it. The
+fix in every case was to explain the mechanism, and where the book had no code behind
+the claim, to write the code.
+
+| Chapter | Was asserted | Now explained, and what shipped |
+|---|---|---|
+| 4  | "PKCE, always" | verifier/challenge, the interception attack, the MUST to verify support first |
+| 4  | "audience binding" | the `aud` claim, then the confused deputy; mix-up described as an attack |
+| 5  | "destroys the prompt cache" | what a prompt cache keys on, and why your own latency graph stays flat |
+| 5  | cursors, annotations | opaque cursors, the empty-string cursor bug, all four annotations and their defaults |
+| 6  | resource descriptors | the field table, `size` as a context-budget control, RFC 6570's four levels |
+| 7  | few-shot, completions | multi-message prompts; `completion/complete` implemented + 7 tests |
+| 8  | "HMAC", "constant time" | what a MAC proves; the timing attack with numbers; `v1.` prefix as key rotation |
+| 9  | polling only | `notifications/tasks` implemented + 5 tests; why the push carries the whole task |
+| 10 | sandbox, CSP, postMessage | the allow-same-origin trap, the directive table, where the origin check goes |
+| 11 | "store it before returning" | `protocol/idempotency.py` + 8 tests: fingerprints, concurrency, failure, expiry |
+| 12 | `traceparent`, "add jitter" | the four fields; `ops.Backoff` with full jitter + reset + 5 tests |
+| 13 | context cost | position effects and accumulated contradictions, which decide more than cost |
+| 14 | "token exchange exists" | RFC 8693 in full; delegation cycle detection + 5 tests |
+| 15 | "non-deterministic" | why temperature 0 does not fix it |
+| 16 | percentiles | tail amplification: fan-out turns your p99 into your typical case |
+| 17 | reuse + fan out | **a real bug**: one HTTP/1.1 connection serialised the fan-out. Pool + 4 tests |
+| 18 | capacity arithmetic | Little's Law, sized on burst rate and degraded service time |
+| 20 | "append-only" | `meridian/audit.py` hash chain + 8 tests, and the limitation stated
 
 ## Open items / notes for the author
 

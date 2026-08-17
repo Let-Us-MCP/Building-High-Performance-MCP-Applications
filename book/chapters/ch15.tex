@@ -32,7 +32,9 @@ slow. That is not a coincidence.}
 \label{tab:test-pyramid}
 \end{table}
 
-Meridian's 208 tests run in 2.3 seconds and use no model at all. The eval suite is separate, slower, and gates deploys.
+Meridian's 208 tests run in about four seconds and use no model at all. Most of
+that is the handful that spawn real subprocesses and open real sockets; the
+rest finish in microseconds. The eval suite is separate, slower, and gates deploys.
 
 \keyidea{If your MCP tests are slow, you are testing the model when you meant to
 test the protocol. Push everything you can down a layer.}
@@ -507,7 +509,7 @@ thousand more tokens per turn, and both are invisible to correctness tests and
 obvious to a benchmark that runs on every commit.
 
 \begin{sh}
-make test      # 208 tests, about two seconds
+make test      # 208 tests, about four seconds
 make bench     # regenerates every number in the book
 make lint      # prose rules plus cross-reference integrity
 \end{sh}
