@@ -223,9 +223,30 @@ WWW-Authenticate: Bearer resource_metadata=&quot;https://mcp.meridian.example/.w
 <p>That <code>scope</code> parameter is a courtesy with real value. Without it the client falls back to requesting everything in <code>scopes_supported</code>, which means the user sees a consent screen asking for more than the operation needs, which means the user learns to click through consent screens.</p>
 <p><strong>2. Protected resource metadata.</strong> Required, by RFC 9728. The client fetches it and learns which authorization servers this resource trusts.</p>
 <p><strong>3. Authorization server metadata.</strong> The client tries OAuth 2.0 Authorization Server Metadata and OpenID Connect Discovery in priority order. Clients must support both, because the ecosystem is split and will stay split.</p>
-<p><strong>4. Authorization.</strong> PKCE, always. The <code>resource</code> parameter, always. Browser, consent, redirect with a code.</p>
-<p><strong>5. Token exchange.</strong> Code plus verifier plus resource, in exchange for an access token.</p>
+<p><strong>4. Authorization.</strong> The client opens a browser at the authorization server’s authorization endpoint. The user signs in, sees a consent screen, and approves. The browser is then redirected to a URI the client is listening on, carrying an authorization code. Two parameters on that request are mandatory, and both are worth understanding rather than copying.</p>
+<p>The first is <code>code_challenge</code>.</p>
+<p><strong>5. Token exchange.</strong> The client posts the code back, together with the PKCE verifier and the <code>resource</code> parameter, and receives an access token.</p>
 <p>Then, finally, the original request runs.</p>
+<section id="pkce-and-why-an-authorization-code-is-not-enough" class="level3">
+<h3>PKCE, and why an authorization code is not enough</h3>
+<p>PKCE (pronounced “pixie”, Proof Key for Code Exchange, RFC 7636) exists because an authorization code travels through a browser redirect, and a browser redirect is not a private channel.</p>
+<p>Consider where the code lands. A desktop or CLI client cannot receive a redirect at a public HTTPS address, so it starts a tiny local web server and registers <code>http://127.0.0.1:3000/callback</code> as its redirect URI. Any other process on that machine can bind that port first and catch the redirect. On mobile the equivalent trick is registering the same custom URI scheme. Either way an attacker who catches the code can walk up to the token endpoint and redeem it, and the user’s token comes back to somebody else.</p>
+<p>PKCE binds the code to whoever asked for it, in three steps.</p>
+<ol>
+<li><p>Before redirecting, the client generates a <code>code_verifier</code>: a high-entropy random string of 43 to 128 characters. It keeps this in memory, associated with this one authorization attempt, and never transmits it during the redirect.</p></li>
+<li><p>It sends the SHA-256 hash of that verifier, base64url-encoded, as <code>code_challenge</code>, along with <code>code_challenge_method=S256</code>. The authorization server files the challenge next to the code it issues.</p></li>
+<li><p>At the token endpoint the client presents the original verifier. The server hashes it and compares it to the stored challenge. A mismatch means the party redeeming the code is not the party that requested it, and the exchange is refused.</p></li>
+</ol>
+<pre class="text" data-language="text"><code>code_verifier   dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
+code_challenge  E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM
+                = base64url(sha256(code_verifier))</code></pre>
+<p>An intercepted code is now inert. The interceptor holds the code and does not hold the verifier, and the verifier never left the client’s memory. The hash is one-way, so the challenge that did travel over the redirect gives nothing away.</p>
+<p>One requirement here is easy to skip, and the specification states it as a MUST: the client must <em>verify</em> that the authorization server supports PKCE before it begins, by looking for <code>code_challenge_methods_supported</code> in the metadata it fetched in step 3. If that field is absent, the client must refuse to proceed. Sending a challenge to a server that ignores challenges produces a flow that looks identical, feels identical, and protects nothing, which is a worse outcome than a visible failure. OpenID Connect Discovery does not technically define that field, and MCP requires it anyway; an OpenID provider that omits it is unusable for MCP.</p>
+</section>
+<section id="one-bookkeeping-step-with-no-network-cost" class="level3">
+<h3>One bookkeeping step with no network cost</h3>
+<p>While the browser is open, the client records the <code>issuer</code> value from the authorization server metadata it validated in step 3, and stores it in the same per-request record that holds the PKCE verifier and the <code>state</code> value.</p>
+<p>Nothing uses it yet. <a href="#sec:issuer-validation">§4.4.2</a> is where it earns its keep, and the requirement that it come from <em>validated</em> metadata is the whole point: an expected issuer read from an untrusted source proves nothing when you compare against it later.</p>
 <aside class="box measured"><p class="box-title">Measured: What the handshake costs (modelled)</p>
 <table>
 <tbody>
@@ -272,6 +293,7 @@ WWW-Authenticate: Bearer resource_metadata=&quot;https://mcp.meridian.example/.w
 <aside class="keyidea">
 <p>Steps 1 through 3 are properties of the server, so cache them per origin, for hours. The token is a property of the user and the scope set, so cache it until it expires. Refresh it while it still works.</p>
 </aside>
+</section>
 </section>
 <section id="client-identity-in-2026" class="level2">
 <h2>Client identity in 2026</h2>
@@ -320,14 +342,23 @@ WWW-Authenticate: Bearer resource_metadata=&quot;https://mcp.meridian.example/.w
 <section id="two-validations-that-stop-real-attacks" class="level2">
 <h2>Two validations that stop real attacks</h2>
 <p>Most of OAuth’s complexity is scar tissue. Two pieces of it are worth understanding in detail, because both fail silently when you get them wrong.</p>
-<section id="audience-binding-or-do-not-be-a-confused-deputy" class="level3">
+<section id="sec:audience-binding" class="level3">
 <h3>Audience binding, or: do not be a confused deputy</h3>
-<p>RFC 8707. The client must send a <code>resource</code> parameter naming the server the token is for, on both the authorization request and the token request:</p>
+<p>An access token carries an <em>audience</em>: the identity of the resource server the token was minted for. In a JWT it is the <code>aud</code> claim; with opaque tokens it comes back from introspection. It answers a question distinct from “is this token real”, and the distinction is the whole subsection:</p>
+<pre class="text" data-language="text"><code>iss  who issued this token          https://login.example.com
+sub  which user it speaks for       user-8891
+aud  which server it is for         https://mcp.meridian.example
+exp  when it stops working          1793404800</code></pre>
+<p>A token can be perfectly valid, unexpired, correctly signed by an issuer you trust, and speak for a real user, and still not be <em>for you</em>. Checking the signature answers the first four questions. Only checking <code>aud</code> answers the fifth.</p>
+<p>Audience binding is the mechanism that puts the right value in that claim. It is RFC 8707, and it has two halves.</p>
+<p>The client half: send a <code>resource</code> parameter naming the server the token is for, on both the authorization request and the token request.</p>
 <pre class="text" data-language="text"><code>&amp;resource=https%3A%2F%2Fmcp.meridian.example</code></pre>
-<p>The server must then validate that tokens presented to it were issued for it.</p>
+<p>The authorization server copies that into the token’s audience. The server half: validate, on every request, that the token presented was issued for you. A token whose audience names somebody else gets a 401, no matter how well-formed it is.</p>
+<p>Skip the server half and you have built a confused deputy.</p>
 <aside class="box threat"><p class="box-title">Threat: The confused deputy</p>
-<p>Without audience binding: a user authorizes a malicious MCP server. That server receives a token. It presents the same token to your server. If your server checks only that the token is valid and signed by an issuer it trusts, it now acts on the user’s behalf at the attacker’s direction.</p>
-<p>The token was real. The user did consent. They simply consented to something else.</p>
+<p>A confused deputy is a program with more authority than its caller, tricked into using that authority on the caller’s behalf. The name is from a 1988 paper by Norm Hardy about a compiler that could write to a billing file its users could not, and could be talked into overwriting it.</p>
+<p>Here is the MCP version. A user installs a malicious MCP server and authorizes it, willingly, because it claims to summarise their calendar. The authorization server issues it a token for the user. That server now presents the same token to <em>your</em> server. If you check only that the token is valid, unexpired, and signed by an issuer you trust, every one of those checks passes, and you go and move the user’s money at the attacker’s direction.</p>
+<p>The token was real. The user did consent. They consented to something else, and the audience claim is where that distinction is written down.</p>
 </aside>
 <p>Three rules follow, and the specification states all three as MUST:</p>
 <ul>
@@ -337,10 +368,14 @@ WWW-Authenticate: Bearer resource_metadata=&quot;https://mcp.meridian.example/.w
 </ul>
 <p>That third one forbids token passthrough, and it is worth being blunt: an MCP server that takes the client’s token and replays it at a third-party API is doing the forbidden thing. Chapter <a href="ch08.html#ch:mrtr">8</a> covers the correct pattern, which is URL-mode elicitation, and Chapter <a href="ch20.html#ch:access-control">20</a> covers why the shortcut is so tempting.</p>
 </section>
-<section id="issuer-validation-rfc-9207" class="level3">
+<section id="sec:issuer-validation" class="level3">
 <h3>Issuer validation, RFC 9207</h3>
 <p>New in this revision, and small enough to skip by accident.</p>
-<p>Before redirecting the user, the client records the <code>issuer</code> from the authorization server’s validated metadata. When the authorization code comes back, the response should carry an <code>iss</code> parameter, and the client must compare it before redeeming the code.</p>
+<p>Audience binding protects the server from a token issued for somebody else. Issuer validation protects the <em>client</em> from a code issued by somebody else, and the attack it stops is called a mix-up.</p>
+<p>A mix-up needs one precondition: the client talks to more than one authorization server, and the attacker controls one of them. That is not exotic. A client that connects to several MCP servers accumulates several issuers, and any one of them could be hostile.</p>
+<p>The attack runs like this. The user asks the client to connect to the attacker’s MCP server, which is an ordinary thing to do and not yet a compromise. The client discovers the attacker’s authorization server and starts a flow with it. The attacker’s authorization server, instead of authenticating the user itself, redirects the browser onward to an honest authorization server the client also uses, with the client’s own <code>client_id</code> and redirect URI. The user sees a login page they recognise, from a company they trust, and signs in. The code comes back to the client’s redirect URI.</p>
+<p>The client is now holding a code issued by the honest server while believing it is talking to the attacker’s server. So it does the natural thing: it sends the code, and the PKCE verifier, to the attacker’s token endpoint. The attacker takes that code and redeems it at the honest server. PKCE did not help, because the client handed over the verifier itself.</p>
+<p>The fix is one string comparison. Before redirecting, the client records the <code>issuer</code> from the authorization server’s validated metadata, which is the bookkeeping step from earlier in this chapter. When the authorization response comes back, it should carry an <code>iss</code> parameter naming who actually issued the code. The client compares the two before redeeming anything. In the attack above they differ, and the flow stops before the code moves.</p>
 <table id="tab:iss-validation">
 <caption>RFC 9207 validation. Row two is the one that exists specifically to stop mix-up attacks.</caption>
 <tbody>

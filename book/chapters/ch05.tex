@@ -55,10 +55,46 @@ There is also a requirement that reads like a footnote and is not:
 the underlying set has not changed. Unstable ordering silently destroys the
 provider's prompt cache, and nothing in your telemetry will tell you.}
 
-That last part is what makes it nasty. Prompt caching keys on a stable prefix.
-If your catalogue serialises in a different order on each request, the prefix
-changes, every cache lookup misses, and you pay full price for prompt processing
-on every turn. Your server looks fine. Your latency is quietly 30\,\% worse.
+That last part is what makes it nasty, so it is worth understanding the
+machinery you are about to break.
+
+\subsection{What a prompt cache actually caches}
+
+Every model turn re-sends the whole conversation. The system prompt, the tool
+catalogue, the user's request, and every tool result so far, all of it, on every
+turn. The model has no memory between calls, so there is nothing else it could
+do.
+
+Processing those tokens costs real time. Before the model can emit its first
+output token it must run the entire input through the network and build the
+internal state, the key-value attention cache, that generation reads from. For a
+6,000-token prompt that is the dominant part of time-to-first-token.
+
+Providers noticed that consecutive turns of the same conversation share almost
+all of their input, and that the shared part is at the \emph{front}. Turn four's
+prompt is turn three's prompt with more appended. So they cache the computed
+state, keyed by the input prefix, and on the next turn they match the longest
+prefix they have already processed and resume from there. What you pay full
+price for is only the new suffix.
+
+The keying is exact, and it is positional. The cache matches on the token
+sequence from position zero. A single token that differs at position 300
+invalidates everything from 300 onward, no matter how similar the rest is.
+
+Now put your tool catalogue in that picture. It sits near the front, right
+behind the system prompt, which is the most valuable real estate in the prompt
+because everything after it depends on it matching. Serialise your forty tools
+in dictionary order on one request and a different dictionary order on the next,
+and the prefix diverges at the first tool that moved. Every turn after that
+misses.
+
+The failure is quiet in a specific and expensive way. Nothing errors. Your
+server's latency is unchanged, because your server did its job in the same 8
+milliseconds it always does. The cost lands on the provider's side, as a
+time-to-first-token that is several times worse and an input bill charged at the
+uncached rate, and the only place it shows up is a graph nobody thinks to blame
+on a loop over a hash map.
+
 Meridian sorts by name and asserts it:
 
 \begin{py}
@@ -78,6 +114,68 @@ def test_tools_list_order_is_stable(self):
 If you build your catalogue by iterating a Python dictionary, a Go map, or a
 database query with no \texttt{ORDER BY}, you are one refactor away from this
 bug. Sort explicitly.
+
+\subsection{Cursors, and the empty string that ends your catalogue early}
+
+\texttt{nextCursor} is the other half of \texttt{tools/list}, and it has one
+rule that bites everybody once.
+
+Pagination in MCP is cursor-based. The server returns a page plus, optionally, a
+\texttt{nextCursor}. The client sends that value back as a \texttt{cursor}
+parameter to get the next page, and keeps going until a response arrives with no
+\texttt{nextCursor} at all. Page size is the server's business; clients must not
+assume one.
+
+The cursor is \textbf{opaque}. It is a string the server minted and the client
+must not read, parse, or reason about. Meridian's happens to be a decimal
+offset, which is honest for a catalogue that is small and sorted and lives in
+memory:
+
+\begin{py}
+def _paginate(self, items: list, cursor: str | None) -> tuple[list, str | None]:
+    """Opaque cursors over a stable ordering.
+
+    The cursor is an offset here because the catalogue is small and stable.
+    A server paginating over a mutable database should encode a sort key
+    instead, because offsets skip and duplicate rows when the underlying
+    set shifts between pages.
+    """
+\end{py}
+
+That docstring is the reason opacity is a rule and not a preference. Offsets are
+wrong for anything mutable: delete a row while a client is between pages and
+page two starts one row late, silently skipping an item the client will never
+see. Encoding a sort key instead fixes it, and a client that had been parsing
+your integers breaks the day you switch. Since the client must not look, you are
+free to change.
+
+Now the rule that bites. A client decides it has reached the end when
+\texttt{nextCursor} is \textbf{absent}, and an empty string is a perfectly valid
+cursor value. So this, which is the obvious thing to write, is a bug:
+
+\begin{plain}
+while cursor:            # WRONG: stops on a valid empty-string cursor
+    page = list_tools(cursor)
+    cursor = page.get("nextCursor")
+\end{plain}
+
+\begin{plain}
+cursor = None
+while True:
+    page = list_tools(cursor)
+    ...
+    if "nextCursor" not in page:
+        break
+    cursor = page["nextCursor"]
+\end{plain}
+
+The difference shows up only against a server that emits an empty first cursor,
+which is rare, which is why the bug survives testing and appears in production
+as ``we only see the first ten tools from that one vendor''.
+
+Invalid cursors get \texttt{-32602}. Meridian raises it for anything that is not
+an integer inside the current range, which also means a cursor from a catalogue
+that has since shrunk fails loudly rather than returning nonsense.
 
 \subsection{\texttt{tools/call}}
 
@@ -322,7 +420,44 @@ cannot occur.
 annotations={"readOnlyHint": True, "idempotentHint": True}
 \end{py}
 
-Useful hints. A host can auto-approve read-only tools and prompt for the rest,
+There are four of them, and the defaults are chosen so that saying nothing is
+the cautious answer:
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}llX@{}}
+\toprule
+\thead{Annotation} & \thead{Default} & \thead{Means} \\
+\midrule
+\texttt{readOnlyHint}    & \texttt{false} & The tool does not modify its environment \\
+\texttt{destructiveHint} & \texttt{true}  & Updates may destroy, not only add \\
+\texttt{idempotentHint}  & \texttt{false} & Repeating the same call changes nothing further \\
+\texttt{openWorldHint}   & \texttt{true}  & It touches an open world of external entities \\
+\bottomrule
+\end{tabularx}
+\caption{Tool annotations and their defaults. The two that default to
+\texttt{true} are the pessimistic ones, so an unannotated tool reads as
+destructive and open-world.}
+\label{tab:tool-annotations}
+\end{table}
+
+Read the defaults column again, because it is the design. Omit annotations
+entirely and your tool is treated as writing, destructive, non-idempotent, and
+open-world, which is the safest reading of a tool nobody described. You opt into
+leniency; you never fall into it.
+
+The last two get overlooked. \texttt{idempotentHint} is what tells a host it may
+retry a timed-out call safely, and Chapter~\ref{ch:transport} explained why
+retries are now ordinary. \texttt{openWorldHint} distinguishes a web search,
+whose results come from anywhere, from a lookup against your own database. That
+distinction is exactly the one Chapter~\ref{ch:threats} cares about, because
+open-world results are attacker-influenced by definition.
+
+Two of them are meaningful only when \texttt{readOnlyHint} is false. A read-only
+tool is trivially non-destructive, so setting both is noise.
+
+A host can auto-approve read-only tools and prompt for the rest,
 which is exactly what Meridian's default consent policy does.
 
 But the specification is blunt: clients must treat annotations as untrusted

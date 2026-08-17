@@ -81,13 +81,79 @@ fetches it and learns which authorization servers this resource trusts.
 Authorization Server Metadata and OpenID Connect Discovery in priority order.
 Clients must support both, because the ecosystem is split and will stay split.
 
-\textbf{4. Authorization.} PKCE, always. The \texttt{resource} parameter,
-always. Browser, consent, redirect with a code.
+\textbf{4. Authorization.} The client opens a browser at the authorization
+server's authorization endpoint. The user signs in, sees a consent screen, and
+approves. The browser is then redirected to a URI the client is listening on,
+carrying an authorization code. Two parameters on that request are mandatory,
+and both are worth understanding rather than copying.
 
-\textbf{5. Token exchange.} Code plus verifier plus resource, in exchange for an
-access token.
+The first is \texttt{code\_challenge}.
+
+\textbf{5. Token exchange.} The client posts the code back, together with the
+PKCE verifier and the \texttt{resource} parameter, and receives an access token.
 
 Then, finally, the original request runs.
+
+\subsection{PKCE, and why an authorization code is not enough}
+
+PKCE (pronounced ``pixie'', Proof Key for Code Exchange, RFC 7636) exists
+because an authorization code travels through a browser redirect, and a browser
+redirect is not a private channel.
+
+Consider where the code lands. A desktop or CLI client cannot receive a redirect
+at a public HTTPS address, so it starts a tiny local web server and registers
+\texttt{http://127.0.0.1:3000/callback} as its redirect URI. Any other process
+on that machine can bind that port first and catch the redirect. On mobile the
+equivalent trick is registering the same custom URI scheme. Either way an
+attacker who catches the code can walk up to the token endpoint and redeem it,
+and the user's token comes back to somebody else.
+
+PKCE binds the code to whoever asked for it, in three steps.
+
+\begin{enumerate}[leftmargin=1.6em, itemsep=3pt]
+\item Before redirecting, the client generates a \texttt{code\_verifier}: a
+high-entropy random string of 43 to 128 characters. It keeps this in memory,
+associated with this one authorization attempt, and never transmits it during
+the redirect.
+\item It sends the SHA-256 hash of that verifier, base64url-encoded, as
+\texttt{code\_challenge}, along with \texttt{code\_challenge\_method=S256}. The
+authorization server files the challenge next to the code it issues.
+\item At the token endpoint the client presents the original verifier. The
+server hashes it and compares it to the stored challenge. A mismatch means the
+party redeeming the code is not the party that requested it, and the exchange
+is refused.
+\end{enumerate}
+
+\begin{plain}
+code_verifier   dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
+code_challenge  E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM
+                = base64url(sha256(code_verifier))
+\end{plain}
+
+An intercepted code is now inert. The interceptor holds the code and does not
+hold the verifier, and the verifier never left the client's memory. The hash is
+one-way, so the challenge that did travel over the redirect gives nothing away.
+
+One requirement here is easy to skip, and the specification states it as a MUST:
+the client must \emph{verify} that the authorization server supports PKCE before
+it begins, by looking for \texttt{code\_challenge\_methods\_supported} in the
+metadata it fetched in step 3. If that field is absent, the client must refuse
+to proceed. Sending a challenge to a server that ignores challenges produces a
+flow that looks identical, feels identical, and protects nothing, which is a
+worse outcome than a visible failure. OpenID Connect Discovery does not
+technically define that field, and MCP requires it anyway; an OpenID provider
+that omits it is unusable for MCP.
+
+\subsection{One bookkeeping step with no network cost}
+
+While the browser is open, the client records the \texttt{issuer} value from the
+authorization server metadata it validated in step 3, and stores it in the same
+per-request record that holds the PKCE verifier and the \texttt{state} value.
+
+Nothing uses it yet. \secref{issuer-validation} is where it earns its keep, and
+the requirement that it come from \emph{validated} metadata is the whole point:
+an expected issuer read from an untrusted source proves nothing when you compare
+against it later.
 
 \begin{measurebox}{What the handshake costs (modelled)}
 \begin{tabular}{@{}lrr@{}}
@@ -211,24 +277,56 @@ Most of OAuth's complexity is scar tissue. Two pieces of it are worth understand
 when you get them wrong.
 
 \subsection{Audience binding, or: do not be a confused deputy}
+\label{sec:audience-binding}
 
-RFC 8707. The client must send a \texttt{resource} parameter naming the server
-the token is for, on both the authorization request and the token request:
+An access token carries an \emph{audience}: the identity of the resource server
+the token was minted for. In a JWT it is the \texttt{aud} claim; with opaque
+tokens it comes back from introspection. It answers a question distinct from
+``is this token real'', and the distinction is the whole subsection:
+
+\begin{plain}
+iss  who issued this token          https://login.example.com
+sub  which user it speaks for       user-8891
+aud  which server it is for         https://mcp.meridian.example
+exp  when it stops working          1793404800
+\end{plain}
+
+A token can be perfectly valid, unexpired, correctly signed by an issuer you
+trust, and speak for a real user, and still not be \emph{for you}. Checking the
+signature answers the first four questions. Only checking \texttt{aud} answers
+the fifth.
+
+Audience binding is the mechanism that puts the right value in that claim. It is
+RFC 8707, and it has two halves.
+
+The client half: send a \texttt{resource} parameter naming the server the token
+is for, on both the authorization request and the token request.
 
 \begin{plain}
 &resource=https%3A%2F%2Fmcp.meridian.example
 \end{plain}
 
-The server must then validate that tokens presented to it were issued for it.
+The authorization server copies that into the token's audience. The server half:
+validate, on every request, that the token presented was issued for you. A token
+whose audience names somebody else gets a 401, no matter how well-formed it is.
+
+Skip the server half and you have built a confused deputy.
 
 \begin{dangerbox}{The confused deputy}
-Without audience binding: a user authorizes a malicious MCP server. That server
-receives a token. It presents the same token to your server. If your server
-checks only that the token is valid and signed by an issuer it trusts, it now
-acts on the user's behalf at the attacker's direction.
+A confused deputy is a program with more authority than its caller, tricked into
+using that authority on the caller's behalf. The name is from a 1988 paper by
+Norm Hardy about a compiler that could write to a billing file its users could
+not, and could be talked into overwriting it.
 
-The token was real. The user did consent. They simply consented to something
-else.
+Here is the MCP version. A user installs a malicious MCP server and authorizes
+it, willingly, because it claims to summarise their calendar. The authorization
+server issues it a token for the user. That server now presents the same token
+to \emph{your} server. If you check only that the token is valid, unexpired, and
+signed by an issuer you trust, every one of those checks passes, and you go and
+move the user's money at the attacker's direction.
+
+The token was real. The user did consent. They consented to something else, and
+the audience claim is where that distinction is written down.
 \end{dangerbox}
 
 Three rules follow, and the specification states all three as MUST:
@@ -247,13 +345,40 @@ which is URL-mode elicitation, and Chapter~\ref{ch:access-control} covers why
 the shortcut is so tempting.
 
 \subsection{Issuer validation, RFC 9207}
+\label{sec:issuer-validation}
 
 New in this revision, and small enough to skip by accident.
 
-Before redirecting the user, the client records the \texttt{issuer} from the
-authorization server's validated metadata. When the authorization code comes
-back, the response should carry an \texttt{iss} parameter, and the client must
-compare it before redeeming the code.
+Audience binding protects the server from a token issued for somebody else.
+Issuer validation protects the \emph{client} from a code issued by somebody
+else, and the attack it stops is called a mix-up.
+
+A mix-up needs one precondition: the client talks to more than one authorization
+server, and the attacker controls one of them. That is not exotic. A client that
+connects to several MCP servers accumulates several issuers, and any one of them
+could be hostile.
+
+The attack runs like this. The user asks the client to connect to the attacker's
+MCP server, which is an ordinary thing to do and not yet a compromise. The
+client discovers the attacker's authorization server and starts a flow with it.
+The attacker's authorization server, instead of authenticating the user itself,
+redirects the browser onward to an honest authorization server the client also
+uses, with the client's own \texttt{client\_id} and redirect URI. The user sees
+a login page they recognise, from a company they trust, and signs in. The code
+comes back to the client's redirect URI.
+
+The client is now holding a code issued by the honest server while believing it
+is talking to the attacker's server. So it does the natural thing: it sends the
+code, and the PKCE verifier, to the attacker's token endpoint. The attacker
+takes that code and redeems it at the honest server. PKCE did not help, because
+the client handed over the verifier itself.
+
+The fix is one string comparison. Before redirecting, the client records the
+\texttt{issuer} from the authorization server's validated metadata, which is the
+bookkeeping step from earlier in this chapter. When the authorization response
+comes back, it should carry an \texttt{iss} parameter naming who actually issued
+the code. The client compares the two before redeeming anything. In the attack
+above they differ, and the flow stops before the code moves.
 
 \begin{table}[htbp]
 \centering

@@ -86,6 +86,47 @@ A read looks like this:
 }
 \end{wire}
 
+\subsection{What a resource descriptor carries}
+
+That was a read. \texttt{resources/list} returns descriptors instead, and a
+descriptor is mostly optional fields that hosts use to make decisions before
+spending anything:
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}llX@{}}
+\toprule
+\thead{Field} & \thead{Required} & \thead{What a host does with it} \\
+\midrule
+\texttt{uri}         & yes & Addresses it. This is the only field a read needs \\
+\texttt{name}        & yes & Programmatic identifier, shown when no title exists \\
+\texttt{title}       & no  & Human-facing label for the picker \\
+\texttt{description} & no  & Goes to the model, so it can decide whether to ask \\
+\texttt{mimeType}    & no  & Chooses a renderer; decides text against blob \\
+\texttt{size}        & no  & Bytes before encoding. Budget before reading \\
+\texttt{annotations} & no  & \texttt{audience}, \texttt{priority}, \texttt{lastModified} \\
+\bottomrule
+\end{tabularx}
+\caption{A resource descriptor. Everything after the first two exists so a host
+can decide \emph{not} to read something.}
+\label{tab:resource-fields}
+\end{table}
+
+\texttt{size} deserves attention because it is the cheapest context-budget
+control in the protocol and almost nobody populates it. It is the raw byte
+count, before base64 encoding and before tokenisation. A host that sees
+\texttt{"size": 4194304} on a filing can decide to summarise it, page it, or ask
+the user, all before a single byte crosses the wire. A host that discovers the
+size by reading has already spent the four megabytes.
+
+The \texttt{annotations} object is three fields and worth knowing:
+\texttt{audience} (\texttt{["user"]}, \texttt{["assistant"]}, or both) says who
+the content is meant for, so a host can attach a resource to the UI without
+putting it in the model's context; \texttt{priority}, from 0 to 1, says how
+important it is, where 1 means effectively required; and \texttt{lastModified},
+an ISO 8601 timestamp, lets a client skip a refetch it can prove is pointless.
+
 Two rules worth internalising.
 
 \textbf{A read may return several contents.} Reading a directory resource can
@@ -125,8 +166,22 @@ def account_summary(ctx: RequestContext, uri: str, params: dict):
     return json.dumps(account.to_json(), separators=(",", ":"))
 \end{py}
 
-Level 1 templates (a variable inside a path segment) cover essentially every
-real case. Meridian compiles them to a regex once, at registration:
+RFC 6570 defines four levels of template expressiveness, and they stack. Level 1
+is simple string substitution: \texttt{\{account\_id\}} anywhere in the URI, one
+variable, expanded verbatim. Level 2 adds reserved-character expansion, so a
+variable can contain slashes without escaping them. Level 3 adds multiple
+variables in one expression and the operators for query strings and path
+segments, such as \texttt{\{?from,to\}}, which expands to
+\texttt{?from=X\&to=Y}. Level 4 adds value modifiers: prefix truncation and
+explosion of lists into repeated parameters.
+
+Level 1 covers essentially every real case, and it is worth being deliberate
+about stopping there. A level 3 template with optional query parameters gives
+the model several ways to write the same URI, which means several cache keys for
+the same content, and a template it can get subtly wrong. One variable per path
+segment is a smaller target.
+
+Meridian compiles level 1 templates to a regex once, at registration:
 
 \begin{py}
 def __post_init__(self) -> None:
@@ -207,7 +262,33 @@ The most common mistake, and it is a self-inflicted denial of service.
 polling on a shared TTL is a synchronised thundering herd that you built
 yourself, on purpose, out of enthusiasm.}
 
-The correct loop is: need the data, check freshness, refetch only if stale.
+A thundering herd is what happens when many clients become ready at the same
+instant and all issue the same request. The synchronisation is the problem, and
+a shared TTL supplies it for free. Suppose 2,000 clients fetch your curve
+resource over a few minutes, each caching it with \texttt{ttlMs} of one hour.
+Their fetches were spread out; their \emph{expiries} are spread out identically,
+so at first nothing looks wrong. Then one deploy restarts them all together, or
+one popular resource gets published and everybody fetches it within the same
+second, and from that moment the fleet is in lockstep. Every hour, on the hour,
+2,000 requests arrive inside a second or two against a server sized for 2,000
+requests per hour.
+
+It gets worse on recovery. The server slows under the spike, clients time out,
+timed-out clients retry immediately, and the retries land while the original
+spike is still in flight.
+
+Two things prevent it, and they compose.
+
+\textbf{Refetch lazily.} The correct loop is: need the data, check freshness,
+refetch only if stale. A client that never asks for data nobody wanted cannot
+stampede. This alone fixes most of it, because real request arrivals are
+naturally spread.
+
+\textbf{Jitter what remains.} Where you genuinely must refresh in the
+background, subtract a random fraction of the TTL from each client's expiry, so
+a one-hour TTL expires somewhere in the last five to ten minutes rather than
+exactly on the hour. The randomness has to be per client and per key; a single
+random offset chosen at startup keeps the fleet synchronised with itself.
 
 \begin{py}
 def get(self, server, method, params, auth_context="anon"):

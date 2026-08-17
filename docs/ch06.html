@@ -243,6 +243,56 @@ subscriptions/listen       -&gt; tell me when these change</code></pre>
     &quot;cacheScope&quot;: &quot;private&quot;
   }
 }</code></pre>
+<section id="what-a-resource-descriptor-carries" class="level3">
+<h3>What a resource descriptor carries</h3>
+<p>That was a read. <code>resources/list</code> returns descriptors instead, and a descriptor is mostly optional fields that hosts use to make decisions before spending anything:</p>
+<table id="tab:resource-fields">
+<caption>A resource descriptor. Everything after the first two exists so a host can decide <em>not</em> to read something.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Field</strong></td>
+<td style="text-align: left;"><strong>Required</strong></td>
+<td style="text-align: left;"><strong>What a host does with it</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>uri</code></td>
+<td style="text-align: left;">yes</td>
+<td style="text-align: left;">Addresses it. This is the only field a read needs</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>name</code></td>
+<td style="text-align: left;">yes</td>
+<td style="text-align: left;">Programmatic identifier, shown when no title exists</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>title</code></td>
+<td style="text-align: left;">no</td>
+<td style="text-align: left;">Human-facing label for the picker</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>description</code></td>
+<td style="text-align: left;">no</td>
+<td style="text-align: left;">Goes to the model, so it can decide whether to ask</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>mimeType</code></td>
+<td style="text-align: left;">no</td>
+<td style="text-align: left;">Chooses a renderer; decides text against blob</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>size</code></td>
+<td style="text-align: left;">no</td>
+<td style="text-align: left;">Bytes before encoding. Budget before reading</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>annotations</code></td>
+<td style="text-align: left;">no</td>
+<td style="text-align: left;"><code>audience</code>, <code>priority</code>, <code>lastModified</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>size</code> deserves attention because it is the cheapest context-budget control in the protocol and almost nobody populates it. It is the raw byte count, before base64 encoding and before tokenisation. A host that sees <code>"size": 4194304</code> on a filing can decide to summarise it, page it, or ask the user, all before a single byte crosses the wire. A host that discovers the size by reading has already spent the four megabytes.</p>
+<p>The <code>annotations</code> object is three fields and worth knowing: <code>audience</code> (<code>["user"]</code>, <code>["assistant"]</code>, or both) says who the content is meant for, so a host can attach a resource to the UI without putting it in the model’s context; <code>priority</code>, from 0 to 1, says how important it is, where 1 means effectively required; and <code>lastModified</code>, an ISO 8601 timestamp, lets a client skip a refetch it can prove is pointless.</p>
 <p>Two rules worth internalising.</p>
 <p><strong>A read may return several contents.</strong> Reading a directory resource can legitimately return every file in it. Useful, and a good way to accidentally put four megabytes into a context window.</p>
 <p><strong>An empty <code>contents</code> array is forbidden for a nonexistent resource.</strong> It is ambiguous: does the resource exist and have no content, or not exist? Return <code>-32602</code> instead.</p>
@@ -250,6 +300,7 @@ subscriptions/listen       -&gt; tell me when these change</code></pre>
 <p>Resource-not-found was <code>-32002</code> through <code>2025-11-25</code>. It is <code>-32602</code> (Invalid params) now, aligning with plain JSON-RPC.</p>
 <p>The asymmetry from Chapter <a href="ch03.html#ch:transport">3</a> applies here specifically: read the old code, write only the new one.</p>
 </aside>
+</section>
 <section id="templates" class="level3">
 <h3>Templates</h3>
 <p>Enumerating 240 accounts as concrete resources would be silly. A template describes the family instead, using RFC 6570 URI templates:</p>
@@ -266,7 +317,9 @@ def account_summary(ctx: RequestContext, uri: str, params: dict):
     if account is None:
         raise ResourceNotFound(uri)
     return json.dumps(account.to_json(), separators=(&quot;,&quot;, &quot;:&quot;))</code></pre>
-<p>Level 1 templates (a variable inside a path segment) cover essentially every real case. Meridian compiles them to a regex once, at registration:</p>
+<p>RFC 6570 defines four levels of template expressiveness, and they stack. Level 1 is simple string substitution: <code>{account_id}</code> anywhere in the URI, one variable, expanded verbatim. Level 2 adds reserved-character expansion, so a variable can contain slashes without escaping them. Level 3 adds multiple variables in one expression and the operators for query strings and path segments, such as <code>{?from,to}</code>, which expands to <code>?from=X&amp;to=Y</code>. Level 4 adds value modifiers: prefix truncation and explosion of lists into repeated parameters.</p>
+<p>Level 1 covers essentially every real case, and it is worth being deliberate about stopping there. A level 3 template with optional query parameters gives the model several ways to write the same URI, which means several cache keys for the same content, and a template it can get subtly wrong. One variable per path segment is a smaller target.</p>
+<p>Meridian compiles level 1 templates to a regex once, at registration:</p>
 <pre class="python" data-language="python"><code>def __post_init__(self) -&gt; None:
     # RFC 6570 level 1 is all the book needs: {var} inside a path.
     pattern = re.escape(self.uri_template)
@@ -314,7 +367,11 @@ def account_summary(ctx: RequestContext, uri: str, params: dict):
 <aside class="keyidea">
 <p>Check freshness when you need the data. Do not wake up every <code>ttlMs</code> to refetch data nobody asked for. At scale, a fleet of clients polling on a shared TTL is a synchronised thundering herd that you built yourself, on purpose, out of enthusiasm.</p>
 </aside>
-<p>The correct loop is: need the data, check freshness, refetch only if stale.</p>
+<p>A thundering herd is what happens when many clients become ready at the same instant and all issue the same request. The synchronisation is the problem, and a shared TTL supplies it for free. Suppose 2,000 clients fetch your curve resource over a few minutes, each caching it with <code>ttlMs</code> of one hour. Their fetches were spread out; their <em>expiries</em> are spread out identically, so at first nothing looks wrong. Then one deploy restarts them all together, or one popular resource gets published and everybody fetches it within the same second, and from that moment the fleet is in lockstep. Every hour, on the hour, 2,000 requests arrive inside a second or two against a server sized for 2,000 requests per hour.</p>
+<p>It gets worse on recovery. The server slows under the spike, clients time out, timed-out clients retry immediately, and the retries land while the original spike is still in flight.</p>
+<p>Two things prevent it, and they compose.</p>
+<p><strong>Refetch lazily.</strong> The correct loop is: need the data, check freshness, refetch only if stale. A client that never asks for data nobody wanted cannot stampede. This alone fixes most of it, because real request arrivals are naturally spread.</p>
+<p><strong>Jitter what remains.</strong> Where you genuinely must refresh in the background, subtract a random fraction of the TTL from each client’s expiry, so a one-hour TTL expires somewhere in the last five to ten minutes rather than exactly on the hour. The randomness has to be per client and per key; a single random offset chosen at startup keeps the fleet synchronised with itself.</p>
 <pre class="python" data-language="python"><code>def get(self, server, method, params, auth_context=&quot;anon&quot;):
     if method not in CACHEABLE_METHODS:
         self.stats.uncacheable += 1
