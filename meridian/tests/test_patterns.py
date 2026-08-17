@@ -363,5 +363,68 @@ class TestCompletions(unittest.TestCase):
         self.assertEqual(resp["error"]["code"], -32602)
 
 
+class TestTaskNotifications(unittest.TestCase):
+    """Push instead of poll: notifications/tasks over subscriptions/listen."""
+
+    def setUp(self):
+        from meridian.protocol import tasks as tasks_ext
+        from meridian.protocol.subscriptions import SubscriptionSink
+        self.tasks_ext = tasks_ext
+        self.server = risk.build_server()
+        tasks_ext.install(self.server)
+        self.sent: list[dict] = []
+        self.sink = SubscriptionSink(7, {"tasks": True}, self.sent.append)
+        self.sink.acknowledge(self.server.capabilities())
+        self.server.attach_subscriber(self.sink)
+
+    def pushed(self):
+        return [m for m in self.sent if m.get("method") == "notifications/tasks"]
+
+    def test_update_pushes_the_whole_task(self):
+        """Carrying the task saves the tasks/get the client would send next."""
+        task = self.server.tasks.create(status=self.tasks_ext.WORKING)
+        self.server.tasks.update(task.task_id, status_message="scoring")
+        pushed = self.pushed()
+        self.assertEqual(len(pushed), 1)
+        body = pushed[0]["params"]["task"]
+        self.assertEqual(body["taskId"], task.task_id)
+        self.assertEqual(body["statusMessage"], "scoring")
+
+    def test_terminal_transition_is_pushed(self):
+        task = self.server.tasks.create(status=self.tasks_ext.WORKING)
+        self.server.tasks.update(task.task_id, status=self.tasks_ext.COMPLETED,
+                                 result={"decision": "approve"})
+        self.assertEqual(self.pushed()[-1]["params"]["task"]["status"], "completed")
+
+    def test_notifications_are_tagged_with_the_subscription_id(self):
+        """One stdio pipe carries every subscription, so the tag is the demux."""
+        task = self.server.tasks.create(status=self.tasks_ext.WORKING)
+        self.server.tasks.update(task.task_id, status_message="x")
+        meta = self.pushed()[0]["params"]["_meta"]
+        self.assertEqual(meta["io.modelcontextprotocol/subscriptionId"], 7)
+
+    def test_a_subscriber_that_did_not_ask_gets_nothing(self):
+        from meridian.protocol.subscriptions import SubscriptionSink
+        other_sent: list[dict] = []
+        other = SubscriptionSink(8, {"toolsListChanged": True}, other_sent.append)
+        other.acknowledge(self.server.capabilities())
+        self.server.attach_subscriber(other)
+
+        task = self.server.tasks.create(status=self.tasks_ext.WORKING)
+        self.server.tasks.update(task.task_id, status_message="x")
+        self.assertFalse([m for m in other_sent
+                          if m.get("method") == "notifications/tasks"])
+
+    def test_a_server_without_the_extension_does_not_grant_task_pushes(self):
+        """Granting them would promise updates no code path can send."""
+        from meridian.protocol.subscriptions import SubscriptionSink
+        plain = risk.build_server()
+        sent: list[dict] = []
+        sink = SubscriptionSink(9, {"tasks": True}, sent.append)
+        sink.acknowledge(plain.capabilities())
+        self.assertNotIn("tasks", sent[0]["params"]["notifications"])
+        self.assertFalse(sink.wants("tasks"))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -246,6 +246,80 @@ For long jobs, back off. Poll fast for the first few seconds in case the work
 was quicker than expected, then widen. And add jitter, or a thousand clients
 that started together will keep polling together forever.
 
+\subsection{Or stop polling}
+
+Every row in that table is waste, and the protocol has an answer.
+
+A server may push task state with \texttt{notifications/tasks}, and clients opt
+in through the \texttt{subscriptions/listen} mechanism from
+Chapter~\ref{ch:resources}. Polling remains the default and the fallback,
+because it needs nothing from either side. Push is what you use when the server
+offers it.
+
+The notification carries \textbf{the whole task}, not just its id:
+
+\begin{wire}
+{
+  "jsonrpc": "2.0",
+  "method": "notifications/tasks",
+  "params": {
+    "_meta": { "io.modelcontextprotocol/subscriptionId": 7 },
+    "task": {
+      "taskId": "tsk_a1b2c3d4e5f6",
+      "status": "working",
+      "statusMessage": "checking covenants",
+      "progress": 0.75,
+      "pollIntervalMs": 200
+    }
+  }
+}
+\end{wire}
+
+That is the design decision worth noticing. A notification saying only ``task
+tsk\_a1b2 changed'' would force a \texttt{tasks/get} to find out what changed,
+so every update would cost a round trip and you would have replaced polling with
+polling plus a wake-up. Carrying the state means the client learns everything
+from one message it did not have to ask for.
+
+Meridian pushes from inside \texttt{TaskStore.update}, which is the only path
+that changes a task:
+
+\begin{py}
+def update(self, task_id: str, **fields) -> Task:
+    """Change a task's state, and tell anybody who asked to be told.
+
+    Every state change goes through here, which is what makes the push
+    path trustworthy: there is no way to move a task to `completed` without
+    the notification going out.
+    """
+\end{py}
+
+The subscription filter has the same shape as the rest, and the granting logic
+has one rule specific to this:
+
+\begin{py}
+# Task pushes are only on offer from a server running the Tasks
+# extension. Granting them otherwise promises updates that no code
+# path can ever send.
+"tasks": "io.modelcontextprotocol/tasks" in (caps.get("extensions") or {}),
+\end{py}
+
+A client that asks a task-less server for task updates is told so in the
+acknowledgement, immediately, rather than waiting quietly for the rest of its
+life. That is the same courtesy the acknowledgement pays for resource
+subscriptions, and for the same reason.
+
+\begin{notebox}{Push does not let you skip the polling code}
+Write the polling loop anyway.
+
+A subscription is a stream, and streams break. The client reconnects and
+re-sends \texttt{subscriptions/listen}, and in the window between the break and
+the re-subscribe, any number of task transitions happened that nobody delivered.
+The state you missed is still readable with \texttt{tasks/get}, which is why the
+right shape is push as an optimisation over a polling loop with a long interval,
+rather than push as a replacement for one.
+\end{notebox}
+
 \subsection{Mid-flight input}
 
 This is where Tasks and MRTR compose, and it is genuinely elegant.
@@ -401,9 +475,10 @@ a frame on the wire that somebody has to read.
 request it belongs to}. It never appears on a \texttt{subscriptions/listen}
 stream, and it stops existing the moment the request finishes.
 
-Task status is polled, or pushed via \texttt{notifications/tasks} to clients who
-subscribed. Different lifetime, different channel, and mixing them up produces a
-client that waits for progress on a request that ended twenty minutes ago.
+Task status is polled, or pushed via \texttt{notifications/tasks} to clients
+who subscribed, and it outlives the request that created it by design.
+Different lifetime, different channel, and mixing them up produces a client
+that waits for progress on a request that ended twenty minutes ago.
 \end{notebox}
 
 \section{Meridian's underwriting task}
@@ -485,6 +560,8 @@ in once via capabilities.
 \item \texttt{input\_required} is not terminal. Poll at the server's
 \texttt{pollIntervalMs}, back off, and add jitter.
 \item \texttt{tasks/update} must be idempotent. Cancellation is cooperative.
+\item \texttt{notifications/tasks} carries the whole task, so a push costs no
+follow-up round trip. Keep the polling loop anyway; streams break.
 \item An in-memory task store behind a load balancer has reinvented sticky
 sessions. Use a shared, durable, expiring store, and authorize every access.
 \item Under a second, stay synchronous. One to ten seconds, stream progress.

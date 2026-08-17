@@ -91,10 +91,12 @@ class TaskStore:
     reinvented sticky sessions, which is the thing this revision deleted.
     """
 
-    def __init__(self, *, default_ttl_ms: int = 3_600_000):
+    def __init__(self, *, default_ttl_ms: int = 3_600_000, server=None):
         self._tasks: dict[str, Task] = {}
         self._lock = threading.RLock()
         self.default_ttl_ms = default_ttl_ms
+        # Set by `install`, so an update can push as well as be polled for.
+        self.server = server
 
     def create(self, **kw) -> Task:
         task = Task(task_id="tsk_" + uuid.uuid4().hex[:16],
@@ -111,10 +113,18 @@ class TaskStore:
         return task
 
     def update(self, task_id: str, **fields) -> Task:
+        """Change a task's state, and tell anybody who asked to be told.
+
+        Every state change goes through here, which is what makes the push
+        path trustworthy: there is no way to move a task to `completed` without
+        the notification going out.
+        """
         task = self.get(task_id)
         with self._lock:
             for key, value in fields.items():
                 setattr(task, key, value)
+        if self.server is not None:
+            self.server.notify_task(task.to_json())
         return task
 
     def sweep(self) -> int:
@@ -137,6 +147,7 @@ def install(server, store: TaskStore | None = None) -> TaskStore:
     """
     store = store or TaskStore()
     server.declare_extension(EXTENSION_ID, {})
+    store.server = server
     server.tasks = store
 
     @server.method("tasks/get")

@@ -397,6 +397,45 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </aside>
 <p>For long jobs, back off. Poll fast for the first few seconds in case the work was quicker than expected, then widen. And add jitter, or a thousand clients that started together will keep polling together forever.</p>
 </section>
+<section id="or-stop-polling" class="level3">
+<h3>Or stop polling</h3>
+<p>Every row in that table is waste, and the protocol has an answer.</p>
+<p>A server may push task state with <code>notifications/tasks</code>, and clients opt in through the <code>subscriptions/listen</code> mechanism from Chapter <a href="ch06.html#ch:resources">6</a>. Polling remains the default and the fallback, because it needs nothing from either side. Push is what you use when the server offers it.</p>
+<p>The notification carries <strong>the whole task</strong>, not just its id:</p>
+<pre class="json" data-language="json"><code>{
+  &quot;jsonrpc&quot;: &quot;2.0&quot;,
+  &quot;method&quot;: &quot;notifications/tasks&quot;,
+  &quot;params&quot;: {
+    &quot;_meta&quot;: { &quot;io.modelcontextprotocol/subscriptionId&quot;: 7 },
+    &quot;task&quot;: {
+      &quot;taskId&quot;: &quot;tsk_a1b2c3d4e5f6&quot;,
+      &quot;status&quot;: &quot;working&quot;,
+      &quot;statusMessage&quot;: &quot;checking covenants&quot;,
+      &quot;progress&quot;: 0.75,
+      &quot;pollIntervalMs&quot;: 200
+    }
+  }
+}</code></pre>
+<p>That is the design decision worth noticing. A notification saying only “task tsk_a1b2 changed” would force a <code>tasks/get</code> to find out what changed, so every update would cost a round trip and you would have replaced polling with polling plus a wake-up. Carrying the state means the client learns everything from one message it did not have to ask for.</p>
+<p>Meridian pushes from inside <code>TaskStore.update</code>, which is the only path that changes a task:</p>
+<pre class="python" data-language="python"><code>def update(self, task_id: str, **fields) -&gt; Task:
+    &quot;&quot;&quot;Change a task&#39;s state, and tell anybody who asked to be told.
+
+    Every state change goes through here, which is what makes the push
+    path trustworthy: there is no way to move a task to `completed` without
+    the notification going out.
+    &quot;&quot;&quot;</code></pre>
+<p>The subscription filter has the same shape as the rest, and the granting logic has one rule specific to this:</p>
+<pre class="python" data-language="python"><code># Task pushes are only on offer from a server running the Tasks
+# extension. Granting them otherwise promises updates that no code
+# path can ever send.
+&quot;tasks&quot;: &quot;io.modelcontextprotocol/tasks&quot; in (caps.get(&quot;extensions&quot;) or {}),</code></pre>
+<p>A client that asks a task-less server for task updates is told so in the acknowledgement, immediately, rather than waiting quietly for the rest of its life. That is the same courtesy the acknowledgement pays for resource subscriptions, and for the same reason.</p>
+<aside class="box note"><p class="box-title">Push does not let you skip the polling code</p>
+<p>Write the polling loop anyway.</p>
+<p>A subscription is a stream, and streams break. The client reconnects and re-sends <code>subscriptions/listen</code>, and in the window between the break and the re-subscribe, any number of task transitions happened that nobody delivered. The state you missed is still readable with <code>tasks/get</code>, which is why the right shape is push as an optimisation over a polling loop with a long interval, rather than push as a replacement for one.</p>
+</aside>
+</section>
 <section id="mid-flight-input" class="level3">
 <h3>Mid-flight input</h3>
 <p>This is where Tasks and MRTR compose, and it is genuinely elegant.</p>
@@ -517,7 +556,7 @@ for i, account_id in enumerate(ids):
 <p>Note the guard. Progress on a three-item loop is noise, and each notification is a frame on the wire that somebody has to read.</p>
 <aside class="box note"><p class="box-title">Progress and tasks are different channels</p>
 <p><code>notifications/progress</code> flows on the <em>response stream of the request it belongs to</em>. It never appears on a <code>subscriptions/listen</code> stream, and it stops existing the moment the request finishes.</p>
-<p>Task status is polled, or pushed via <code>notifications/tasks</code> to clients who subscribed. Different lifetime, different channel, and mixing them up produces a client that waits for progress on a request that ended twenty minutes ago.</p>
+<p>Task status is polled, or pushed via <code>notifications/tasks</code> to clients who subscribed, and it outlives the request that created it by design. Different lifetime, different channel, and mixing them up produces a client that waits for progress on a request that ended twenty minutes ago.</p>
 </aside>
 </section>
 <section id="meridians-underwriting-task" class="level2">
@@ -569,6 +608,7 @@ return tasks_ext.create_task_result(task)</code></pre>
 <li><p>Create the task durably <em>before</em> answering.</p></li>
 <li><p><code>input_required</code> is not terminal. Poll at the server’s <code>pollIntervalMs</code>, back off, and add jitter.</p></li>
 <li><p><code>tasks/update</code> must be idempotent. Cancellation is cooperative.</p></li>
+<li><p><code>notifications/tasks</code> carries the whole task, so a push costs no follow-up round trip. Keep the polling loop anyway; streams break.</p></li>
 <li><p>An in-memory task store behind a load balancer has reinvented sticky sessions. Use a shared, durable, expiring store, and authorize every access.</p></li>
 <li><p>Under a second, stay synchronous. One to ten seconds, stream progress. Over a minute, or human in the loop, use Tasks.</p></li>
 </ul>

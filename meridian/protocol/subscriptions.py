@@ -26,7 +26,8 @@ from typing import Any, Callable
 from . import jsonrpc
 from .meta import KEY_SUBSCRIPTION_ID
 
-FILTER_KEYS = ("toolsListChanged", "promptsListChanged", "resourcesListChanged")
+FILTER_KEYS = ("toolsListChanged", "promptsListChanged", "resourcesListChanged",
+               "tasks")
 
 
 class SubscriptionSink:
@@ -66,6 +67,10 @@ class SubscriptionSink:
             "toolsListChanged": bool((caps.get("tools") or {}).get("listChanged")),
             "promptsListChanged": bool((caps.get("prompts") or {}).get("listChanged")),
             "resourcesListChanged": bool((caps.get("resources") or {}).get("listChanged")),
+            # Task pushes are only on offer from a server running the Tasks
+            # extension. Granting them otherwise promises updates that no code
+            # path can ever send.
+            "tasks": "io.modelcontextprotocol/tasks" in (caps.get("extensions") or {}),
         }
         for key in FILTER_KEYS:
             if self.flags[key] and supports_list_changed[key]:

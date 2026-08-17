@@ -593,6 +593,24 @@ class Server:
                 sent += 1
         return sent
 
+    def notify_task(self, task_json: dict) -> int:
+        """Push a task's state to subscribers who asked for task updates.
+
+        The notification carries the whole task rather than just the id, which
+        saves the `tasks/get` the client would otherwise send on being told
+        something changed. That is the entire reason to prefer this over
+        polling: one message instead of a message plus a round trip.
+        """
+        sent = 0
+        with self._lock:
+            sinks = list(self._subscribers)
+        for sink in sinks:
+            if sink.wants("tasks"):
+                sink.send(jsonrpc.Notification(
+                    "notifications/tasks", {"task": task_json}).to_json())
+                sent += 1
+        return sent
+
     def notify_resource_updated(self, uri: str) -> int:
         sent = 0
         with self._lock:
