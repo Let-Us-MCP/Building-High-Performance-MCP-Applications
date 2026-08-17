@@ -323,6 +323,17 @@ if self.cost_budget_usd is not None and result.cost_usd &gt; self.cost_budget_us
 <h2>Context management</h2>
 <p>Now the hard part.</p>
 <p>Every tool result enters the context and stays there. Ten calls returning 2 KB each is 20 KB of JSON, re-processed on every subsequent turn, most of it irrelevant by the time you get to turn eight.</p>
+<section id="the-cost-argument-is-the-weaker-one" class="level3">
+<h3>The cost argument is the weaker one</h3>
+<p>The obvious reason to manage context is money, and this chapter’s cost table makes that case. There is a second reason, and in practice it decides more outcomes.</p>
+<p>A model reading 60,000 tokens is not the same model reading 6,000. Attention is finite and spread across everything present, so each additional token of irrelevant material competes with the relevant ones. Two effects follow, and both are worth designing around.</p>
+<p><strong>Position matters.</strong> Material at the very start and very end of a long context is used more reliably than material in the middle. A tool result buried at turn three of a twelve-turn conversation is in the worst possible place: still paid for on every turn, and least likely to be acted on. This is why appending is not a neutral operation, and why the summarisation strategies below beat simply having a bigger window.</p>
+<p><strong>Contradictions accumulate.</strong> At turn one the account had a score of 55. At turn seven, after a re-score, it has 61. Both are in the context, both look authoritative, and nothing marks the first as superseded. The model now has to guess which one you meant, and a plausible wrong guess is worse than a missing value, because a missing value produces a question and a wrong guess produces a confident answer.</p>
+<p>So the goal is not a smaller context. It is a context where everything present is current and relevant, which is a different objective and sometimes points the other way: re-injecting a result you dropped can be the right call, and spending tokens on an explicit “the score was re-run; the current figure is 61” is usually worth more than the tokens it costs.</p>
+<aside class="keyidea">
+<p>Growing your context window raises the ceiling on what fits. It does not raise the ceiling on what the model reliably uses. Those are different limits, and the second one is the one your task success rate is bounded by.</p>
+</aside>
+</section>
 <section id="truncate-at-minimum" class="level3">
 <h3>Truncate, at minimum</h3>
 <p>Meridian’s approach is blunt and bounded, which beats unbounded:</p>

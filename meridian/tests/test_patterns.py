@@ -12,6 +12,7 @@ import unittest
 from meridian import ops
 from meridian.host.delegation import (
     DEPTH_KEY,
+    PATH_KEY,
     DOLLARS_KEY,
     MAX_DELEGATION_DEPTH,
     TOKENS_KEY,
@@ -26,6 +27,7 @@ from meridian.protocol import (
     McpError,
     build_request_meta,
 )
+from meridian.host import delegation
 from meridian.protocol.meta import parse_request_context
 from meridian.servers import fraud, risk, scoped
 
@@ -561,6 +563,38 @@ class TestBackoff(unittest.TestCase):
             b.next_delay(1.0)
         b.reset()
         self.assertEqual(b.next_delay(1.0), 1.0)
+
+
+class TestDelegationCycles(unittest.TestCase):
+    def path_ctx(self, path):
+        return ctx_with({PATH_KEY: path})
+
+    def test_a_fresh_request_has_an_empty_path(self):
+        self.assertEqual(delegation.call_path(ctx_with({})), [])
+
+    def test_the_path_grows(self):
+        self.assertEqual(
+            delegation.extend_path(self.path_ctx(["supervisor"]), "risk-agent"),
+            ["supervisor", "risk-agent"])
+
+    def test_a_cycle_is_refused(self):
+        with self.assertRaises(McpError):
+            delegation.extend_path(self.path_ctx(["a", "b", "c"]), "a")
+
+    def test_the_error_names_the_cycle(self):
+        """A depth error names the wrong problem; this one names the actual one."""
+        try:
+            delegation.extend_path(self.path_ctx(["a", "b", "c"]), "a")
+        except McpError as exc:
+            self.assertIn("a -> b -> c -> a", str(exc))
+        else:
+            self.fail("no error raised")
+
+    def test_a_diamond_is_not_a_cycle(self):
+        """Two paths reaching the same agent independently are both fine."""
+        left = delegation.extend_path(self.path_ctx(["top", "left"]), "shared")
+        right = delegation.extend_path(self.path_ctx(["top", "right"]), "shared")
+        self.assertEqual(left[-1], right[-1])
 
 
 if __name__ == "__main__":

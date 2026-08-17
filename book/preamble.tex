@@ -286,13 +286,19 @@
 }
 
 % The one-line thesis of a section. Used sparingly, on purpose.
+% The box must start in vertical mode. A stray \noindent here opens horizontal
+% mode, and a breakable tcolorbox that then splits across a page raises
+% "You can't use \prevdepth in horizontal mode" — a fatal error that names a
+% page number and no file, and that only appears once the text above it grows
+% enough to move the box onto a boundary.
 \newcommand{\keyidea}[1]{%
-  \par\vspace{8pt}
-  \noindent\begin{tcolorbox}[enhanced, breakable, colback=accentsoft,
+  \par\vspace{8pt}%
+  \begin{tcolorbox}[enhanced, breakable, colback=accentsoft,
     colframe=accent, boxrule=0pt, leftrule=3pt, arc=0pt, outer arc=0pt,
     left=11pt, right=11pt, top=9pt, bottom=9pt]
   \sffamily\itshape #1
-  \end{tcolorbox}\vspace{4pt}\noindent\ignorespaces
+  \end{tcolorbox}%
+  \vspace{4pt}\par\noindent\ignorespaces
 }
 
 % ---------------------------------------------------------------------------

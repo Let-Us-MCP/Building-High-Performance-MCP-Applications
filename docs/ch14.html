@@ -236,6 +236,24 @@ def analyse_account(ctx: RequestContext):
 <p>Agents call each other directly. No coordinator.</p>
 <p><strong>Isolation:</strong> none, structurally. Peers route around damage, which is resilience of a different kind.</p>
 <p><strong>Failure mode:</strong> cycles. A calls B calls C calls A, and now you have an infinite recursion distributed across three machines with a token meter attached.</p>
+<p>The depth limit below bounds how expensive that gets. It does not <em>detect</em> it, and the difference matters when somebody is paged. A cycle that hits the depth limit reports “delegation depth 3 exceeds the limit of 3”, which names a budget problem and sends whoever is on call to look at budgets. The actual problem is a loop in the call graph, and it is not visible from that message.</p>
+<p>So carry the path as well as the depth:</p>
+<pre class="python" data-language="python"><code>def extend_path(ctx: RequestContext, name: str) -&gt; list[str]:
+    &quot;&quot;&quot;Add this agent to the path, refusing if it is already on it.
+
+    A depth limit bounds how bad a cycle gets; it does not detect one. A mesh
+    where A calls B calls C calls A stops at depth 3 having done three useless
+    delegations and returned a budget error that names the wrong problem. The
+    path makes the actual cycle visible in the error message, which is the
+    difference between a five-minute diagnosis and an afternoon.
+    &quot;&quot;&quot;
+    path = call_path(ctx)
+    if name in path:
+        raise errors.InvalidParams(
+            &quot;Delegation cycle: &quot; + &quot; -&gt; &quot;.join([*path, name]))
+    return [*path, name]</code></pre>
+<p>The error now reads <code>Delegation cycle: a -&gt; b -&gt; c -&gt; a</code>, which is a diagnosis rather than a symptom.</p>
+<p>One deliberate property: a diamond is legal. If the supervisor delegates to two specialists and both call the same pricing agent, neither path contains a repeat, and both proceed. The check is on the path, not on the set of agents involved, because reaching one agent by two routes is a normal shape and only a loop is a bug.</p>
 </section>
 <section id="hierarchy" class="level3">
 <h3>Hierarchy</h3>
@@ -450,10 +468,27 @@ result = AgentLoop(supervisor, model,
 <p>Which is the confused deputy from Chapter <a href="ch04.html#ch:authorization">4</a>, one layer up and much easier to build by accident, because the specialist is “one of ours”.</p>
 </aside>
 <p>Three rules:</p>
-<p><strong>Delegate authorization, not just work.</strong> The child should act with its own credentials, scoped to what it needs. Token exchange exists for this.</p>
-<p><strong>Never pass through a token.</strong> It was forbidden in Chapter <a href="ch04.html#ch:authorization">4</a> and it is still forbidden here.</p>
+<p><strong>Delegate authorization along with the work.</strong> The child should act with its own credentials, scoped to what it needs.</p>
+<p><strong>Never pass through a token.</strong> It was forbidden in Chapter <a href="ch04.html#ch:authorization">4</a> and it is still forbidden here. Chapter 4’s audience binding is the reason: the supervisor’s token names the supervisor as its audience, so a specialist presenting it downstream is presenting a token issued for somebody else, and a correctly implemented server will refuse it.</p>
+<p>Which raises the obvious question the first two rules leave open. If the child needs credentials, and the parent must not lend it any, where do the child’s credentials come from?</p>
+<section id="token-exchange-or-how-the-child-gets-its-own-credentials" class="level3">
+<h3>Token exchange, or: how the child gets its own credentials</h3>
+<p>The mechanism is OAuth Token Exchange, RFC 8693, and it is worth knowing by name because it is the piece most delegated architectures are missing.</p>
+<p>The idea is that an authorization server will trade one token for another, narrower one. The supervisor presents its own token, says which downstream resource the new token is for and which scopes it needs, and receives a token that speaks for the same user, names the specialist as the party acting, and can do strictly less.</p>
+<pre class="http" data-language="http"><code>POST /token HTTP/1.1
+grant_type=urn:ietf:params:oauth:grant-type:token-exchange
+&amp;subject_token=&lt;the supervisor&#39;s token&gt;
+&amp;subject_token_type=urn:ietf:params:oauth:token-type:access_token
+&amp;resource=https%3A%2F%2Frisk-agent.meridian.example
+&amp;scope=risk:read</code></pre>
+<p>Three properties make this the right answer rather than a ceremony.</p>
+<p><strong>The audience is correct.</strong> The returned token names the risk agent, so the risk agent accepts it and nothing else does. A leaked token from deep in the tree unlocks one leaf.</p>
+<p><strong>The scopes only narrow.</strong> A supervisor holding <code>risk:read</code> and <code>risk:write</code> can mint a child token with <code>risk:read</code> alone. The specialist that only reads cannot be talked into writing, whatever it is told by whatever text it just read.</p>
+<p><strong>The user is still the subject.</strong> The <code>sub</code> claim still names the human. Your audit log at the leaf records who this was ultimately for, and the <code>act</code> claim records which agent was acting, so the chain reconstructs without your having to log it separately at every hop.</p>
+<p>That last property is what distinguishes token exchange from giving each agent a service account. Service accounts work, and they lose the user: every leaf log line says <code>risk-agent-prod</code> did it, and the question “what did this system do on Ade’s behalf” becomes unanswerable at exactly the moment somebody asks it in an incident review.</p>
 <p><strong>Audit the delegation, not just the leaves.</strong> An audit log showing <code>assess_account_risk</code> was called tells you nothing about who decided to call it. Record the chain.</p>
 <p>And the one that people find surprising: an agent that consumes untrusted content and then calls another agent has extended the injection surface. If a compliance agent reads poisoned guidance text and then delegates to a risk agent, the injection now reaches a system with different privileges. Chapter <a href="ch19.html#ch:threats">19</a> follows that thread to its conclusion.</p>
+</section>
 </section>
 <section id="what-to-remember" class="level2">
 <h2>What to remember</h2>
@@ -466,7 +501,8 @@ result = AgentLoop(supervisor, model,
 <li><p>Circuit breakers with a half-open probe, because a timeout burns the caller’s step budget and tells it nothing.</p></li>
 <li><p>Propagate <code>traceparent</code>, or a slow request becomes eleven log searches.</p></li>
 <li><p>Every delegation adds at least two model turns. Delegate for real reasons.</p></li>
-<li><p>Delegate authorization along with work, never a token.</p></li>
+<li><p>Delegate authorization along with work, never a token. RFC 8693 token exchange is how the child gets its own, narrower credentials while the user stays the subject.</p></li>
+<li><p>Carry the call path, not only the depth, or a cycle reports itself as a budget problem.</p></li>
 </ul>
 <p>That closes Part III. You can build all of it now. Part IV is about finding out whether it is any good.</p>
 </section>

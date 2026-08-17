@@ -184,6 +184,41 @@ Every tool result enters the context and stays there. Ten calls returning 2\,KB
 each is 20\,KB of JSON, re-processed on every subsequent turn, most of it
 irrelevant by the time you get to turn eight.
 
+\subsection{The cost argument is the weaker one}
+
+The obvious reason to manage context is money, and this chapter's cost table
+makes that case. There is a second reason, and in practice it decides more
+outcomes.
+
+A model reading 60,000 tokens is not the same model reading 6,000. Attention is
+finite and spread across everything present, so each additional token of
+irrelevant material competes with the relevant ones. Two effects follow, and
+both are worth designing around.
+
+\textbf{Position matters.} Material at the very start and very end of a long
+context is used more reliably than material in the middle. A tool result buried
+at turn three of a twelve-turn conversation is in the worst possible place: still
+paid for on every turn, and least likely to be acted on. This is why appending
+is not a neutral operation, and why the summarisation strategies below beat
+simply having a bigger window.
+
+\textbf{Contradictions accumulate.} At turn one the account had a score of 55. At
+turn seven, after a re-score, it has 61. Both are in the context, both look
+authoritative, and nothing marks the first as superseded. The model now has to
+guess which one you meant, and a plausible wrong guess is worse than a missing
+value, because a missing value produces a question and a wrong guess produces a
+confident answer.
+
+So the goal is not a smaller context. It is a context where everything present is
+current and relevant, which is a different objective and sometimes points the
+other way: re-injecting a result you dropped can be the right call, and spending
+tokens on an explicit ``the score was re-run; the current figure is 61'' is
+usually worth more than the tokens it costs.
+
+\keyidea{Growing your context window raises the ceiling on what fits. It does
+not raise the ceiling on what the model reliably uses. Those are different
+limits, and the second one is the one your task success rate is bounded by.}
+
 \subsection{Truncate, at minimum}
 
 Meridian's approach is blunt and bounded, which beats unbounded:

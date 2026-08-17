@@ -180,3 +180,32 @@ def build_delegating_agent(inner_host, model, *, name: str = "meridian-risk-agen
                                        "depth": budget.depth})
 
     return agent
+
+
+# ---------------------------------------------------------------------------
+# Cycles
+# ---------------------------------------------------------------------------
+
+PATH_KEY = "com.meridian/delegationPath"
+
+
+def call_path(ctx: RequestContext) -> list[str]:
+    """The agents this request has already passed through, oldest first."""
+    raw = ctx.raw_meta.get(PATH_KEY)
+    return [str(x) for x in raw] if isinstance(raw, list) else []
+
+
+def extend_path(ctx: RequestContext, name: str) -> list[str]:
+    """Add this agent to the path, refusing if it is already on it.
+
+    A depth limit bounds how bad a cycle gets; it does not detect one. A mesh
+    where A calls B calls C calls A stops at depth 3 having done three useless
+    delegations and returned a budget error that names the wrong problem. The
+    path makes the actual cycle visible in the error message, which is the
+    difference between a five-minute diagnosis and an afternoon.
+    """
+    path = call_path(ctx)
+    if name in path:
+        raise errors.InvalidParams(
+            "Delegation cycle: " + " -> ".join([*path, name]))
+    return [*path, name]

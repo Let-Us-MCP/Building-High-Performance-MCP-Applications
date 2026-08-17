@@ -89,6 +89,40 @@ resilience of a different kind.
 \textbf{Failure mode:} cycles. A calls B calls C calls A, and now you have an
 infinite recursion distributed across three machines with a token meter attached.
 
+The depth limit below bounds how expensive that gets. It does not \emph{detect}
+it, and the difference matters when somebody is paged. A cycle that hits the
+depth limit reports ``delegation depth 3 exceeds the limit of 3'', which names a
+budget problem and sends whoever is on call to look at budgets. The actual
+problem is a loop in the call graph, and it is not visible from that message.
+
+So carry the path as well as the depth:
+
+\begin{py}
+def extend_path(ctx: RequestContext, name: str) -> list[str]:
+    """Add this agent to the path, refusing if it is already on it.
+
+    A depth limit bounds how bad a cycle gets; it does not detect one. A mesh
+    where A calls B calls C calls A stops at depth 3 having done three useless
+    delegations and returned a budget error that names the wrong problem. The
+    path makes the actual cycle visible in the error message, which is the
+    difference between a five-minute diagnosis and an afternoon.
+    """
+    path = call_path(ctx)
+    if name in path:
+        raise errors.InvalidParams(
+            "Delegation cycle: " + " -> ".join([*path, name]))
+    return [*path, name]
+\end{py}
+
+The error now reads \texttt{Delegation cycle: a -> b -> c -> a}, which is a
+diagnosis rather than a symptom.
+
+One deliberate property: a diamond is legal. If the supervisor delegates to two
+specialists and both call the same pricing agent, neither path contains a
+repeat, and both proceed. The check is on the path, not on the set of agents
+involved, because reaching one agent by two routes is a normal shape and only a
+loop is a bug.
+
 \subsection{Hierarchy}
 
 Levels, each summarising for the one above. Portfolio, sector, account.
@@ -368,11 +402,60 @@ and much easier to build by accident, because the specialist is ``one of ours''.
 
 Three rules:
 
-\textbf{Delegate authorization, not just work.} The child should act with its
-own credentials, scoped to what it needs. Token exchange exists for this.
+\textbf{Delegate authorization along with the work.} The child should act with
+its own credentials, scoped to what it needs.
 
 \textbf{Never pass through a token.} It was forbidden in
-Chapter~\ref{ch:authorization} and it is still forbidden here.
+Chapter~\ref{ch:authorization} and it is still forbidden here. Chapter 4's
+audience binding is the reason: the supervisor's token names the supervisor as
+its audience, so a specialist presenting it downstream is presenting a token
+issued for somebody else, and a correctly implemented server will refuse it.
+
+Which raises the obvious question the first two rules leave open. If the child
+needs credentials, and the parent must not lend it any, where do the child's
+credentials come from?
+
+\subsection{Token exchange, or: how the child gets its own credentials}
+
+The mechanism is OAuth Token Exchange, RFC 8693, and it is worth knowing by name
+because it is the piece most delegated architectures are missing.
+
+The idea is that an authorization server will trade one token for another,
+narrower one. The supervisor presents its own token, says which downstream
+resource the new token is for and which scopes it needs, and receives a token
+that speaks for the same user, names the specialist as the party acting, and can
+do strictly less.
+
+\begin{http}
+POST /token HTTP/1.1
+grant_type=urn:ietf:params:oauth:grant-type:token-exchange
+&subject_token=<the supervisor's token>
+&subject_token_type=urn:ietf:params:oauth:token-type:access_token
+&resource=https%3A%2F%2Frisk-agent.meridian.example
+&scope=risk:read
+\end{http}
+
+Three properties make this the right answer rather than a ceremony.
+
+\textbf{The audience is correct.} The returned token names the risk agent, so
+the risk agent accepts it and nothing else does. A leaked token from deep in the
+tree unlocks one leaf.
+
+\textbf{The scopes only narrow.} A supervisor holding \texttt{risk:read} and
+\texttt{risk:write} can mint a child token with \texttt{risk:read} alone. The
+specialist that only reads cannot be talked into writing, whatever it is told by
+whatever text it just read.
+
+\textbf{The user is still the subject.} The \texttt{sub} claim still names the
+human. Your audit log at the leaf records who this was ultimately for, and the
+\texttt{act} claim records which agent was acting, so the chain reconstructs
+without your having to log it separately at every hop.
+
+That last property is what distinguishes token exchange from giving each agent a
+service account. Service accounts work, and they lose the user: every leaf log
+line says \texttt{risk-agent-prod} did it, and the question ``what did this
+system do on Ade's behalf'' becomes unanswerable at exactly the moment somebody
+asks it in an incident review.
 
 \textbf{Audit the delegation, not just the leaves.} An audit log showing
 \texttt{assess\_account\_risk} was called tells you nothing about who decided to
@@ -402,7 +485,10 @@ caller's step budget and tells it nothing.
 \item Propagate \texttt{traceparent}, or a slow request becomes eleven log
 searches.
 \item Every delegation adds at least two model turns. Delegate for real reasons.
-\item Delegate authorization along with work, never a token.
+\item Delegate authorization along with work, never a token. RFC 8693 token
+exchange is how the child gets its own, narrower credentials while the user
+stays the subject. \item Carry the call path, not only the depth, or a cycle
+reports itself as a budget problem.
 \end{itemize}
 
 That closes Part~III. You can build all of it now. Part~IV is about finding out
