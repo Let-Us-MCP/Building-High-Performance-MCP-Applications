@@ -27,6 +27,13 @@ from .meta import (
 
 MAX_MRTR_ROUNDS = 6
 
+# HTTP 401 surfaces as an ordinary protocol error by the time it reaches here.
+UNAUTHORIZED_MARKERS = ("401", "unauthorized", "invalid_token")
+
+
+def _is_unauthorized(exc) -> bool:
+    return any(m in str(exc).lower() for m in UNAUTHORIZED_MARKERS)
+
 
 @dataclass
 class CallStats:
@@ -337,6 +344,44 @@ class Client:
             uri = params.get("uri")
             if uri:
                 self.cache.invalidate_uri(self.label, uri)
+
+    # -- authorization recovery ---------------------------------------------
+
+    def call_with_reauth(self, name, arguments, *, max_attempts=2):
+        """Refresh once, retry once, then stop.
+
+        The retry limit matters. A server that returns 401 for a reason the
+        client cannot fix (a revoked grant, a disabled account) will do so
+        forever, and an unbounded retry turns that into an outage plus a
+        denial-of-service against your own authorization server.
+        """
+        for attempt in range(max_attempts):
+            try:
+                return self.call_tool(name, arguments)
+            except errors.McpError as exc:
+                if not _is_unauthorized(exc):
+                    raise
+                if attempt + 1 == max_attempts:
+                    raise
+                if not self.refresh_token():
+                    raise            # refresh failed; a human is needed
+        raise errors.InternalError("re-authentication did not help")
+
+    def refresh_token(self) -> bool:
+        """Refresh the access token. Returns False when a human is required.
+
+        Meridian has no authorization server, so this is the seam a real client
+        implements. The retry policy above is the part worth copying.
+        """
+        refresh = getattr(self, "_refresh_hook", None)
+        if refresh is None:
+            return False
+        token = refresh()
+        if not token:
+            return False
+        if hasattr(self.transport, "token"):
+            self.transport.token = token
+        return True
 
     # -- era detection ------------------------------------------------------
 

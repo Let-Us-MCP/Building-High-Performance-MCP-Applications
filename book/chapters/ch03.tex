@@ -3,55 +3,109 @@
 
 \epigraph{``Show me the money!''}{Rod Tidwell, \emph{Jerry Maguire} (1996)}
 
-Rod's point was not greed. It was that he had spent years being told about
-value in the abstract and wanted to see the actual figure. This chapter is that
-demand, applied to MCP. We are going to look at literal bytes on a literal
-connection, because every claim about performance from here on rests on knowing
-what is genuinely on the wire and what you imagined was there.
+Rod had spent years being told about value in the abstract and wanted to see the
+actual figure on the actual page. This
+chapter is that demand, applied to MCP.
 
-There are two transports. There used to be three.
+We are going to look at literal bytes on a literal connection, because every
+claim about performance from here on rests on knowing what is genuinely on the
+wire and what you merely imagined was there. I have found that most arguments
+about protocol overhead are settled in about ninety seconds by printing one
+request.
+
+\section{What a transport is, and why there are two}
+
+A \textbf{transport} is the answer to a boring question: how do the bytes get
+from the client to the server and back?
+
+The protocol proper, everything in Chapter~\ref{ch:architecture}, says nothing
+about that. It describes messages: what a request looks like, what a result
+looks like, which fields are required. A transport is the binding that carries
+those messages over some actual channel.
+
+MCP defines two.
+
+\begin{description}[leftmargin=1.4em, style=nextline, itemsep=5pt]
+\item[stdio] The client launches the server as a child process and they talk
+over the process's standard input and output streams, the same two pipes a
+command-line program uses to read and print. Local only, by construction.
+\item[Streamable HTTP] The server is a network service with one URL. The client
+sends HTTP POST requests to it.
+\end{description}
+
+There used to be a third, and Chapter~\ref{ch:transport-matrix} covers migrating
+off it.
+
+Everything else in this chapter is the detail of those two, so it is worth
+saying up front what the choice actually turns on: \textbf{stdio when the server
+runs on the user's own machine, Streamable HTTP when it is shared.} The rest is
+consequences.
 
 \section{JSON-RPC, and the two things MCP adds}
 
-The framing is JSON-RPC 2.0, unmodified, which was a good decision made by
-people resisting the urge to design something. It has three message types.
+Both transports carry the same messages, and the message format is JSON-RPC 2.0.
 
-\textbf{Requests} have an id and expect a response:
+If you have not met it: JSON-RPC is a small, old, deliberately boring
+specification for calling a procedure over a network using JSON. It defines
+three message types and almost nothing else. No types, no schemas, no service
+definitions. It is about two pages long.
+
+MCP uses it unmodified, which was a good decision made by people resisting the
+urge to design something.
+
+\subsection{The three message types}
+
+\textbf{A request} has an id, a method name, and parameters. It expects an
+answer.
 
 \begin{wire}
 { "jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": { ... } }
 \end{wire}
 
-\textbf{Results} come back with the same id:
+\textbf{A result} comes back carrying the same id, so the client can match it to
+the request it sent. That matters because several requests may be in flight at
+once.
 
 \begin{wire}
 { "jsonrpc": "2.0", "id": 1, "result": { "resultType": "complete", ... } }
 \end{wire}
 
-\textbf{Notifications} have no id and get no reply:
+\textbf{A notification} has no id and gets no reply. It is fire-and-forget, used
+for things like progress updates where an acknowledgement would be pointless.
 
 \begin{wire}
 { "jsonrpc": "2.0", "method": "notifications/progress", "params": { ... } }
 \end{wire}
 
-MCP adds exactly two rules on top:
+MCP adds exactly two rules on top of that:
 
-\begin{enumerate}[leftmargin=1.6em, itemsep=3pt]
+\begin{enumerate}[leftmargin=1.6em, itemsep=4pt]
 \item \texttt{result.resultType} is required. Chapter~\ref{ch:architecture}
-covered why: it is the hinge that lets MRTR and Tasks exist without changing
-anything else.
+covered why: it lets a client tell which of several completely different result
+shapes it is holding before it parses the payload.
 \item Request ids must not be \texttt{null}, and must be unique among requests
-you have issued and not yet had answered. Base JSON-RPC allows a null id. MCP
-does not, because null ids make correlation ambiguous on a shared channel.
+you have issued and not yet had answered. Base JSON-RPC permits a null id; MCP
+does not, because a null id makes correlation ambiguous on a shared channel.
 \end{enumerate}
 
-That is the whole extension. Everything interesting is in the payloads.
+That is the whole extension. Everything interesting lives in the payloads.
 
 \subsection{Error codes, and the range you must not touch}
 
-JSON-RPC reserves \texttt{-32768} to \texttt{-32000}. Within that, it leaves
-\texttt{-32000} to \texttt{-32099} for implementations, and \texttt{2026-07-28}
-finally partitioned that space, which needed doing.
+When something goes wrong, the response carries an error instead of a result:
+
+\begin{wire}
+{ "jsonrpc": "2.0", "id": 1,
+  "error": { "code": -32602, "message": "Unknown tool: nope" } }
+\end{wire}
+
+Those negative numbers are not arbitrary. JSON-RPC reserves the range
+\texttt{-32768} to \texttt{-32000} for itself, and within that leaves
+\texttt{-32000} to \texttt{-32099} for implementations to use as they see fit.
+
+``As they see fit'' worked out about as well as you would expect. Different MCP
+implementations picked overlapping codes for different meanings, so
+\texttt{2026-07-28} partitioned the space properly.
 
 \begin{table}[htbp]
 \centering
@@ -73,12 +127,12 @@ Outside \texttt{-32768..-32000}
 \bottomrule
 \end{tabularx}
 \caption{The error-code partition. The middle row is the one people violate,
-usually by picking a ``nice round'' number like \texttt{-32050}.}
+usually by picking a nice round number like \texttt{-32050}.}
 \label{tab:error-ranges}
 \end{table}
 
-Three codes are currently defined in the reserved range, and each tells the
-client something actionable:
+Three codes are currently defined in the reserved range, and each one is designed
+so the client can recover automatically rather than merely reporting failure:
 
 \begin{table}[htbp]
 \centering
@@ -88,25 +142,28 @@ client something actionable:
 \thead{Code} & \thead{Name} & \thead{What the client should do} \\
 \midrule
 \texttt{-32020} & \texttt{HeaderMismatch}
-  & Refetch \texttt{tools/list} (the schema may have changed), then retry with
+  & Refetch the tool list, since the schema may have changed, then retry with
     correct headers \\
 \texttt{-32021} & \texttt{MissingRequiredClientCapability}
-  & Read \texttt{data.requiredCapabilities}; either declare them or stop \\
+  & Read which capability was missing from the error data; declare it or stop \\
 \texttt{-32022} & \texttt{UnsupportedProtocolVersion}
-  & Pick a version from \texttt{data.supported} and retry \\
+  & Pick a version from the \texttt{supported} list in the error and retry \\
 \bottomrule
 \end{tabularx}
-\caption{Every one of these carries enough information for the client to
-recover automatically. That is not an accident, it is the design goal.}
+\caption{Every one of these carries enough information for the client to fix
+itself. That is not an accident, it is the design goal.}
 \label{tab:mcp-errors}
 \end{table}
 
-Two codes are retired and must never be re-emitted: \texttt{-32002}, which meant
-``resource not found'' until this revision replaced it with \texttt{-32602}, and
-\texttt{-32042}, which meant ``URL elicitation required'' for exactly one
+Two codes are retired and must never be sent again: \texttt{-32002}, which meant
+``resource not found'' until this revision replaced it with the standard
+\texttt{-32602}, and \texttt{-32042}, which meant something for exactly one
 revision. Clients should still \emph{accept} \texttt{-32002} from older servers.
-Servers on this revision must not send it. Meridian has a test for precisely
-this, because it is the kind of thing that rots quietly:
+Servers on this revision must not send it.
+
+That asymmetry, accept the old, emit only the new, is worth internalising because
+it recurs everywhere in this book. Meridian has a test for this one, because it
+is exactly the kind of thing that rots quietly:
 
 \begin{py}
 def test_retired_codes_are_never_emitted(self):
@@ -126,8 +183,7 @@ def test_retired_codes_are_never_emitted(self):
 One endpoint. POST only. Every JSON-RPC message is its own HTTP request.
 
 That sentence is doing a lot of work, because it describes something quite
-different from what the same transport looked like a year ago. Here is what
-2026-07-28 deleted:
+different from what the same transport looked like a year ago.
 
 \begin{legacybox}{What Streamable HTTP used to have}
 Protocol versions \texttt{2025-03-26} through \texttt{2025-11-25} used the same
@@ -135,32 +191,61 @@ transport name and a materially different shape:
 
 \begin{itemize}[leftmargin=1.4em, itemsep=2pt]
 \item \texttt{Mcp-Session-Id}, assigned by the server, terminated with HTTP DELETE
-\item A standalone \texttt{GET} that opened an SSE stream for server-initiated messages
-\item Servers sending JSON-RPC \emph{requests} on those streams
-\item Stream resumability via \texttt{Last-Event-ID} and SSE event ids
+\item A standalone \texttt{GET} that opened a long-lived stream for
+      server-initiated messages
+\item Servers sending their own JSON-RPC \emph{requests} on those streams
+\item Streams that could be resumed after a disconnect via \texttt{Last-Event-ID}
 \end{itemize}
 
-None of it survives. A server on this revision should answer \texttt{405} to
-GET and DELETE, ignore \texttt{Mcp-Session-Id} without echoing it, and ignore
-\texttt{Last-Event-ID}.
+None of it survives. A server on this revision should answer \texttt{405 Method
+Not Allowed} to GET and DELETE, ignore \texttt{Mcp-Session-Id} without echoing
+it, and ignore \texttt{Last-Event-ID}.
 \end{legacybox}
+
+\subsection{Server-sent events, briefly}
+
+Before the flow diagrams, one piece of vocabulary, because it appears constantly
+from here on.
+
+Most HTTP responses are a single body: the server sends it and closes. But a
+response can also be a \textbf{stream}, where the server holds the connection
+open and sends pieces over time. The format MCP uses for that is
+\textbf{server-sent events}, or SSE: a text format where each message is a line
+beginning \texttt{data:}, followed by a blank line.
+
+\begin{plain}
+data: {"jsonrpc":"2.0","method":"notifications/progress","params":{...}}
+
+data: {"jsonrpc":"2.0","id":1,"result":{...}}
+
+\end{plain}
+
+It is deliberately simple, it works through ordinary HTTP infrastructure, and
+it flows one way: the server pushes, the client listens. That last property is
+why the 2026 design uses it the way it does.
 
 \subsection{The three shapes of traffic}
 
 \bookfig[0.68]{http-flows}{Everything that happens on a Streamable HTTP
-connection. Three shapes, and the third one is still request/response no matter
+connection. Three shapes, and the third is still request-and-response no matter
 how long it stays open.}{http-flows}
 
-The elegance is in the third one. A long-lived notification stream is not a
-special connection type with its own lifecycle. It is an ordinary POST whose
-response happens to be an SSE stream that stays open. Its state belongs to the
-request, not to the connection, which is why it survives the deletion of
-sessions without needing a replacement concept.
+The first shape is an ordinary request and a single JSON response. The second is
+a request whose response is an SSE stream, used when the server wants to report
+progress before delivering the answer. Both are unremarkable.
+
+The third deserves attention, because it is where the elegance is. A long-lived
+notification stream is not a special connection type with its own lifecycle. It
+is an ordinary POST, to the same endpoint, whose response happens to be a stream
+that stays open. Its state belongs to that request rather than to the connection
+underneath, which is why it survived the deletion of sessions without needing a
+replacement concept.
 
 \subsection{Required headers, and why they exist}
 \label{sec:required-headers}
 
-Here is a genuinely new obligation. Every POST must carry these:
+Here is a genuinely new obligation in this revision. Every POST must carry
+these:
 
 \begin{http}
 POST /mcp HTTP/1.1
@@ -185,30 +270,37 @@ Mcp-Name: assess_account_risk
 }
 \end{http}
 
-\texttt{Mcp-Method} mirrors \texttt{method}. \texttt{Mcp-Name} mirrors
-\texttt{params.name} (or \texttt{params.uri} for \texttt{resources/read}), and
-is required for \texttt{tools/call}, \texttt{prompts/get}, and
-\texttt{resources/read}.
+Look at what those three headers contain. \texttt{Mcp-Method} duplicates the
+\texttt{method} from the body. \texttt{Mcp-Name} duplicates
+\texttt{params.name}. \texttt{MCP-Protocol-Version} duplicates the version from
+\texttt{\_meta}.
 
-The point is that an intermediary can now do its job without parsing JSON:
+Duplicating data is normally a smell, so the reason is worth stating: it lets
+every piece of infrastructure between the client and the server do its job
+without parsing JSON.
 
 \begin{itemize}[leftmargin=1.6em, itemsep=3pt]
 \item A load balancer routes \texttt{tools/call} to a compute pool and
-\texttt{tools/list} to a cache tier.
-\item A WAF applies a strict policy to one tool name and a relaxed one to
-another.
+\texttt{tools/list} to a cache tier, using a header rule it already knows how to
+write.
+\item A web application firewall applies a strict policy to one tool name and a
+relaxed one to another.
 \item Rate limiting works per method rather than per connection, which is the
 only granularity that means anything now that connections are meaningless.
 \item Your access logs become useful without a JSON parser in the log pipeline.
 \end{itemize}
 
+That is a real gain. It also creates a real hazard.
+
 \begin{dangerbox}{Two sources of truth is a smuggling primitive}
-Mirroring creates an obvious hazard. If a gateway routes on \texttt{Mcp-Name:
-read\_only\_tool} and the body says \texttt{"name": "wire\_transfer"}, the
-gateway has approved one thing and the server has executed another.
+If a gateway routes on \texttt{Mcp-Name: read\_only\_tool} and the body says
+\texttt{"name": "wire\_transfer"}, then the gateway has approved one thing and
+the server has executed another. The attacker's whole job is finding two
+components that disagree.
 
 So validation is mandatory, not advisory. Any server that processes the body
-\textbf{must} reject a mismatch with \texttt{400} and \texttt{-32020}.
+\textbf{must} reject a mismatch with \texttt{400} and error code
+\texttt{-32020}.
 \end{dangerbox}
 
 \begin{py}
@@ -241,7 +333,7 @@ def _validate_headers(self, headers, message: dict) -> None:
 \end{py}
 
 Meridian tests each failure mode separately, because ``we validate headers'' is
-the kind of claim that is true until somebody refactors:
+the kind of claim that stays true until somebody refactors:
 
 \begin{py}
 def test_method_header_disagreeing_with_body_is_rejected(self):
@@ -258,8 +350,8 @@ def test_method_header_disagreeing_with_body_is_rejected(self):
 
 \subsection{Mirroring tool parameters into headers}
 
-Servers can go further and expose specific tool arguments as headers, using an
-\texttt{x-mcp-header} annotation in the input schema:
+Servers can go one step further and expose specific tool \emph{arguments} as
+headers, by annotating the tool's schema:
 
 \begin{wire}
 {
@@ -280,11 +372,13 @@ Servers can go further and expose specific tool arguments as headers, using an
 \end{wire}
 
 A call with \texttt{"region": "eu-central"} now carries
-\texttt{Mcp-Param-Region: eu-central}, and your gateway can route EU traffic to
-EU infrastructure without reading a byte of the body. For a data-residency
-requirement that is genuinely valuable.
+\texttt{Mcp-Param-Region: eu-central}, and a gateway can route EU traffic to EU
+infrastructure without reading a byte of the body. For a data-residency
+requirement that is genuinely valuable, and it is the kind of thing that is
+miserable to retrofit.
 
-The constraints are strict, and each one closes a specific hole:
+The constraints on the annotation are strict, and each one closes a specific
+hole:
 
 \begin{table}[htbp]
 \centering
@@ -293,17 +387,17 @@ The constraints are strict, and each one closes a specific hole:
 \toprule
 \thead{Constraint} & \thead{Why} \\
 \midrule
-Primitive types only (string, integer, boolean; \emph{not} number)
-  & Floats do not have a canonical string form, so header and body could
-    disagree while both being ``correct'' \\
+Primitive types only: string, integer, boolean, and \emph{not} number
+  & Floating-point values have no single canonical string form, so header and
+    body could disagree while both being ``correct'' \\
 Case-insensitively unique within the schema
-  & Header names are case-insensitive, so two annotations differing only in
+  & HTTP header names are case-insensitive, so two annotations differing only in
     case would collide \\
-No control characters, including CR and LF
-  & Header injection \\
-Statically reachable from the root, through \texttt{properties} keys only
-  & An intermediary must know from the schema alone which headers a call will
-    carry. No arrays, no \texttt{oneOf}, no \texttt{\$ref} \\
+No control characters, including carriage return and line feed
+  & Otherwise an argument value can inject an entire extra header \\
+Statically reachable from the schema root, through \texttt{properties} keys only
+  & An intermediary must be able to know, from the schema alone, exactly which
+    headers a call will carry. No arrays, no \texttt{oneOf}, no \texttt{\$ref} \\
 \bottomrule
 \end{tabularx}
 \caption{The \texttt{x-mcp-header} rules. The last one is the subtle one, and
@@ -312,14 +406,14 @@ Meridian validates it recursively.}
 \end{table}
 
 A client on Streamable HTTP must \emph{reject} a tool whose annotations violate
-these rules, and rejection means excluding that one tool from
-\texttt{tools/list} rather than failing the whole catalogue. One bad tool
+these rules. Rejection means excluding that one tool from the catalogue. One malformed tool
 should not take down the other forty-nine.
 
 \subsection{Encoding values safely}
 
-RFC 9110 allows visible ASCII, space, and tab in header values. Anything else
-gets wrapped in a sentinel:
+HTTP header values are restricted to visible ASCII, space, and tab. Tool
+arguments are not. So anything that cannot survive as a plain header value gets
+wrapped in a sentinel:
 
 \begin{table}[htbp]
 \centering
@@ -335,16 +429,16 @@ gets wrapped in a sentinel:
 \texttt{=?base64?literal?=} & looks like the sentinel & \texttt{=?base64?PT9iYXNlNjQ/bGl0ZXJhbD89?=} \\
 \bottomrule
 \end{tabular}
-\caption{Header value encoding. The last row is the one that separates a
-correct implementation from a plausible one.}
+\caption{Header value encoding. The last row separates a correct implementation
+from a merely plausible one.}
 \label{tab:header-encoding}
 \end{table}
 
-That last row deserves a moment. A plain ASCII value that happens to look like
-the sentinel must \emph{also} be encoded, otherwise a decoder turns
-\texttt{"=?base64?literal?="} into something the sender never wrote. It is a
-tiny rule and exactly the sort of thing that produces a security advisory two
-years later.
+That last row deserves a moment. A plain ASCII value that happens to \emph{look}
+like the sentinel must also be encoded, because otherwise a decoder turns
+\texttt{"=?base64?literal?="} into whatever those characters decode to, which is
+not what the sender wrote. It is a tiny rule, and exactly the sort of thing that
+produces a security advisory two years later.
 
 \begin{py}
 def encode_header_value(value) -> str:
@@ -367,28 +461,36 @@ def encode_header_value(value) -> str:
 
 \subsection{No resumability, and what that means for you}
 
-A broken response stream loses the request. There is no \texttt{Last-Event-ID},
-no redelivery, no ``resume from event 14''. The client re-issues with a
-\emph{new} request id and starts over.
+Under the old design, if a streaming response was interrupted, the client could
+reconnect and say ``resume from event 14'' using a \texttt{Last-Event-ID}
+header. The server was expected to have kept the intervening messages.
 
-This is a real simplification, and it moves a burden onto you.
+That is gone. A broken response stream loses the request. The client re-issues
+it with a \emph{new} request id and starts over.
+
+This is a real simplification for server authors, and it quietly moves a burden
+onto you.
 
 \keyidea{Design your servers to be idempotent, because retries are now a normal
 part of operation rather than an exception. If re-issuing \texttt{transfer\_funds}
-twice moves money twice, the transport will eventually find out for you.}
+twice moves money twice, the transport will eventually find that out for you, at
+a time of its choosing.}
 
-The usual mechanism is an idempotency key supplied by the caller and honoured
-for a window on the server. It is not a protocol feature; it is an ordinary tool
+\emph{Idempotent} here means what it usually means: performing the operation
+twice has the same effect as performing it once. The usual mechanism is an
+idempotency key, a unique value supplied by the caller and remembered by the
+server for some window. It is not a protocol feature. It is an ordinary tool
 argument, and Chapter~\ref{ch:building-servers} builds one.
 
 \subsection{Cancellation}
 
 On HTTP, closing the response stream \emph{is} cancellation. That is the whole
-mechanism. Because each request has its own stream, a transport-level disconnect
-is unambiguous, so no \texttt{notifications/cancelled} is sent or expected.
+mechanism, and it works because each request has its own stream, which makes a
+transport-level disconnect unambiguous. No separate cancellation message is sent
+or expected.
 
-The server must stop as soon as practical and must send nothing further for that
-request. In Meridian this falls out of the write path:
+The server must stop as soon as practical and send nothing further for that
+request. In Meridian this falls out of the write path naturally:
 
 \begin{py}
 def write(msg: dict) -> None:
@@ -400,10 +502,11 @@ def write(msg: dict) -> None:
             raise _ClientGone()
 \end{py}
 
-A client hanging up mid-stream is normal here, not an incident. Which means the
-stock Python HTTP server's habit of printing a traceback for every reset
-connection turns routine operation into alarming log noise, so Meridian
-suppresses it explicitly. Small thing. Saves somebody a 3 a.m. investigation.
+A client hanging up mid-stream is normal operation here. Which
+means the stock Python HTTP server's habit of printing a stack trace for every
+reset connection turns routine behaviour into alarming log noise, so Meridian
+suppresses it explicitly. Small thing. Saves somebody a three-in-the-morning
+investigation into an error that means nothing.
 
 \subsection{One header that is pure profit}
 
@@ -411,20 +514,24 @@ suppresses it explicitly. Small thing. Saves somebody a 3 a.m. investigation.
 X-Accel-Buffering: no
 \end{http}
 
-Reverse proxies buffer responses by default. Without this header nginx will
-happily accumulate your progress notifications and deliver them in one lump
-after the final response, at which point you have all the complexity of
-streaming and none of the benefit. Send it on every SSE response.
+Reverse proxies buffer responses by default, because for ordinary responses
+buffering is a performance win. For a stream it is a disaster: nginx will happily
+accumulate your carefully emitted progress notifications and deliver them in one
+lump after the final response, at which point you have all the complexity of
+streaming and none of the benefit.
+
+Send this header on every SSE response. It costs nothing.
 
 \section{stdio}
 
-The other transport is a subprocess and two pipes. It is much simpler and it
-has sharper edges.
+The other transport is a subprocess and two pipes. It is much simpler and it has
+sharper edges.
 
 \begin{itemize}[leftmargin=1.6em, itemsep=3pt]
 \item The client launches the server as a child process.
-\item Messages go over \texttt{stdin} and \texttt{stdout}, one per line.
-\item Messages must not contain embedded newlines.
+\item Messages go over \texttt{stdin} and \texttt{stdout}, one message per line.
+\item Messages must not contain embedded newlines, since a newline ends a
+message.
 \item \texttt{stderr} is for logging, and the client may capture, forward, or
 ignore it.
 \item The server must write \textbf{nothing} to \texttt{stdout} that is not a
@@ -432,11 +539,12 @@ valid MCP message.
 \end{itemize}
 
 That last rule is the one that will bite you, and it will not be your code that
-breaks it. It will be a library that prints a deprecation warning to stdout on
-import. One stray \texttt{print()} corrupts the stream, and the client sees a
-parse error it cannot attribute to anything.
+breaks it. It will be a library that prints a deprecation warning on import. One
+stray line corrupts the stream, and the client sees a parse error it cannot
+attribute to anything.
 
-Meridian encodes with no whitespace and asserts the invariant in a test:
+Meridian encodes with no gratuitous whitespace and asserts the invariant in a
+test:
 
 \begin{py}
 def test_encoded_messages_contain_no_newlines(self):
@@ -448,18 +556,19 @@ def test_encoded_messages_contain_no_newlines(self):
 
 \subsection{A connection is not a conversation}
 
-The specification is unusually direct about this, and it is worth quoting the
-consequence: clients may interleave unrelated requests on the same pipe, and a
+The specification is unusually direct about this, and the consequence is worth
+spelling out: clients may interleave unrelated requests on the same pipe, and a
 server must not treat process identity as a proxy for conversation continuity.
 
-Practically: do not put a user id in a module-level variable at startup. Do not
-cache ``the current account'' between calls. The next message on that pipe may
-belong to an entirely different task.
+Practically, that means: do not put a user id in a module-level variable at
+startup. Do not cache ``the current account'' between calls. The next message on
+that pipe may belong to an entirely different task, for a different user, in a
+different conversation. The pipe is a wire, not a session.
 
 \subsection{Cold start is the number that decides your topology}
 
-Because every message shares one channel and the process must be spawned, stdio
-has a cost HTTP does not: process startup.
+Because the server is a process that must be spawned, stdio has a cost HTTP does
+not: process startup.
 
 \begin{measurebox}{stdio cold start versus warm call}
 \begin{tabular}{@{}lr@{}}
@@ -475,13 +584,16 @@ Calls needed to amortise a cold start & \textasciitilde{}750 \\
 
 \vspace{6pt}
 \footnotesize
-Python 3.14 on arm64. Interpreter boot plus imports. A Node server is
+Python 3.14 on arm64: interpreter boot plus imports. A Node server is
 comparable; a static binary is far better.
 \end{measurebox}
 
 Forty-five milliseconds sounds small until you notice it is 750 times a warm
-call. Spawn-per-call is therefore indefensible for anything but a one-shot CLI.
-Keep a warm pool, and Chapter~\ref{ch:optimizing} shows how.
+call. Which means spawning a process per call is indefensible for anything but a
+one-shot command-line tool: you would spend 99.9\,\% of your time starting
+Python.
+
+Keep a pool of warm processes instead. Chapter~\ref{ch:optimizing} covers how.
 
 \subsection{Shutdown, done properly}
 
@@ -505,35 +617,39 @@ def close(self, timeout: float = 5.0) -> None:
 \end{py}
 
 Closing stdin is the primary graceful-shutdown signal and the only portable one,
-so servers should exit promptly on EOF. If yours does not, every client that
-talks to it will eventually SIGKILL it, and your cleanup handlers will never run.
-Meridian tests that its servers exit cleanly rather than needing to be killed.
+so servers should exit promptly when they see end-of-file. If yours does not,
+every client that talks to it will eventually kill it outright, and your cleanup
+handlers will never run. Meridian tests that its servers exit cleanly rather than
+needing to be killed.
 
 \subsection{Cancellation on stdio}
 
-Different from HTTP, and for a good reason: there is no per-request stream to
-close, so cancellation is an explicit notification.
+Different from HTTP, and for a good reason. There is no per-request stream to
+close, because everything shares one pipe. So cancellation is an explicit
+notification:
 
 \begin{wire}
 { "jsonrpc": "2.0", "method": "notifications/cancelled",
   "params": { "requestId": 42 } }
 \end{wire}
 
-The server should stop work and must send nothing further for that request,
-including its response.
+The server should stop work and send nothing further for that request, including
+its response.
 
 \begin{notebox}{The asymmetry is not sloppiness}
 It is the transport binding doing its job. On HTTP the disconnect is
 unambiguous, so a message would be redundant. On stdio the channel is shared, so
-a message is the only signal available. Same semantics, different mechanism,
-which is exactly what a transport binding is for.
+a message is the only signal available.
+
+Same semantics, different mechanism, which is exactly what a transport binding
+is for.
 \end{notebox}
 
 \section{Comparing the two, with numbers}
 
 \bookfig[0.98]{transport-cost}{Left: protocol overhead with server execution
 subtracted out. Right: the same numbers next to actual network distance, on a
-log scale, which is the honest context.}{transport-cost}
+logarithmic scale, which is the honest context.}{transport-cost}
 
 \begin{measurebox}{Same call, three transports}
 \begin{tabular}{@{}lrrr@{}}
@@ -552,9 +668,13 @@ The control still serialises and deserialises, so this compares transport
 mechanics rather than flattering the in-process case.
 \end{measurebox}
 
-Read that right-hand chart carefully, because it is the point of the section.
-Streamable HTTP costs 0.13\,ms more than in-process on loopback. A same-region
-network hop costs around 1.2\,ms. A cross-region hop costs around 68\,ms.
+Read the right-hand chart carefully, because it is the point of the whole
+section. Streamable HTTP costs 0.13\,ms more than in-process on loopback. A
+same-region network hop costs around 1.2\,ms. A cross-region hop costs around
+68\,ms.
+
+So the transport you choose changes your latency by a tenth of a millisecond,
+and where you put the server changes it by sixty-eight.
 
 \keyidea{Transport overhead is not your problem. Distance is your problem, and
 round trips are how you pay for distance. Choose your transport on operational
@@ -572,41 +692,42 @@ Isolation       & Process boundary & Process, container, or host \\
 Startup         & 44.6\,ms per spawn & Connection setup, then reused \\
 Concurrency     & One shared channel & One stream per request \\
 Cancellation    & \texttt{notifications/cancelled} & Close the stream \\
-Auth            & Environment (credentials from the parent) & OAuth 2.1 (\chapref{authorization}) \\
-Scaling         & One process per host & Round-robin, any replica \\
+Auth            & Environment variables from the parent & OAuth 2.1 (\chapref{authorization}) \\
+Scaling         & One process per machine & Round-robin, any replica \\
 Best for        & Local tools, filesystems, developer machines & Everything shared or remote \\
 \bottomrule
 \end{tabularx}
-\caption{Choosing. Appendix~\ref{ch:transport-matrix} has the long version.}
+\caption{Choosing. Appendix~\ref{ch:transport-matrix} has the long version and a
+checklist for each.}
 \label{tab:transport-choice}
 \end{table}
 
 \section{Topologies}
 
-The stateless core changes what is possible here, so it is worth drawing.
+The stateless core from Chapter~\ref{ch:architecture} changes what is possible
+here, so it is worth drawing.
 
-\bookfig[0.98]{topologies}{Three shapes. The middle one is the one that got
-dramatically easier in 2026-07-28, because round-robin now works without a
-session store behind it.}{topologies}
+\bookfig[0.98]{topologies}{Three shapes. The middle one got dramatically easier
+in 2026-07-28, because round-robin now works without a session store behind
+it.}{topologies}
 
-\textbf{Sidecar} is stdio, one server process per host, no network. Simple
+\textbf{Sidecar} is stdio: one server process per machine, no network. Simple
 isolation, and you pay the cold start.
 
-\textbf{Gateway} is the interesting one. Before this revision, N hosts behind
+\textbf{Gateway} is the interesting one. Before this revision, many hosts behind
 one gateway meant sticky sessions, because request two had to reach whichever
-replica handled request one. Now it does not, so the gateway is a plain
-round-robin load balancer with a cache in front of it, and the routing headers
-from \secref{required-headers} let it make decisions without parsing bodies.
+replica handled request one. Now it does not, so the gateway is a plain round-robin load balancer with a cache in front, and
+the routing headers from \secref{required-headers} let it decide without parsing
+bodies.
 
-\textbf{Mesh} is agents talking to agents, where a node is a host on one side
-and a server on the other. Chapter~\ref{ch:multi-agent} builds this and spends
-most of its time on the failure modes, because a mesh with no depth limit is a
-fork bomb with a nicer API.
+\textbf{Mesh} is agents talking to agents, where a node is a host on one side and
+a server on the other. Chapter~\ref{ch:multi-agent} builds this and spends most
+of its time on the failure modes, because a mesh with no depth limit is a fork
+bomb with a nicer API.
 
 \section{Meridian's transport decision}
 
-Meridian runs four servers. Here is what each got and why, which is a more
-useful format than a general recommendation.
+Here is what each Meridian server got, and why.
 
 \begin{table}[htbp]
 \centering
@@ -620,12 +741,12 @@ useful format than a general recommendation.
 \texttt{compliance} & HTTP
   & Audit trail must be centralised, and it sits behind an API gateway \\
 \texttt{fraud} & HTTP
-  & Called in parallel with risk, so it wants connection reuse \\
+  & Called in parallel with risk, so it benefits from connection reuse \\
 \texttt{marketdata} & HTTP
-  & \texttt{cacheScope: public} results, so a shared gateway cache is the entire
-    point \\
+  & Its results are identical for every caller, so a shared cache in front of it
+    pays for everybody at once \\
 \midrule
-Local dev & stdio & No auth, no ports, and \texttt{.mcp.json} just works \\
+Local dev & stdio & No auth, no ports, and the config file just works \\
 \bottomrule
 \end{tabularx}
 \caption{Meridian's choices. Everything shared is HTTP; stdio is a development
@@ -633,27 +754,28 @@ convenience and a good one.}
 \label{tab:meridian-transports}
 \end{table}
 
-The \texttt{marketdata} row is worth noticing. It is the only server whose
-results are identical for every caller, which is what makes
-\texttt{cacheScope: public} honest, which is what makes a shared gateway cache
-legal. Chapter~\ref{ch:resources} measures that: 577 of 600 reads avoided, at a
-96.2\,\% hit rate.
+The \texttt{marketdata} row is the one worth noticing. It is the only server
+whose results do not depend on who is asking, which is what makes them safely
+shareable, which is what makes a cache in front of it legal.
+Chapter~\ref{ch:resources} measures that: 577 of 600 reads avoided.
 
 \section{What to remember}
 
 \begin{itemize}[leftmargin=1.6em, itemsep=3pt]
-\item JSON-RPC 2.0, plus required \texttt{resultType} and non-null ids.
-\item Never allocate error codes in \texttt{-32020} to \texttt{-32099}. Never
-re-emit \texttt{-32002} or \texttt{-32042}.
-\item Streamable HTTP is POST-only. GET, DELETE, sessions, and resumability are
-all gone.
-\item \texttt{MCP-Protocol-Version}, \texttt{Mcp-Method}, and \texttt{Mcp-Name}
-are mandatory, and a mismatch between header and body must be rejected.
-\item No resumability means retries are routine. Make your servers idempotent.
+\item A transport is just the binding that carries messages. There are two, and
+the choice is local versus shared.
+\item JSON-RPC 2.0, plus a required \texttt{resultType} and non-null ids.
+\item Never allocate error codes in \texttt{-32020} to \texttt{-32099}. Accept
+\texttt{-32002} from old servers, never emit it.
+\item Streamable HTTP is POST-only. Sessions, the GET stream, and resumability
+are all gone.
+\item Three headers are mandatory and must match the body, because a gateway and
+a server that can disagree is a smuggling primitive.
+\item No resumability means retries are routine. Make mutating tools idempotent.
 \item Cancellation is a closed stream on HTTP and a notification on stdio.
-\item stdio cold start is 44.6\,ms, around 750 warm calls. Use a warm pool.
+\item stdio cold start is 44.6\,ms, roughly 750 warm calls. Use a warm pool.
 \item Transport overhead is fractions of a millisecond. Distance and round trips
-are what cost you.
+are what actually cost you.
 \end{itemize}
 
 Next: authorization, which is a security chapter with a performance chapter

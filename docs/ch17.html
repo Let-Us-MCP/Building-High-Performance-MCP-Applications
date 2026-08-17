@@ -295,7 +295,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <p>Two separate things that people conflate.</p>
 <p><em>Batching</em> is the model emitting three tool calls in one turn instead of three turns. That saves model turns, which is the expensive part.</p>
 <p><em>Fan-out</em> is the host executing those three concurrently. That saves transport time, which is the cheap part.</p>
-<p>The measurement above shows the split precisely: batching took 1,751 ms to 1,067 ms, and fan-out took 1,067 to 1,014. Batching is thirteen times more valuable, and it is the one that depends on your <em>tool design</em> rather than on your host code.</p>
+<p>The measurement above shows the split precisely: batching took 1,751 ms to 1,067 ms, and fan-out took 1,067 to 1,014. Batching is thirteen times more valuable, and it is the one that depends on your <em>tool design</em>.</p>
 </section>
 <section id="prefetch-app-templates" class="level3">
 <h3>Prefetch App templates</h3>
@@ -401,7 +401,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </tbody>
 </table>
 </aside>
-<p>Spawn-per-call is indefensible for anything but a one-shot CLI. Keep a pool, size it to your concurrency, and recycle processes on a schedule rather than per request.</p>
+<p>Spawn-per-call is indefensible for anything but a one-shot CLI. Keep a pool, size it to your concurrency, and recycle processes on a schedule.</p>
 </section>
 <section id="let-the-gateway-route-on-headers" class="level3">
 <h3>Let the gateway route on headers</h3>

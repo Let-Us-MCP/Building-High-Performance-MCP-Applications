@@ -234,7 +234,8 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <p><strong>Good for:</strong> local tools, filesystem access, developer machines, anything where the user’s own credentials are the right credentials.</p>
 <p><strong>Operational profile:</strong> no ports, no TLS, no auth infrastructure. The process boundary is the isolation boundary. Cold start is 44.6 ms, which Chapter <a href="ch17.html#ch:optimizing">17</a> says to amortise with a pool.</p>
 <p><strong>Watch for:</strong> the server inheriting more environment than it should. A subprocess gets the parent’s environment by default, including credentials for things it has no business touching.</p>
-<pre class="python" data-language="python"><code>self._proc = subprocess.Popen(
+<pre class="python" data-language="python"><code># sketch: condensed for the page
+self._proc = subprocess.Popen(
     command,
     stdin=subprocess.PIPE, stdout=subprocess.PIPE,
     stderr=subprocess.PIPE if capture_stderr else None,
@@ -274,9 +275,8 @@ CMD [&quot;python3&quot;, &quot;-m&quot;, &quot;meridian.serve&quot;, &quot;risk
 <pre class="python" data-language="python"><code>def healthy(server) -&gt; tuple[bool, dict]:
     &quot;&quot;&quot;Health means `server/discover` answers correctly, not that a port is open.
 
-    A process can accept connections while its catalogue is empty, its
-    dependencies are down, or its handlers all raise. Answering discovery
-    proves routing, capability derivation, and serialisation all work.
+    Answering discovery proves routing, capability derivation, and
+    serialisation all work, which is three subsystems for one request.
     &quot;&quot;&quot;
     probe = {
         &quot;jsonrpc&quot;: &quot;2.0&quot;, &quot;id&quot;: &quot;health&quot;, &quot;method&quot;: &quot;server/discover&quot;,
@@ -285,15 +285,18 @@ CMD [&quot;python3&quot;, &quot;-m&quot;, &quot;meridian.serve&quot;, &quot;risk
             KEY_CLIENT_CAPABILITIES: {},
         }},
     }
-    resp = server.handle(probe)
-    if &quot;error&quot; in resp:
-        return False, {&quot;reason&quot;: resp[&quot;error&quot;][&quot;message&quot;]}
-    result = resp[&quot;result&quot;]
-    return (
-        PROTOCOL_VERSION in result.get(&quot;supportedVersions&quot;, [])
-        and bool(result.get(&quot;capabilities&quot;)),
-        {&quot;capabilities&quot;: sorted(result.get(&quot;capabilities&quot;, {}))},
-    )</code></pre>
+    response = server.handle(probe)
+    if response is None or &quot;error&quot; in response:
+        reason = (response or {}).get(&quot;error&quot;, {}).get(&quot;message&quot;, &quot;no response&quot;)
+        return False, {&quot;reason&quot;: reason}
+
+    result = response[&quot;result&quot;]
+    ok = (PROTOCOL_VERSION in result.get(&quot;supportedVersions&quot;, [])
+          and bool(result.get(&quot;capabilities&quot;)))
+    return ok, {
+        &quot;capabilities&quot;: sorted(result.get(&quot;capabilities&quot;, {})),
+        &quot;supportedVersions&quot;: result.get(&quot;supportedVersions&quot;, []),
+    }</code></pre>
 <p>Three levels, and use all three:</p>
 <table id="tab:health-checks">
 <caption>The deep check is the one that catches a server whose database went away, and it is the one most people skip.</caption>
@@ -322,7 +325,7 @@ CMD [&quot;python3&quot;, &quot;-m&quot;, &quot;meridian.serve&quot;, &quot;risk
 </table>
 <aside class="box note"><p class="box-title">Do not use <code>ping</code></p>
 <p>It was removed in <code>2026-07-28</code>. If your health check sends it, a modern server answers <code>-32601</code> and your orchestrator concludes the server is unhealthy and restarts it, forever.</p>
-<p>The dual-era bridge answers <code>ping</code> for exactly this reason, which is a compatibility shim rather than a recommendation.</p>
+<p>The dual-era bridge answers <code>ping</code> for exactly this reason, which is a compatibility shim, not a recommendation.</p>
 </aside>
 </section>
 <section id="graceful-drain" class="level2">

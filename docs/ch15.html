@@ -216,7 +216,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </tr>
 </tbody>
 </table>
-<p>Meridian’s 134 tests run in 2.3 seconds and use no model at all. The eval suite is separate, slower, and gates deploys rather than commits.</p>
+<p>Meridian’s 134 tests run in 2.3 seconds and use no model at all. The eval suite is separate, slower, and gates deploys.</p>
 <aside class="keyidea">
 <p>If your MCP tests are slow, you are testing the model when you meant to test the protocol. Push everything you can down a layer.</p>
 </aside>
@@ -305,7 +305,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
         self.good_headers(&quot;tools/call&quot;, &quot;some_other_tool&quot;))
     self.assertEqual(status, 400)
     self.assertEqual(body[&quot;error&quot;][&quot;code&quot;], errors.HEADER_MISMATCH)</code></pre>
-<p>Note <code>raw_post</code>. Not the client. A hand-built HTTP request, because testing header validation through a client that constructs correct headers tests nothing.</p>
+<p>Note <code>raw_post</code>: a hand-built HTTP request. Testing header validation through a client that constructs correct headers tests nothing.</p>
 </section>
 </section>
 <section id="integration-testing-with-a-stubbed-model" class="level2">
@@ -389,7 +389,7 @@ self.assertIn(&quot;structuredContent&quot;, third[&quot;result&quot;])</code></
 <section id="evals" class="level2">
 <h2>Evals</h2>
 <p>The top of the pyramid: does the thing actually work, with a real model.</p>
-<p>Evals are not tests. They are a <em>regression suite for behaviour</em>, and they have properties tests do not: they are slow, they cost money, they are non-deterministic, and their result is a score rather than a pass or fail.</p>
+<p>Evals are not tests. They are a <em>regression suite for behaviour</em>, and they have properties tests do not: they are slow, they cost money, they are non-deterministic, and their result is a score.</p>
 <section id="what-to-measure" class="level3">
 <h3>What to measure</h3>
 <table id="tab:eval-metrics">
@@ -457,7 +457,7 @@ self.assertIn(&quot;structuredContent&quot;, third[&quot;result&quot;])</code></
 <section id="scoring-without-flakiness" class="level3">
 <h3>Scoring without flakiness</h3>
 <p>Non-determinism makes naive assertions flaky. Three habits fix most of it:</p>
-<p><strong>Assert on structure, not prose.</strong> “The answer contains 55.4” is stable. “The answer says the account is elevated risk” is not.</p>
+<p><strong>Assert on structure. “The answer contains 55.4” is stable; “the answer says the account is elevated risk” is not.</strong> “The answer contains 55.4” is stable. “The answer says the account is elevated risk” is not.</p>
 <p><strong>Run N times, threshold the rate.</strong> A case that passes 19 of 20 times is passing. Requiring 20 of 20 is requiring determinism you were told you would not get.</p>
 <p><strong>Gate on movement, not on absolutes.</strong> “Success rate did not drop more than 3 points against the last release” is a gate you can actually keep green. “Success rate is above 95 %” is a gate somebody will eventually delete.</p>
 </section>

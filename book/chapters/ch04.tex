@@ -202,13 +202,12 @@ error message is never helpful.
 
 Also: key persisted credentials by the authorization server's \texttt{issuer}.
 Reusing a client id across authorization servers is a specification violation,
-and it fails in confusing ways rather than clean ones.
+and it fails in confusing ways.
 \end{legacybox}
 
 \section{Two validations that stop real attacks}
 
-Most of OAuth's complexity is scar tissue. Two pieces of it are worth
-understanding rather than merely implementing.
+Most of OAuth's complexity is scar tissue. Two pieces of it are worth understanding, not merely implementing.
 
 \subsection{Audience binding, or: do not be a confused deputy}
 
@@ -301,8 +300,8 @@ WWW-Authenticate: Bearer error="insufficient_scope",
                          error_description="Writing a risk override requires risk:write"
 \end{http}
 
-Note 403 rather than 401. A 401 means ``I do not know who you are''; a 403 means
-``I know exactly who you are and you may not do that''. Clients branch on this,
+Note the 403. A 401 means ``I do not know who you are''; a 403 means ``I know
+exactly who you are and you may not do that''. Clients branch on this,
 so getting it wrong sends them into a re-authentication loop that cannot succeed.
 
 Two rules for servers, both about not being annoying:
@@ -450,6 +449,7 @@ attack. Meridian seals its \texttt{requestState} with the authenticated subject
 inside, and rejects state presented by anybody else:
 
 \begin{py}
+# sketch: elided from the shipped handler
 return input_required(
     input_requests={"approval": elicit_form(...)},
     request_state=SEALER.seal(

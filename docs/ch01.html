@@ -177,9 +177,79 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <p><em>“I feel the need. The need for speed.”</em></p>
 <p>Maverick and Goose, <em>Top Gun</em> (1986)</p>
 </aside>
-<p>Everybody quotes that line. Almost nobody remembers what happens next, which is that the two of them proceed to fly recklessly, get chewed out, and eventually lose an aircraft. The need for speed is not a strategy. It is an appetite. What turns it into engineering is knowing which knob actually moves the aircraft.</p>
-<p>So before we look at a single byte of the Model Context Protocol, we are going to spend a chapter on the physics. Not because physics is fun, though it is. Because every design decision in the rest of this book is a trade against one of exactly three budgets. Miss that, and you will spend three weeks optimising the wrong thing. I have done this. I have watched a very good team spend a sprint moving a server from Python to Go, ship it, measure it, and discover they had improved end-to-end task latency by approximately one half of one percent.</p>
-<p>They were not stupid. They were optimising the only layer they could see.</p>
+<p>Everybody quotes that line. Almost nobody remembers what happens next, which is that the two of them proceed to fly recklessly, get chewed out by a superior officer, and eventually lose an aircraft and a friend. The need for speed is an appetite. What turns an appetite into engineering is knowing which control surface actually moves the aircraft.</p>
+<p>So before we look at a single byte of the Model Context Protocol, we are going to spend a chapter on the physics. Every design decision in the rest of this book is a trade against one of exactly three budgets, and if you do not have those three in your head, you will spend three weeks optimising something that does not matter.</p>
+<p>I have done this. Let me tell you about it.</p>
+<section id="the-forty-second-demo" class="level2">
+<h2>The forty-second demo</h2>
+<p>I was watching a demo. Somebody had wired an AI assistant into four internal systems, and it worked. Actual work got done, live, in front of people who had been promised this for two years. Somebody in the back asked how long it took. The presenter said, cheerfully, “about forty seconds,” and the room stayed delighted.</p>
+<p>I sat there doing arithmetic. The four systems it called were all sub-hundred-millisecond services. I had seen their dashboards that morning. Four calls at 100 milliseconds each is 0.4 seconds. The demo took forty. So thirty-nine and a half seconds went somewhere, and nobody in that room, including the person who built it, could have told you where.</p>
+<p>That is a description of the entire field right now. We have built a genuinely new kind of software and we are shipping it with roughly the diagnostic sophistication of a 1996 CGI script. We know it works. We do not know why it is slow, what it costs, or which of the eleven things we could change would matter.</p>
+<p>So we guess. And because the server is the part we can see and profile and rewrite, we optimise the server.</p>
+<figure id="fig:preface-roundtrips">
+<img src="figures/xkcd-roundtrips.svg" />
+<figcaption>Four optimisations, measured. Three of them are the ones teams reach for first. The fourth is the one that works.</figcaption>
+</figure>
+<p>I have watched a very good team spend a sprint moving a server from Python to Go. They shipped it. They measured it. End-to-end task latency improved by about half of one percent. They were not stupid, and the Go server was genuinely faster. They were optimising the only layer they could see.</p>
+<p>By the end of this chapter you will be able to see the other layers. That is the entire goal.</p>
+</section>
+<section id="sec:what-is-a-loop" class="level2">
+<h2>What an agent loop is</h2>
+<p>Before we can talk about where the time goes, we need to agree on what the thing is. This section is deliberately slow. If you already know it, skim; everything after this assumes it.</p>
+<p>A single question to a language model is one request and one response. You send some text, the model sends some text back, and you are done. That is not what we are talking about here.</p>
+<p>An <strong>agent loop</strong> is what happens when the model is allowed to <em>act</em> before it answers. The shape is always the same:</p>
+<ol>
+<li><p>The application sends the model the user’s question, plus a list of actions the model is allowed to take.</p></li>
+<li><p>The model replies. Its reply is either a final answer, or a request to take one of those actions.</p></li>
+<li><p>If it asked for an action, the application performs it and puts the result back in front of the model.</p></li>
+<li><p>Go to step 2.</p></li>
+</ol>
+<p>Four terms fall out of that, and I am going to use all four constantly, so here they are precisely.</p>
+<dl>
+<dt>Tool</dt>
+<dd>
+<p>One of the actions the model is allowed to take. In MCP a tool has a name, a human-readable description, and a JSON Schema describing its arguments. <code>assess_account_risk</code>, taking an account id, returning a score.</p>
+</dd>
+<dt>Tool catalogue</dt>
+<dd>
+<p>The complete list of tools sent to the model. Not the tools it uses. The tools it <em>could</em> use. This distinction turns out to matter enormously, because the catalogue is sent whether or not anything in it gets called.</p>
+</dd>
+<dt>Tool call</dt>
+<dd>
+<p>One execution of one tool. The model emits an intent (“call <code>assess_account_risk</code> with <code>accountId: ACC-1042</code>”), the application performs it, and a result comes back.</p>
+</dd>
+<dt>Model turn</dt>
+<dd>
+<p>One pass of the model over the whole conversation so far, producing either a tool-call intent or a final answer. This is step 2 above, and it is the expensive one.</p>
+</dd>
+</dl>
+<p>And one more, which is the unit this whole book is denominated in:</p>
+<dl>
+<dt>Loop iteration</dt>
+<dd>
+<p>One model turn, plus any tool calls it triggered, plus the results going back into the conversation. One trip around the diagram above.</p>
+</dd>
+</dl>
+<p>Here is a concrete one. The user asks: <em>is ACC-1042 a credit risk?</em></p>
+<pre class="text" data-language="text"><code>iteration 0   model reads the question + the catalogue
+              model says: call assess_account_risk(ACC-1042)
+              application calls it, gets {score: 55.4, band: &quot;elevated&quot;}
+
+iteration 1   model reads the question + the catalogue + that result
+              model says: call screen_account(ACC-1042)
+              application calls it, gets {verdict: &quot;watch&quot;, signals: 1}
+
+iteration 2   model reads the question + the catalogue + both results
+              model says: &quot;ACC-1042 scores 55.4, elevated. One fraud signal.&quot;
+              no tool call, so the loop ends</code></pre>
+<p>Two tool calls. Three model turns. Three loop iterations.</p>
+<p>Look hard at iteration 2. It calls nothing. It exists purely so the model can read what came back and decide it is finished. It is not free, it is not optional, and almost everybody forgets to count it.</p>
+<aside class="keyidea">
+<p>A task with <span class="math inline"><em>N</em></span> tool calls costs <span class="math inline"><em>N</em> + 1</span> model turns, not <span class="math inline"><em>N</em></span>. The extra one is the model deciding it is done. Use <span class="math inline"><em>N</em> + 1</span> whenever you estimate.</p>
+</aside>
+<p>Notice also what the model re-reads on every iteration. The question. The catalogue. <em>Every previous result.</em> Iteration 2 reads more than iteration 0 did, because the results piled up. Nothing was thrown away.</p>
+<p>That last observation is the seed of everything in this chapter. Hold onto it.</p>
+</section>
 <section id="sec:three-budgets" class="level2">
 <h2>The three budgets</h2>
 <p>Every agentic application spends three things. Not two. Not four. These three, and they are coupled, so you cannot economise on one without paying in another.</p>
@@ -189,27 +259,29 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </figure>
 <section id="latency" class="level3">
 <h3>Latency</h3>
-<p>Wall clock, from the user pressing enter to the user having an answer. It decomposes into pieces you must learn to name separately, because they behave completely differently:</p>
+<p>Wall clock, from the user pressing enter to the user having an answer.</p>
+<p>That is the number that matters, but it is useless on its own, because it is a sum of pieces that behave completely differently. You have to be able to name the pieces separately. Here they are.</p>
 <dl>
-<dt>Time to first token (TTFT)</dt>
+<dt>Time to first token, or TTFT</dt>
 <dd>
-<p>How long the model thinks before it emits anything. Dominated by prompt processing, so it grows with how much context you sent. This is the number your users feel as “is it broken?”</p>
+<p>How long the model thinks before it emits anything at all. It is dominated by <em>prompt processing</em>: the model has to read everything you sent before it can write anything. So TTFT grows with the size of your context. This is the number a user experiences as “is this broken?”</p>
 </dd>
 <dt>Tokens per second</dt>
 <dd>
-<p>The generation rate once it starts. Roughly constant for a given model, and roughly outside your control.</p>
+<p>The generation rate once output starts. Roughly constant for a given model on given hardware, and roughly outside your control. You can pick a faster model. You cannot make a given model generate faster.</p>
 </dd>
 <dt>Round-trip time of one loop iteration</dt>
 <dd>
-<p>Model turn, plus tool call, plus the model reading the result. This is the unit that actually matters, and it is the one nobody measures.</p>
+<p>TTFT, plus generation, plus getting the tool call to the server and the result back, plus the model reading that result. One trip around the loop from <a href="#sec:what-is-a-loop">§1.2</a>.</p>
 </dd>
 </dl>
-<p>The third one is the whole ballgame. A single agent task is not one model call. It is a loop, and every trip round that loop pays for a full model turn.</p>
+<p>The third is the whole ballgame, and it is the one nobody instruments. Teams measure server latency, because that is what their existing monitoring measures. Server latency is a component of the third item, and as we are about to see, it is a small one.</p>
 </section>
 <section id="context" class="level3">
 <h3>Context</h3>
-<p>The token window is your bandwidth. It is also your memory, which is an unusual and slightly horrible property: the same finite resource stores the conversation, the tool catalogue, the system prompt, and every result you have retrieved so far. Fill it with junk and there is no room for the task.</p>
-<p>Worse, it is not a one-time cost. Anything sitting in context is re-sent and re-processed on every single turn. A tool description you added in March is being paid for, right now, on a request that will never call it.</p>
+<p>The <strong>context window</strong> is the maximum amount of text a model can consider at once, measured in tokens. A token is roughly four characters of English, so a 200,000-token window is roughly 800,000 characters, or a decent-sized novel.</p>
+<p>It is your bandwidth, and it is also your memory. That dual role is an unusual and slightly horrible property: the same finite resource stores the conversation, the tool catalogue, the system prompt, and every result you have retrieved so far. Fill it with junk and there is no room left to think in.</p>
+<p>And here is the part that surprises people, which follows directly from the loop structure above: <strong>context is not a one-time cost</strong>. Anything sitting in context is re-sent and re-processed on every subsequent turn. A tool description you added in March is being paid for right now, on a request that will never call it, and it will be paid for again on the next request, and the one after that.</p>
 <figure id="fig:xkcd-context">
 <img src="figures/xkcd-context.svg" />
 <figcaption>The context window of a working agent, in approximate proportion. The green sliver is the part anybody would defend in a code review.</figcaption>
@@ -217,33 +289,35 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </section>
 <section id="cost" class="level3">
 <h3>Cost</h3>
-<p>Dollars per task, and it deserves to be a first-class metric rather than something finance discovers in the quarterly. It is nearly a linear function of context: input tokens times input price, plus output tokens times output price, summed over every turn in the loop.</p>
+<p>Dollars per task.</p>
+<p>It deserves to be a first-class metric rather than something finance discovers in the quarterly review. And it is nearly a linear function of context: input tokens times the input price, plus output tokens times the output price, summed over every turn in the loop.</p>
 <p>Which means context bloat is not merely a memory problem. It is a recurring bill, and it scales with your traffic, which is exactly the direction you were hoping your traffic would scale.</p>
 <aside class="keyidea">
-<p>Latency, context, and cost are one resource wearing three hats. Every optimisation in this book is a trade among them, and most of the good ones attack all three at once because they remove work rather than moving it.</p>
+<p>Latency, context, and cost are one resource wearing three hats. Every optimisation in this book is a trade among them, and the good ones attack all three at once, because they remove work rather than moving it.</p>
 </aside>
 </section>
 </section>
 <section id="sec:anatomy" class="level2">
 <h2>Anatomy of one loop iteration</h2>
-<p>Here is where the time goes. This is the diagram the rest of the book keeps returning to, so it is worth staring at for a minute.</p>
+<p>Now we can look at where the time actually goes. This is the diagram the rest of the book keeps returning to, so it is worth a minute.</p>
 <figure id="fig:loop-anatomy">
 <img src="figures/loop-anatomy.svg" />
 <figcaption>One iteration of an agent loop, drawn to scale. The model bands are simulated from a stated distribution; the server band is measured. Note the proportion, and note which band this book can actually help you with.</figcaption>
 </figure>
 <p>Read it left to right:</p>
 <ol>
-<li><p><strong>The host assembles context.</strong> Conversation history, system prompt, and the merged tool catalogue from every connected server. Cheap in time. Ruinously expensive in tokens, which we will get to.</p></li>
-<li><p><strong>The model thinks.</strong> Time to first token, then generation. It emits a tool-call intent: a name and some arguments.</p></li>
-<li><p><strong>The host serialises and sends.</strong> JSON-RPC, over stdio or HTTP. Microseconds of CPU, plus whatever the network costs.</p></li>
-<li><p><strong>The server executes.</strong> Your actual business logic. The part you own, the part you profile, and usually the smallest slice on the chart.</p></li>
-<li><p><strong>The result comes back and re-enters context.</strong> And now the model has to read it, which means the whole prompt gets processed again.</p></li>
-<li><p><strong>The model thinks again.</strong> Another full turn. This is step 2 again, and it costs what step 2 cost.</p></li>
+<li><p><strong>The application assembles context.</strong> Conversation history, system prompt, and the merged tool catalogue from every connected server. Cheap in time, since it is string concatenation. Ruinously expensive in tokens, for reasons we just covered.</p></li>
+<li><p><strong>The model thinks.</strong> TTFT, then generation. It emits a tool-call intent: a name and some arguments.</p></li>
+<li><p><strong>The application serialises and sends.</strong> JSON over a pipe or over HTTP. Microseconds of CPU, plus whatever the network costs you.</p></li>
+<li><p><strong>The server executes.</strong> Your actual business logic. The part you own, the part you profile, the part you can rewrite in Go.</p></li>
+<li><p><strong>The result comes back and enters the context.</strong> And now the conversation is longer than it was.</p></li>
+<li><p><strong>The model thinks again.</strong> Over the longer conversation. This is step 2 again, and it costs at least what step 2 cost, usually slightly more.</p></li>
 </ol>
-<p>Steps 5 and 6 are the expensive ones and they are the ones people forget, because they do not look like work. Nothing is executing. But a tool result entering context means the next model turn processes a longer prompt, and you pay another TTFT, and you are billed for every token again.</p>
+<p>Steps 5 and 6 are the expensive ones, and they are the ones people leave out of their mental model, because they do not look like work. Nothing is executing. No code is running. But a tool result entering context means the next model turn processes a longer prompt, which means a longer TTFT, and you are billed for every token in that prompt again.</p>
 <section id="what-the-proportions-actually-are" class="level3">
 <h3>What the proportions actually are</h3>
-<p>Enough theory. Meridian, the reference application that ships with this book, runs a three-step task against four MCP servers: score an account for credit risk, screen it for fraud, and price a facility against the reference curve. Here is where its wall clock goes.</p>
+<p>Enough theory. Meridian is the reference application that ships with this book, and I will introduce it properly in <a href="#sec:meridian">§1.7</a>. For now, all you need to know is that it runs the three-step task from <a href="#sec:what-is-a-loop">§1.2</a> against four MCP servers, and that it is instrumented.</p>
+<p>Here is where its wall clock goes.</p>
 <aside class="box measured"><p class="box-title">Measured: Meridian baseline, one task, three iterations</p>
 <table>
 <tbody>
@@ -269,24 +343,43 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </tr>
 </tbody>
 </table>
-<p>3 model turns, 3 tool calls, 4 servers, 4<span>,</span>009 tokens, $0.0125 per task. Model timings simulated from the distribution in <a href="#sec:simulated">§1.6.2</a>; transport and execution measured on the machine in <a href="#sec:machine">§1.6</a>. Regenerate with <code>make bench</code>.</p>
+<p>3 model turns, 3 tool calls, 4 servers, 4<span>,</span>009 tokens, $0.0125 per task. Model timings simulated from the distribution in <a href="#sec:simulated">§1.8.2</a>; transport and execution measured on the machine in <a href="#sec:machine">§1.8</a>. Regenerate with <code>make bench</code>.</p>
 </aside>
 <figure id="fig:loop-breakdown">
 <img src="figures/loop-breakdown.svg" />
 <figcaption>The same numbers, to scale. If you have been optimising the green sliver, this chart is either very good news or very bad news depending on how long you have been at it.</figcaption>
 </figure>
-<p>Now, before you conclude that the protocol does not matter and close the book: that green sliver is not the point. The point is the <em>number of blue bands</em>. There are three of them because the loop ran three times.</p>
+<p>Now, I know what some of you are thinking, because I thought it too:</p>
+<blockquote>
+<p><em>Hang on. If 96 % of the time is the model, and I cannot make the model faster, then the protocol does not matter and this book is pointless. Also this is a strange thing for the author to admit on page seven.</em></p>
+</blockquote>
+<p>It is a fair objection and it deserves a proper answer.</p>
+<p>That green sliver is not the point. The point is the <em>number of blue bands</em>. There are three of them, and there are three of them because the loop ran three times. Delete an iteration and you delete an entire blue band, which is 400-odd milliseconds, which is roughly eight times the whole green sliver.</p>
+<p>So the lever is the count of the bands.</p>
 <aside class="keyidea">
-<p>You do not make an agent fast by making the tool call fast. You make it fast by needing fewer tool calls, and by making each one carry more.</p>
+<p>You do not make an agent fast by making the tool call fast. You make it fast by needing fewer iterations, and by making each one carry more.</p>
 </aside>
-<p>That reframing is the reason this book exists. Every technique in Chapter <a href="ch17.html#ch:optimizing">17</a> is ultimately a way of deleting a blue band, or of stopping one from getting wider.</p>
+<p>And what controls the number of iterations? The design of your tools, which is Chapter <a href="ch05.html#ch:tools">5</a>. What controls the width of the blue bands? The size of your context, which is Chapters <a href="ch05.html#ch:tools">5</a> and <a href="ch06.html#ch:resources">6</a>. Both of those are protocol-layer decisions. That is why the protocol matters even though it is 3.9 % of the chart.</p>
 </section>
 </section>
 <section id="sec:round-trips" class="level2">
 <h2>Round trips are the enemy</h2>
 <p>If you take one idea from this chapter, take this one.</p>
-<p>An extra round trip is not an extra 20 milliseconds of network time. It is an extra <em>model turn</em>, because the model has to look at what came back and decide what to do next. On the Meridian baseline that is roughly 440 milliseconds, plus another 1,300 tokens of input, plus the cost of those tokens, every time.</p>
-<p>Watch what that does to an MRTR interaction. Multi round-trip requests are how a 2026-era server asks the client a question mid-call, and Chapter <a href="ch08.html#ch:mrtr">8</a> covers the mechanism properly. For now, only the price tag matters.</p>
+<p>An extra round trip is not an extra 20 milliseconds of network time. It is an extra <em>model turn</em>, because the model has to look at what came back and decide what to do next. On the Meridian baseline that is roughly 440 milliseconds, plus another 1,300 tokens of input, plus the money those tokens cost, every time.</p>
+<p>Let me show you that with something concrete, and to do that I need to introduce one protocol feature early. I will keep it to what you need.</p>
+<section id="a-worked-example-the-server-asks-a-question" class="level3">
+<h3>A worked example: the server asks a question</h3>
+<p>Sometimes a server cannot finish a job without information only a human can supply. An approval. A choice between two options. A confirmation that yes, you really do want to move that much money.</p>
+<p>MCP has a mechanism for this called <strong>elicitation</strong>: the server, in the middle of handling a tool call, asks the client to go and get something from the user. Concretely, in revision <code>2026-07-28</code>, it works like this.</p>
+<ol>
+<li><p>The client calls a tool.</p></li>
+<li><p>Instead of the answer, the server replies “I need something first,” and attaches the question.</p></li>
+<li><p>The client puts the question to the user, gets an answer, and calls the tool again, carrying the answer.</p></li>
+<li><p>Now the server has enough, and returns the real result.</p></li>
+</ol>
+<p>That pattern has a name, <strong>multi round-trip requests</strong>, abbreviated MRTR, and Chapter <a href="ch08.html#ch:mrtr">8</a> builds it properly: the wire format, the security model, and why it replaced the 2025 design. You do not need any of that yet.</p>
+<p>What you need is the shape: <strong>one tool call became two</strong>. And a second thing, which is the part people miss: between those two calls, the model had to read the user’s answer and re-issue the call. That is a model turn.</p>
+<p>So let us count.</p>
 <aside class="box measured"><p class="box-title">Measured: The cost of one elicitation</p>
 <table>
 <tbody>
@@ -311,7 +404,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <td style="text-align: right;">+34.5 ms</td>
 </tr>
 <tr>
-<td style="text-align: left;">Plus one model turn to read the form</td>
+<td style="text-align: left;">Plus one model turn to read the answer</td>
 <td style="text-align: right;"></td>
 <td style="text-align: right;">+340 ms</td>
 </tr>
@@ -322,10 +415,17 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </tr>
 </tbody>
 </table>
-<p>Measured at 12 ms simulated per-call latency. The transport cost of the extra round trip is real but small; the model turn it forces is ten times larger.</p>
+<p>Measured at 12 ms simulated per-call latency. The transport half is measured; the model turn is the stated TTFT mean from <a href="#sec:simulated">§1.8.2</a>.</p>
 </aside>
-<p>The transport delta is 34 milliseconds and looks harmless. The honest number is 375, because a round trip drags a model turn along behind it. This is why Chapter <a href="ch08.html#ch:mrtr">8</a> spends so much energy on collecting inputs up front, and why “just add a confirmation prompt” is a more expensive suggestion than it sounds in a design review.</p>
-<p>The same arithmetic runs the other way, which is the good news. When the model asks for three tools at once, it is telling you those three are independent. Run them together:</p>
+<p>Read the first two rows and you would conclude an elicitation costs 34 milliseconds. That is the number your server-side monitoring will show you, and it is true, and it is the wrong number.</p>
+<p>The honest number is 375, because the round trip dragged a model turn along behind it. Ten times larger, and invisible to every dashboard that watches servers rather than tasks.</p>
+<p>This is why Chapter <a href="ch08.html#ch:mrtr">8</a> spends so much energy on gathering inputs up front, and why “we should just add a confirmation prompt there” is a much more expensive suggestion in a design review than it sounds.</p>
+</section>
+<section id="the-same-arithmetic-running-the-other-way" class="level3">
+<h3>The same arithmetic, running the other way</h3>
+<p>Now the good news, because the round-trip rule cuts both ways.</p>
+<p>When a model asks for three tools in a single turn, it is telling you something useful: it believes those three do not depend on each other. It would have sequenced them if they did.</p>
+<p>An application that honours that runs all three at once and waits for the slowest. An application that ignores it runs them one after another and waits for the sum.</p>
 <aside class="box measured"><p class="box-title">Measured: Serial versus parallel fan-out, three independent tools</p>
 <table>
 <tbody>
@@ -355,29 +455,32 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </tr>
 </tbody>
 </table>
-<p>Three calls, so the ceiling is 3<span class="math inline">×</span>. The gap between 2.8 and 3.0 is thread scheduling and the slowest of the three servers.</p>
+<p>Three calls, so the ceiling is 3<span class="math inline">×</span>. The gap between 2.9 and 3.0 is thread scheduling plus the slowest of the three servers.</p>
 </aside>
-<p>Notice that the speedup gets <em>better</em> as latency rises. Serial fan-out pays the sum of the latencies; parallel pays the maximum. The worse your network, the more the mistake costs you, which is a deeply unfair property of the universe and one you should exploit.</p>
+<p>Running three things at once being about three times faster is not a surprising result. What is worth noticing is the <em>trend down the table</em>: the speedup gets better as per-call latency rises. Serial pays the sum of the latencies; parallel pays the maximum. As latency grows, the sum grows three times faster than the maximum does.</p>
+<p>Which means the worse your network, the more the mistake costs you. If your servers are in another region, this is the first thing to fix.</p>
 </section>
-<section id="the-n-times-m-problem-and-why-a-protocol-is-the-answer" class="level2">
-<h2>The N times M problem, and why a protocol is the answer</h2>
-<p>Let us back up and ask why MCP exists, because the answer is not “standardisation is nice.”</p>
-<p>You have <span class="math inline"><em>N</em></span> AI applications and <span class="math inline"><em>M</em></span> systems worth connecting them to. Without a shared contract, you write <span class="math inline"><em>N</em> × <em>M</em></span> integrations, and worse, you <em>maintain</em> <span class="math inline"><em>N</em> × <em>M</em></span> integrations. Four hosts and five systems is twenty pieces of bespoke glue, each with its own auth, its own error handling, and its own person who understands it and is currently on holiday.</p>
+</section>
+<section id="the-n-times-m-problem" class="level2">
+<h2>The N times M problem</h2>
+<p>Let us back up and ask why MCP exists at all, because “standardisation is nice” is not an answer.</p>
+<p>You have <span class="math inline"><em>N</em></span> AI applications. You have <span class="math inline"><em>M</em></span> systems worth connecting them to: your CRM, your data warehouse, three internal services, and a mainframe nobody wants to discuss. Without a shared contract, connecting them means writing <span class="math inline"><em>N</em> × <em>M</em></span> integrations, and worse, <em>maintaining</em> <span class="math inline"><em>N</em> × <em>M</em></span> integrations. Four applications and five systems is twenty pieces of bespoke glue, each with its own authentication, its own error handling, and its own person who understands it and is currently on holiday.</p>
 <figure id="fig:nxm-problem">
 <img src="figures/nxm-problem.svg" />
 <figcaption>Twenty integrations, or nine. This is the same argument that produced ODBC, LSP, and every other narrow waist in computing history, and it works for the same reason.</figcaption>
 </figure>
-<p>With a protocol you write <span class="math inline"><em>N</em> + <em>M</em></span>. Nine. Each host implements a client once, each system exposes a server once, and the contract in the middle is somebody else’s problem to specify.</p>
-<p>This is the Language Server Protocol argument, and it is worth dwelling on why LSP worked, because it tells you what MCP has to get right. Before LSP, every editor implemented Go To Definition for every language. After LSP, editors implemented one client and languages implemented one server, and the ecosystem exploded. The waist was narrow enough to implement in a weekend and expressive enough to be worth implementing.</p>
-<section id="why-not-a-framework" class="level3">
-<h3>Why not a framework?</h3>
-<p>Fair question, since frameworks got there first.</p>
-<p>A framework is a library you import. It works beautifully as long as everyone is in the same process, in the same language, on the same release cadence. The moment your risk team ships Python, your platform team ships TypeScript, and a vendor ships a binary you cannot recompile, a library is the wrong shape. You need something that survives a process boundary and a version skew.</p>
-<p>That is a protocol. And once it is a protocol, it needs a wire format, a versioning story, and a deprecation policy, which is precisely what Chapter <a href="ch02.html#ch:architecture">2</a> is about.</p>
+<p>With a protocol you write <span class="math inline"><em>N</em> + <em>M</em></span>. Nine. Each application implements a client once, each system exposes a server once, and the contract in the middle is somebody else’s problem to specify.</p>
+<p>It is worth dwelling on why the Language Server Protocol worked, because it tells you what MCP has to get right. Before LSP, every editor implemented Go To Definition for every language: Emacs for Python, Vim for Python, Emacs for Go, and so on, forever. After LSP, editors implemented one client and language teams implemented one server. The ecosystem exploded.</p>
+<p>The reason it worked is that the waist was narrow enough to implement in a weekend and expressive enough to be worth implementing. Miss on either side and you get a standard nobody adopts.</p>
+<section id="but-why-not-a-framework" class="level3">
+<h3>But why not a framework?</h3>
+<p>Fair question, and frameworks got there first.</p>
+<p>A framework is a library you import. It works beautifully as long as everything is in one process, in one language, on one release cadence. The moment your risk team ships Python, your platform team ships TypeScript, and a vendor ships a binary you cannot recompile, a library is the wrong shape. You need something that survives a process boundary and a version skew.</p>
+<p>That is a protocol. And once it is a protocol it needs a wire format, a versioning story, and a deprecation policy, which is precisely what Chapter <a href="ch02.html#ch:architecture">2</a> is about.</p>
 </section>
 <section id="positioning-against-the-alternatives" class="level3">
 <h3>Positioning against the alternatives</h3>
-<p>You have choices, and MCP is not always the right one. Here is my honest read as of mid-2026.</p>
+<p>You have choices, and MCP is not the right one for all of them. Here is my honest read as of mid-2026.</p>
 <table id="tab:positioning">
 <caption>Where each approach earns its keep. If you are one team, one language, one model provider, and one system, provider-native function calling is genuinely the right answer and you should use it.</caption>
 <tbody>
@@ -403,7 +506,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </tr>
 <tr>
 <td style="text-align: left;"><strong>MCP</strong></td>
-<td style="text-align: left;"><strong>Many hosts, many systems, separate teams, real trust boundaries</strong></td>
+<td style="text-align: left;"><strong>Many applications, many systems, separate teams, real trust boundaries</strong></td>
 <td style="text-align: left;"><strong>A protocol to learn, and a host to run</strong></td>
 </tr>
 <tr>
@@ -413,32 +516,34 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </tr>
 </tbody>
 </table>
-<p>The A2A comparison is the one people ask about most, so: they are orthogonal. MCP connects an agent to <em>capabilities</em>. A2A connects an agent to <em>other agents</em>. Chapter <a href="ch14.html#ch:multi-agent">14</a> builds a system that is both, because an agent that consumes MCP tools on one side and exposes MCP tools on the other is a completely ordinary thing to want.</p>
+<p>I want to be blunt about the first row, because books about a technology rarely are. If you have one application, one model provider, and one system to connect to, then MCP is overhead. Use your provider’s function calling, ship it, and come back when you have a second application or a second team. The <span class="math inline"><em>N</em> × <em>M</em></span> argument needs <span class="math inline"><em>N</em></span> and <span class="math inline"><em>M</em></span> to be bigger than one.</p>
+<p>The A2A comparison is the one people ask about most, so: they are orthogonal. MCP connects an agent to <em>capabilities</em>. A2A connects an agent to <em>other agents</em>. Chapter <a href="ch14.html#ch:multi-agent">14</a> builds a system that is both, because an agent that consumes MCP tools on one side and exposes MCP tools on the other turns out to be a completely ordinary thing to want.</p>
 </section>
 </section>
 <section id="sec:meridian" class="level2">
 <h2>Meet Meridian</h2>
-<p>Meridian is the instrumented reference application for this book. It is a financial analytics assistant, and it exists so that no claim in these pages has to be taken on faith.</p>
+<p>Meridian is the instrumented reference application for this book. It exists so that no claim in these pages has to be taken on faith.</p>
+<p>It is a financial analytics assistant, in the sense that a flight simulator is an aircraft: the domain is realistic enough to generate real design pressure, and nobody’s money is involved. Four MCP servers:</p>
 <dl>
 <dt><code>meridian-risk</code></dt>
 <dd>
-<p>Credit scoring. Tools, resources, prompts, MRTR approvals, the Tasks extension, and an MCP App template. The busiest server.</p>
+<p>Credit scoring. It has tools, resources, prompts, approval flows, long-running jobs, and an interactive interface. It is the busiest server and it demonstrates most of the protocol.</p>
 </dd>
 <dt><code>meridian-compliance</code></dt>
 <dd>
-<p>Transaction review with a human in the loop, an immutable audit log, and (on request) the tool-poisoning payload from Chapter <a href="ch19.html#ch:threats">19</a>.</p>
+<p>Transaction review with a human in the loop, and an immutable audit log, which is the append-only record of who did what. It is also the server that gets compromised in Chapter <a href="ch19.html#ch:threats">19</a>.</p>
 </dd>
 <dt><code>meridian-fraud</code></dt>
 <dd>
-<p>Fast, read-only behavioural signals. The cheap parallel call.</p>
+<p>Fast, read-only behavioural signals. It is the cheap call that can safely run in parallel with everything else.</p>
 </dd>
 <dt><code>meridian-marketdata</code></dt>
 <dd>
-<p>Reference rates. Everything it returns is identical for every caller, which makes it the one place a shared gateway cache genuinely pays.</p>
+<p>Reference interest rates. Everything it returns is identical for every caller, which turns out to make it the one place where shared caching genuinely pays.</p>
 </dd>
 </dl>
-<p>Plus a host, a client, an agent loop, a measurement harness, and 134 tests.</p>
-<p>The whole thing has no third-party runtime dependencies, which was a deliberate and slightly obsessive decision. The SDKs are good and you should use them in production. But they were still shipping the handshake-era protocol while this book was being written, and a book about the wire that hides the wire behind somebody’s convenience wrapper is not doing its job. So <code>meridian/protocol/</code> is a complete implementation of <code>2026-07-28</code> in about two thousand lines of standard-library Python. You can read all of it in an evening.</p>
+<p>Plus an application that drives them, an agent loop, a measurement harness, and 134 tests.</p>
+<p>The whole thing has no third-party runtime dependencies, which was a deliberate and slightly obsessive decision. The official SDKs are good and you should use them in production. But they were still shipping the 2025 protocol while this book was being written, and more importantly, a book about the wire that hides the wire behind somebody’s convenience wrapper is not doing its job. So <code>meridian/protocol/</code> is a complete implementation of <code>2026-07-28</code> in about 3,900 lines of standard-library Python. You can read all of it in an evening, and Appendix <a href="appendix-e.html#ch:companion">E</a> suggests an order.</p>
 <section id="try-it-now" class="level3">
 <h3>Try it now</h3>
 <pre class="bash" data-language="bash"><code>git clone https://github.com/krimler/Building-Awesome-MCP-Apps
@@ -452,7 +557,7 @@ make bench    # every number in this book</code></pre>
 FRAUD: watch 1
 CURVE: 1Y=3.96 5Y=3.68</code></pre>
 <p>Those values match the fixtures exactly, which is the point. <code>meridian/VERIFICATION.md</code> records the full transcript.</p>
-<p>There is a wrinkle in that command worth flagging now, because it shaped several later chapters. Claude Code, like most clients shipping in 2026, still opens a connection with an <code>initialize</code> handshake. Revision <code>2026-07-28</code> deleted that handshake. A strictly conforming modern server would therefore be completely correct and completely unusable. Meridian ships a dual-era bridge to handle exactly this, and Chapter <a href="ch02.html#ch:architecture">2</a> explains how the specification tells you to build one.</p>
+<p>There is a wrinkle in that command worth flagging now, because it shaped several later chapters. Claude Code, like most clients shipping in 2026, still opens a connection the way the 2025 protocol required. Revision <code>2026-07-28</code> removed that step. So a server that implements the new revision strictly is completely correct and completely unable to talk to the clients that exist. Meridian ships a compatibility layer to handle exactly this, and Chapter <a href="ch02.html#ch:architecture">2</a> explains what the specification says to do about it.</p>
 </section>
 <section id="the-baseline-numbers" class="level3">
 <h3>The baseline numbers</h3>
@@ -499,7 +604,7 @@ CURVE: 1Y=3.96 5Y=3.68</code></pre>
 </tbody>
 </table>
 </aside>
-<p>By Chapter <a href="ch17.html#ch:optimizing">17</a> that task is meaningfully faster and cheaper, and every step of the change is attributed to a specific technique with a specific measurement. No hand-waving.</p>
+<p>By Chapter <a href="ch17.html#ch:optimizing">17</a> that task is meaningfully faster and about eight times cheaper, and every step of the change is attributed to a specific technique with a specific measurement. No hand-waving, and I also report the changes that turned out to be worth nothing.</p>
 </section>
 </section>
 <section id="sec:machine" class="level2">
@@ -507,8 +612,8 @@ CURVE: 1Y=3.96 5Y=3.68</code></pre>
 <p>Two things you are owed up front.</p>
 <section id="the-machine" class="level3">
 <h3>The machine</h3>
-<p>Every measurement was taken on Apple Silicon (arm64), macOS 15.7.3, Python 3.14.6. Your absolute numbers will differ. The <em>ratios</em> are what travel, and ratios are what the arguments rest on.</p>
-<p>Transport figures are loopback figures. That is deliberate. Localhost has essentially no physics, which isolates protocol overhead so you can see it without your office wi-fi in the way. Here is what that isolation buys:</p>
+<p>Every measurement was taken on Apple Silicon (arm64), macOS 15.7.3, Python 3.14.6. Your absolute numbers will differ. The <em>ratios</em> are what travel, and the ratios are what the arguments rest on.</p>
+<p>Transport figures are loopback figures, meaning both ends are on the same machine and nothing touches a network card. That is deliberate. Localhost has essentially no physics, which isolates protocol overhead so you can see it without my office wi-fi in the way. Here is what that isolation buys.</p>
 <aside class="box measured"><p class="box-title">Measured: Same call, three transports</p>
 <table>
 <tbody>
@@ -536,8 +641,9 @@ CURVE: 1Y=3.96 5Y=3.68</code></pre>
 </table>
 <p>The in-process transport still serialises and deserialises, so this is a fair comparison rather than a flattering one.</p>
 </aside>
-<p>Subtract the control from the other two and you have transport cost with server execution removed. That subtraction is the single most useful trick in Chapter <a href="ch16.html#ch:measuring">16</a>, and it is the only honest way to answer “is my server slow, or is my transport slow.”</p>
-<p>Add your own network latency on top. A cross-region hop is 40 to 90 milliseconds and swamps all three rows, which is exactly why Chapter <a href="ch03.html#ch:transport">3</a> cares about connection reuse and Chapter <a href="ch17.html#ch:optimizing">17</a> cares about round-trip counts.</p>
+<p>The first row is a control: the same request and response, encoded and decoded, but handed directly to the server in the same process. Subtract it from the other two and what remains is transport cost with server execution removed.</p>
+<p>That subtraction is the single most useful trick in Chapter <a href="ch16.html#ch:measuring">16</a>, because it is the only honest way to answer “is my server slow, or is my transport slow”. It takes about ten minutes to set up and it will save you an argument.</p>
+<p>Add your own network latency on top. A cross-region hop is 40 to 90 milliseconds, which swamps all three rows by two orders of magnitude. That is exactly why Chapter <a href="ch03.html#ch:transport">3</a> cares about connection reuse and why this chapter cares about round-trip counts.</p>
 </section>
 <section id="sec:simulated" class="level3">
 <h3>What is simulated</h3>
@@ -548,27 +654,25 @@ MS_PER_OUTPUT_TOKEN  = 7.5
 CHARS_PER_TOKEN      = 4.0     # rough, and rough is fine for ratios
 INPUT_USD_PER_MTOK   = 3.00
 OUTPUT_USD_PER_MTOK  = 15.00</code></pre>
-<p>Those constants are calibrated against published figures for mid-size hosted models in mid-2026. They are stated here so you can disagree with them precisely rather than vaguely. Edit <code>meridian/host/model.py</code>, rerun <code>make bench</code>, and every number in the book moves with you.</p>
-<p>Everything downstream of inference is measured for real: serialisation, transport, server execution, cache hit rates, round-trip counts, catalogue token cost, and process cold starts.</p>
+<p>Those constants are calibrated against published figures for mid-size hosted models in mid-2026. They are stated here so you can disagree with them precisely. Edit <code>meridian/host/model.py</code>, rerun <code>make bench</code>, and every number in the book moves with you.</p>
+<p>Everything downstream of inference is measured for real: serialisation, transport, server execution, cache hit rates, round-trip counts, catalogue token cost, and process start-up times.</p>
 <aside class="keyidea">
-<p>When a measurement box in this book gives you a number, the number came out of a program you can run. When part of it is modelled, the box says so. If you catch me violating this, open an issue.</p>
+<p>When a measurement box in this book gives you a number, that number came out of a program you can run. When part of it is modelled, the box says which part. If you catch me violating this, open an issue.</p>
 </aside>
 </section>
 </section>
 <section id="what-you-should-do-on-monday" class="level2">
 <h2>What you should do on Monday</h2>
-<p>Before you read another chapter, go and find out three things about the system you already have.</p>
-<ol>
-<li><p><strong>How many loop iterations does a typical task take?</strong> Not tool calls. Iterations. Each one is a full model turn. If the answer is more than four, that is where your latency lives and no amount of server tuning will touch it.</p></li>
-<li><p><strong>How many tokens does your tool catalogue cost per turn?</strong> Serialise your merged <code>tools/list</code> output, divide the character count by four, and multiply by the number of turns in a task. Chapter <a href="ch05.html#ch:tools">5</a> measures a catalogue that costs 4,371 extra tokens on every single turn, which worked out to $26 per thousand tasks in pure waste. That was a real catalogue, and it was not the worst one I have seen.</p></li>
-<li><p><strong>What fraction of your requests could have been served from cache?</strong> If you are not honouring <code>ttlMs</code>, the answer is most of them. Meridian avoided 577 of 600 resource reads with a 96.2 % hit rate on a realistic access pattern.</p></li>
-</ol>
-<p>Three numbers. An afternoon. They will tell you which chapter to read next better than my table of contents can.</p>
+<p>Before you read another chapter, go and find out three things about the system you already have. Each of these is an afternoon at most, and between them they will tell you which chapter to read next better than my table of contents can.</p>
+<p><strong>One. How many loop iterations does a typical task take?</strong> Not tool calls. Iterations, in the sense of <a href="#sec:what-is-a-loop">§1.2</a>, because each one is a full model turn. If the answer is more than four, that is where your latency lives, and no amount of server tuning will touch it.</p>
+<p><strong>Two. How many tokens does your tool catalogue cost per turn?</strong> Serialise your merged tool list, divide the character count by four, and multiply by the number of turns in a task. Chapter <a href="ch05.html#ch:tools">5</a> measures a catalogue that cost 4,371 extra tokens on every single turn, which worked out to $26 per thousand tasks in pure waste. That was a real catalogue, and it was not the worst one I have seen.</p>
+<p><strong>Three. What fraction of your requests could have been served from a cache?</strong> If you are not honouring the freshness hints the protocol sends you, and Chapter <a href="ch06.html#ch:resources">6</a> explains what those are, the answer is most of them. Meridian avoided 577 of 600 resource reads on a realistic access pattern.</p>
 </section>
 <section id="where-this-is-going" class="level2">
 <h2>Where this is going</h2>
-<p>The rest of Part I gets you to the wire: the stateless architecture in Chapter <a href="ch02.html#ch:architecture">2</a>, both transports byte by byte in Chapter <a href="ch03.html#ch:transport">3</a>, and OAuth as MCP actually uses it in Chapter <a href="ch04.html#ch:authorization">4</a>. Part II is the primitives, one chapter each, every one of them following the same pattern of mechanics, then cost, then guidance.</p>
-<p>But the frame never changes. Three budgets. Round trips are the enemy. Measure before you optimise, and measure the thing you actually ship.</p>
+<p>The rest of Part I gets you to the wire. Chapter <a href="ch02.html#ch:architecture">2</a> covers the architecture and the stateless design that defines this revision. Chapter <a href="ch03.html#ch:transport">3</a> covers both transports byte by byte. Chapter <a href="ch04.html#ch:authorization">4</a> covers authorization, which is a security chapter with a performance chapter hiding inside it.</p>
+<p>Part II is the protocol’s capabilities, one chapter each, every one following the same pattern: how it works on the wire, what it costs, and when to use it.</p>
+<p>But the frame never changes, and it is the frame from this chapter. Three budgets. Round trips are the enemy. Measure before you optimise, and measure the thing you actually ship.</p>
 <p>Onward.</p>
 </section>
 </section>

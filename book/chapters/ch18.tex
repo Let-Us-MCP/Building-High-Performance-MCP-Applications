@@ -59,6 +59,7 @@ subprocess gets the parent's environment by default, including credentials for
 things it has no business touching.
 
 \begin{py}
+# sketch: condensed for the page
 self._proc = subprocess.Popen(
     command,
     stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -124,9 +125,8 @@ A useful health check exercises the protocol:
 def healthy(server) -> tuple[bool, dict]:
     """Health means `server/discover` answers correctly, not that a port is open.
 
-    A process can accept connections while its catalogue is empty, its
-    dependencies are down, or its handlers all raise. Answering discovery
-    proves routing, capability derivation, and serialisation all work.
+    Answering discovery proves routing, capability derivation, and
+    serialisation all work, which is three subsystems for one request.
     """
     probe = {
         "jsonrpc": "2.0", "id": "health", "method": "server/discover",
@@ -135,15 +135,18 @@ def healthy(server) -> tuple[bool, dict]:
             KEY_CLIENT_CAPABILITIES: {},
         }},
     }
-    resp = server.handle(probe)
-    if "error" in resp:
-        return False, {"reason": resp["error"]["message"]}
-    result = resp["result"]
-    return (
-        PROTOCOL_VERSION in result.get("supportedVersions", [])
-        and bool(result.get("capabilities")),
-        {"capabilities": sorted(result.get("capabilities", {}))},
-    )
+    response = server.handle(probe)
+    if response is None or "error" in response:
+        reason = (response or {}).get("error", {}).get("message", "no response")
+        return False, {"reason": reason}
+
+    result = response["result"]
+    ok = (PROTOCOL_VERSION in result.get("supportedVersions", [])
+          and bool(result.get("capabilities")))
+    return ok, {
+        "capabilities": sorted(result.get("capabilities", {})),
+        "supportedVersions": result.get("supportedVersions", []),
+    }
 \end{py}
 
 Three levels, and use all three:
@@ -173,8 +176,7 @@ It was removed in \texttt{2026-07-28}. If your health check sends it, a modern
 server answers \texttt{-32601} and your orchestrator concludes the server is
 unhealthy and restarts it, forever.
 
-The dual-era bridge answers \texttt{ping} for exactly this reason, which is a
-compatibility shim rather than a recommendation.
+The dual-era bridge answers \texttt{ping} for exactly this reason, which is a compatibility shim, not a recommendation.
 \end{notebox}
 
 \section{Graceful drain}

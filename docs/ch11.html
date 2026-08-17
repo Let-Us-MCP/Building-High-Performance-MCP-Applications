@@ -315,45 +315,35 @@ def assess_account_risk(ctx: RequestContext):
 </section>
 <section id="state-without-sessions" class="level2">
 <h2>State without sessions</h2>
-<p>The pattern from Chapter <a href="ch02.html#ch:architecture">2</a>, built properly.</p>
-<pre class="python" data-language="python"><code># --&gt; tools/call
-{ &quot;name&quot;: &quot;create_basket&quot;, &quot;arguments&quot;: {} }
+<p>Chapter <a href="ch02.html#ch:architecture">2</a> introduced the handle pattern: a server that needs to remember something between calls mints an identifier, returns it, and requires it back. It also gave the four rules that keep one safe. This section is about the part that chapter left out, which is what the code looks like.</p>
+<p>The whole mechanism on the server side is a dictionary and an authorization check:</p>
+<pre class="python" data-language="python"><code>@server.tool(&quot;add_item&quot;, &quot;Add an item to an open basket.&quot;, ADD_ITEM_SCHEMA)
+def add_item(ctx: RequestContext):
+    basket_id = ctx.arguments[&quot;basket_id&quot;]
+    basket = BASKETS.get(basket_id)
 
-# &lt;-- result
-{ &quot;structuredContent&quot;: { &quot;basket_id&quot;: &quot;bsk_a1b2c3&quot; } }
+    # A handle names an object. It does not grant access to one, so the
+    # caller&#39;s authorization is re-checked here on every single call.
+    if basket is None or not can_access(ctx.auth, basket):
+        return tool_error(
+            f&quot;Basket {basket_id} does not exist or has expired. &quot;
+            &quot;Create a new one with create_basket.&quot;)
 
-# --&gt; tools/call, later, possibly to a different replica
-{ &quot;name&quot;: &quot;add_item&quot;, &quot;arguments&quot;: { &quot;basket_id&quot;: &quot;bsk_a1b2c3&quot;, &quot;sku&quot;: &quot;...&quot; } }</code></pre>
-<p>From the wire’s point of view, <code>basket_id</code> is a string argument. There is no protocol concept of a handle, which is exactly why it works on every client and every transport with no negotiation.</p>
-<p>Four rules, and each of them is somebody’s incident report:</p>
-<table id="tab:handle-rules">
-<caption>Handle design. The first row is the one that turns a convenience into a vulnerability.</caption>
-<tbody>
-<tr>
-<td style="text-align: left;"><strong>Rule</strong></td>
-<td style="text-align: left;"><strong>What goes wrong without it</strong></td>
-</tr>
-<tr>
-<td style="text-align: left;">Authorize on every call</td>
-<td style="text-align: left;">A handle becomes a bearer token. Anyone who sees one owns the object</td>
-</tr>
-<tr>
-<td style="text-align: left;">Keep it opaque</td>
-<td style="text-align: left;"><code>basket_user42_20260728</code> invites enumeration of user 43</td>
-</tr>
-<tr>
-<td style="text-align: left;">State the lifetime in the creation tool’s description</td>
-<td style="text-align: left;">The model cannot see your retention policy anywhere else</td>
-</tr>
-<tr>
-<td style="text-align: left;">Return a clear expiry error</td>
-<td style="text-align: left;">The model retries a dead handle forever instead of making a new one</td>
-</tr>
-</tbody>
-</table>
-<aside class="keyidea">
-<p>For an authenticated server, a handle is a name, not a capability. Re-check authorization against it on every single call. For an unauthenticated server the handle <em>is</em> a bearer token, so give it real entropy and a bounded life.</p>
-</aside>
+    basket.items.append(ctx.arguments[&quot;sku&quot;])
+    basket.touched_at = time.time()
+    return {&quot;structuredContent&quot;: {&quot;basket_id&quot;: basket_id,
+                                  &quot;itemCount&quot;: len(basket.items)}}</code></pre>
+<p>Three details in that handler are doing real work.</p>
+<p>The authorization check and the existence check produce the <em>same</em> error. Distinguishing “this basket is not yours” from “this basket does not exist” tells an attacker which identifiers are real, which is how you turn a handle space into an enumeration oracle.</p>
+<p>The error is a tool execution error, so the model reads it. And it names the recovery: create a new one. Chapter <a href="ch05.html#ch:tools">5</a> argued for this generally; here it is the difference between a model that recovers from an expired basket and a model that retries a dead identifier until the step budget stops it.</p>
+<p>And <code>touched_at</code> exists because handles need a retention policy, which needs to be visible to the model:</p>
+<pre class="python" data-language="python"><code>@server.tool(
+    &quot;create_basket&quot;,
+    &quot;Create a shopping basket and return its id. Baskets expire after 24 &quot;
+    &quot;hours of inactivity; pass the id to add_item and checkout.&quot;,
+    {&quot;type&quot;: &quot;object&quot;, &quot;additionalProperties&quot;: False},
+)</code></pre>
+<p>That description is the only place the model can learn the lifetime. It is not in the schema, it is not in the protocol, and there is nowhere else to put it.</p>
 </section>
 <section id="idempotency-because-retries-are-routine-now" class="level2">
 <h2>Idempotency, because retries are routine now</h2>
@@ -417,7 +407,11 @@ def assess_account_risk(ctx: RequestContext):
     return sorted(self._tools.values(), key=lambda t: t.name)</code></pre>
 <p>A scope-aware subclass:</p>
 <pre class="python" data-language="python"><code>class ScopedRiskServer(Server):
-    def visible_tools(self, ctx):
+    &quot;&quot;&quot;The risk server, with per-tool scopes and row-level account access.&quot;&quot;&quot;
+
+    def visible_tools(self, ctx: RequestContext) -&gt; list[Tool]:
+        &quot;&quot;&quot;Override to filter by scope. The set may vary by authorization,
+        never by connection.&quot;&quot;&quot;
         scopes = set((ctx.auth or {}).get(&quot;scopes&quot;, []))
         return [t for t in super().visible_tools(ctx)
                 if not REQUIRED_SCOPE.get(t.name)
@@ -503,7 +497,7 @@ def test_unsupported_version_lists_what_is_supported(self):
             self.assertIn(&quot;cacheScope&quot;, result)
             self.assertGreaterEqual(result[&quot;ttlMs&quot;], 0)
             self.assertIn(result[&quot;cacheScope&quot;], (&quot;public&quot;, &quot;private&quot;))</code></pre>
-<p><code>subTest</code> means one failing method reports as one failure rather than aborting the loop, so you see all six.</p>
+<p><code>subTest</code> means one failing method reports as one failure, so you see all six instead of stopping at the first.</p>
 </section>
 <section id="pagination-that-actually-terminates" class="level3">
 <h3>Pagination that actually terminates</h3>
@@ -548,7 +542,7 @@ def test_bad_business_input_is_a_tool_execution_error(self):
 <h2>The build, start to finish</h2>
 <p>Meridian’s risk server, in order:</p>
 <ol>
-<li><p><strong>Construct</strong>, with instructions written for a model rather than for a README.</p></li>
+<li><p><strong>Construct</strong>, with instructions written for a model to read.</p></li>
 <li><p><strong>Three tools</strong>, task-shaped: one account, many accounts, and the long-running one.</p></li>
 <li><p><strong>MRTR approval</strong> above the exposure threshold, with sealed state.</p></li>
 <li><p><strong>Resources</strong>: templated account summaries (private, 15 min), public filings (public, 24 h), a model card (public, 7 d), and the App template.</p></li>

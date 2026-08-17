@@ -160,6 +160,22 @@ Legend: `[ ]` not started · `[~]` drafted · `[x]` drafted + prose-linted + bui
   so the bridge refuses it with an explanatory error instead of sending a shape the client
   cannot parse; that limitation is documented rather than hidden.
 
+## Style rules discovered in review (binding from here on)
+
+- **Write straight, not contrastively.** The first draft leaned on "X is not Y. It is
+  Z.", "not just A but B", and "rather than" as a default connective, which reads as
+  arguing with somebody who is not in the room. Say what the thing IS.
+  `tools/check_contrastive.py` counts them; budget is 8 per file. Went 244 -> 163.
+- **Define before use, never defer.** The first draft used "elicitation" in a table
+  before defining it anywhere, and waved at concepts with "Chapter 8 covers the
+  mechanism properly". `tools/audit_style.py --deferrals` catches that; it is now 0.
+- **Density over sparseness.** HPBN builds a concept fully before spending it. Ch 1-3
+  were rewritten on that model and roughly doubled: ch01 1,584 -> 3,790 words of prose.
+- **Every listing must trace to real code.** `tools/check_listings.py` proved ~15
+  listings were sketches the book presented as extracted. Fixed by implementing them
+  (`host/delegation.py`, `servers/scoped.py`, `ops.py`, `client.call_with_reauth`) and
+  marking the genuinely elided ones `# sketch:`. Now 151/151 trace.
+
 ## Open items / notes for the author
 
 - `desc` line 10 says "lipic style". Read as *lucid* style: plain, concrete, example-first.

@@ -26,12 +26,12 @@ a tool call. This is a good property, and it is why MCP does not need a
 multi-agent extension.
 
 \begin{py}
-risk_agent = Server("meridian-risk-agent", "1.0.0", instructions=(
+agent = Server(name, "1.0.0", instructions=(
     "Delegated credit analysis. Give it an account and a question; it will "
     "consult the risk, fraud, and market-data servers and return a synthesis."
 ))
 
-@risk_agent.tool(
+@agent.tool(
     "analyse_account",
     "Full credit analysis of one account: risk score, fraud signals, and "
     "indicative pricing, synthesised into a recommendation.",
@@ -46,7 +46,7 @@ risk_agent = Server("meridian-risk-agent", "1.0.0", instructions=(
     },
 )
 def analyse_account(ctx: RequestContext):
-    budget = _inherit_budget(ctx)          # see below
+    budget = inherit_budget(ctx)
     result = AgentLoop(inner_host, model,
                        max_steps=budget.steps,
                        token_budget=budget.tokens,
@@ -55,7 +55,8 @@ def analyse_account(ctx: RequestContext):
         f"{ctx.arguments.get('question', '')}")
     return text_result(result.answer,
                        structured={"iterations": len(result.iterations),
-                                   "costUsd": result.cost_usd})
+                                   "costUsd": round(result.cost_usd, 6),
+                                   "depth": budget.depth})
 \end{py}
 
 A tool whose implementation is a loop. The caller cannot tell, and mostly should
@@ -92,8 +93,7 @@ infinite recursion distributed across three machines with a token meter attached
 
 Levels, each summarising for the one above. Portfolio, sector, account.
 
-\textbf{Isolation:} good, and the context property is the real prize: each level
-sees summaries rather than raw results, so the top-level window stays small
+\textbf{Isolation:} good, and the context property is the real prize: each level sees summaries, so the top-level window stays small
 regardless of how many accounts exist.
 
 \textbf{Failure mode:} depth multiplies latency. Three levels means the leaf's
@@ -106,14 +106,14 @@ Whatever the shape, four things must travel with a delegated request, and all
 four ride in \texttt{\_meta}.
 
 \begin{py}
-DEPTH_KEY   = "com.meridian/delegationDepth"
-TOKENS_KEY  = "com.meridian/tokenBudgetRemaining"
+DEPTH_KEY = "com.meridian/delegationDepth"
+TOKENS_KEY = "com.meridian/tokenBudgetRemaining"
 DOLLARS_KEY = "com.meridian/costBudgetRemaining"
 # `traceparent` is already reserved by the spec for the fourth.
 
 MAX_DELEGATION_DEPTH = 3
 
-def _inherit_budget(ctx: RequestContext) -> Budget:
+def inherit_budget(ctx: RequestContext) -> Budget:
     """Read the caller's remaining budget, or assume the smallest.
 
     An agent that receives no budget must not assume an unlimited one. That
@@ -155,8 +155,7 @@ A supervisor with a \$1.00 budget delegating to 3 agents, each delegating to 3
 more, each running 8 steps: if every level passes its full budget down, the
 system is authorised to spend \$9.00 and will happily do so.
 
-Depth limits alone do not fix this. You need the budget to be a shared,
-decrementing quantity rather than a per-node allowance.
+Depth limits alone do not fix this. The budget has to be a shared, decrementing quantity.
 \end{dangerbox}
 
 \section{Circuit breakers}
@@ -179,7 +178,7 @@ class CircuitBreaker:
         self.failures = 0
         self.opened_at: float | None = None
 
-    def allows(self, now: float) -> bool:
+    def allows(self, now: float | None = None) -> bool:
         if self.opened_at is None:
             return True
         if now - self.opened_at >= self.cooldown:
@@ -188,7 +187,7 @@ class CircuitBreaker:
             return True
         return False
 
-    def record(self, ok: bool, now: float) -> None:
+    def record(self, ok: bool, now: float | None = None) -> None:
         if ok:
             self.failures = 0
             self.opened_at = None
@@ -265,6 +264,7 @@ builds the waterfall.
 Three specialists, one coordinator, one traced request.
 
 \begin{py}
+# sketch: illustrative wiring, not extracted from the repository
 supervisor = Host(name="meridian-supervisor",
                   consent=ConsentPolicy(auto_allow_read_only=True),
                   tool_token_budget=3000)
@@ -304,7 +304,7 @@ supervisor.analyse_portfolio                        [ 4,180 ms]
  `- model turn (synthesise)                         [   470 ms]
 \end{plain}
 
-Read the shape rather than the numbers. The fan-out costs the \emph{maximum} of
+Read the shape first. The fan-out costs the \emph{maximum} of
 its children (1,820) rather than the sum (3,950), which is what parallelism
 bought. And the leaf tool calls are 12\,ms and 9\,ms against model turns of 430
 and 410, which is Chapter~\ref{ch:primer}'s point restated at a different scale:
@@ -333,7 +333,7 @@ adds a budget to enforce. Sometimes that is worth it. Often it is not.
 The sub-task needs a genuinely different tool catalogue
   & You could have added three tools to one server \\
 The sub-task needs different authorization, and the boundary is real
-  & The boundary is organisational rather than technical \\
+  & The boundary is organisational only \\
 Sub-tasks are independent and parallel fan-out pays
   & They are sequential, so you pay depth for no concurrency \\
 Context isolation is the point: the child sees data the parent must not

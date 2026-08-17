@@ -46,8 +46,7 @@ Two methods. That is the entire surface.
 Three fields at the bottom that did not exist in 2025 and matter a great deal.
 \texttt{nextCursor} means catalogues paginate. \texttt{ttlMs} and
 \texttt{cacheScope} mean the client can stop asking. Chapter~\ref{ch:resources}
-covers the caching model; here the relevant fact is that a well-behaved client
-fetches your catalogue once per TTL rather than once per task.
+covers the caching model; here the relevant fact is that a well-behaved client fetches your catalogue once per TTL, not once per task.
 
 There is also a requirement that reads like a footnote and is not:
 
@@ -109,8 +108,7 @@ And back:
 }
 \end{wire}
 
-Note that the result carries the same data twice. That is deliberate and
-recommended: \texttt{structuredContent} for anything that will parse it,
+The result carries the same data twice, deliberately: \texttt{structuredContent} for anything that will parse it,
 \texttt{content} for backwards compatibility and for models that do better with
 text. Chapter~\ref{ch:apps} shows the third consumer, an MCP App, which reads
 \texttt{structuredContent} and never puts it in the model's context at all.
@@ -192,6 +190,7 @@ of forty accounts is forty round trips and forty model turns. With it, one.
 The description points at it explicitly, because the model reads descriptions:
 
 \begin{py}
+# sketch: elided from the shipped handler
 @server.tool(
     "rank_portfolio_risk",
     "Rank a set of accounts by risk score in one call. Prefer this over "
@@ -294,9 +293,8 @@ Optional, and you should use them anyway.
 
 Without one, a model receives text and has to parse it. Sometimes it parses
 wrong, which costs a retry, which costs a model turn. With one, the client
-validates \texttt{structuredContent} before it ever reaches the model, and a
-malformed response is caught at the boundary instead of confusing the planner
-two turns later.
+validates \texttt{structuredContent} before it ever reaches the model, and a malformed response is caught at the boundary, before it can confuse the
+planner two turns later.
 
 \begin{py}
 output_schema={
@@ -486,8 +484,7 @@ servers.
 Two things the host must get right for this to work at all.
 
 \textbf{Preserve ordering.} Results must come back in the order the calls were
-issued, whatever order they complete in. Meridian iterates futures in submission
-order rather than as-completed, for exactly this reason.
+issued, whatever order they complete in. Meridian iterates futures in submission order for exactly this reason.
 
 \textbf{Never fail the batch on one failure.} One tool erroring should produce
 one error result, not an exception that discards the other two successful calls
@@ -517,7 +514,7 @@ compliance & \texttt{review\_transaction} & Needs a named officer (\chapref{mrtr
 compliance & \texttt{search\_guidance}   & Reference text. Untrusted (\chapref{threats}) \\
 compliance & \texttt{export\_audit\_log} & For the regulator, not the debugger \\
 fraud & \texttt{screen\_account}   & Fast, read-only, safe to run in parallel \\
-fraud & \texttt{explain\_signal}   & So the model can explain rather than guess \\
+fraud & \texttt{explain\_signal}   & So the model can explain a signal \\
 marketdata & \texttt{get\_reference\_curve} & Public, cacheable, called constantly \\
 marketdata & \texttt{price\_facility}      & The combine step, done server-side \\
 \bottomrule

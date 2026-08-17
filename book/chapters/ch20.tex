@@ -33,7 +33,11 @@ REQUIRED_SCOPE = {
 }
 
 class ScopedRiskServer(Server):
-    def visible_tools(self, ctx):
+    """The risk server, with per-tool scopes and row-level account access."""
+
+    def visible_tools(self, ctx: RequestContext) -> list[Tool]:
+        """Override to filter by scope. The set may vary by authorization,
+        never by connection."""
         scopes = set((ctx.auth or {}).get("scopes", []))
         return [t for t in super().visible_tools(ctx)
                 if not REQUIRED_SCOPE.get(t.name)
@@ -42,8 +46,7 @@ class ScopedRiskServer(Server):
 
 Two properties worth noting.
 
-The filtering happens in \texttt{visible\_tools}, so an unauthorized tool is
-\emph{invisible} rather than present-and-forbidden. The model never sees it,
+The filtering happens in \texttt{visible\_tools}, so an unauthorized tool is \emph{invisible}. The model never sees it,
 never plans around it, and never wastes a turn discovering it cannot call it.
 
 And \texttt{super()} sorts first, so the filtered list stays deterministic and
@@ -60,6 +63,7 @@ handler must check authorization too. If your only check is in
 \subsection{Per-resource}
 
 \begin{py}
+# sketch: the shipped handler with an authorization check added inline
 @server.template("meridian://accounts/{account_id}/summary", ...)
 def account_summary(ctx: RequestContext, uri: str, params: dict):
     account_id = params["account_id"]
@@ -79,6 +83,7 @@ enumeration oracle. Return the same thing for both.
 The finest grain, and the one that actually matters for multi-tenant systems.
 
 \begin{py}
+# sketch: the shipped handler with row-level filtering added inline
 def rank_portfolio_risk(ctx: RequestContext):
     ids = ctx.arguments.get("accountIds") or []
     # Intersect what was asked for with what this principal may see, before
@@ -131,7 +136,7 @@ def cache_key(server, method, params, auth_context):
 
 That trades some gateway-level sharing of public resources for making a
 mislabelling bug harmless. For a financial system it is obviously the right
-trade. Make the choice deliberately rather than inheriting it.
+trade. Make the choice deliberately.
 
 \begin{py}
 def test_private_entries_are_keyed_by_auth_context(self):
@@ -448,8 +453,7 @@ Third-party runtime dependencies & \multicolumn{2}{r}{0} \\
 Regenerate every row with \texttt{make bench} and \texttt{make test}.
 \end{measurebox}
 
-Every number is reproducible on your own machine, and every one of them came from
-a technique in this book rather than from faster hardware.
+Every number is reproducible on your own machine, and every one of them came from a technique in this book.
 
 \section{What to remember}
 

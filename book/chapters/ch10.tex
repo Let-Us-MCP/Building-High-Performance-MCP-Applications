@@ -93,8 +93,7 @@ The template URI is in the tool \emph{definition}, which the host fetched during
 That gives the host three things it could not otherwise have:
 
 \begin{description}[leftmargin=1.4em, style=nextline, itemsep=3pt]
-\item[Prefetch] Fetch and parse the template during idle time, so the first
-render is instant rather than a fetch plus a parse plus a paint.
+\item[Prefetch] Fetch and parse the template during idle time, so the first render is instant.
 \item[Cache] Meridian's template carries a 24-hour TTL and
 \texttt{cacheScope: public}. It is identical for every user, so a shared gateway
 can serve it, and a returning user never fetches it at all.
@@ -286,7 +285,7 @@ parent.postMessage({ jsonrpc: '2.0', id: 'init', method: 'ui/initialize',
 \end{ts}
 
 Note that the app announces \emph{its} protocol version, \texttt{2026-01-26},
-which is the Apps extension's own revision rather than core MCP's. Extensions
+which is the Apps extension's own revision, not core MCP's. Extensions
 version independently, as Chapter~\ref{ch:tasks} described, and this is what
 that looks like in practice.
 
@@ -302,8 +301,7 @@ the check is the one that actually protects anybody.
 
 Frameworks are entirely optional. The official examples ship starters for React,
 Vue, Svelte, Preact, Solid, and vanilla JavaScript, and the \texttt{App} class
-in \texttt{@modelcontextprotocol/ext-apps} is a convenience wrapper rather than a
-requirement. It is postMessage and JSON-RPC underneath, which means the whole
+in \texttt{@modelcontextprotocol/ext-apps} is a convenience wrapper. It is postMessage and JSON-RPC underneath, which means the whole
 web platform is available and none of it is mandatory.
 
 \section{UX patterns worth copying}
@@ -322,8 +320,8 @@ drawn in the same window.
 triage, losing that is worse than never having had it.
 
 \textbf{Degrade to text.} Not every host renders apps. Your tool must still
-return useful \texttt{content}, and it must be useful on its own rather than a
-placeholder saying ``see the dashboard''. Meridian's tools all return complete
+return useful \texttt{content}, and it must stand on its own. A placeholder saying ``see the dashboard'' is a
+broken tool. Meridian's tools all return complete
 text results whether or not anything renders them.
 
 \section{Measuring an app}

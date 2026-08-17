@@ -177,28 +177,55 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <p><em>“Show me the money!”</em></p>
 <p>Rod Tidwell, <em>Jerry Maguire</em> (1996)</p>
 </aside>
-<p>Rod’s point was not greed. It was that he had spent years being told about value in the abstract and wanted to see the actual figure. This chapter is that demand, applied to MCP. We are going to look at literal bytes on a literal connection, because every claim about performance from here on rests on knowing what is genuinely on the wire and what you imagined was there.</p>
-<p>There are two transports. There used to be three.</p>
+<p>Rod had spent years being told about value in the abstract and wanted to see the actual figure on the actual page. This chapter is that demand, applied to MCP.</p>
+<p>We are going to look at literal bytes on a literal connection, because every claim about performance from here on rests on knowing what is genuinely on the wire and what you merely imagined was there. I have found that most arguments about protocol overhead are settled in about ninety seconds by printing one request.</p>
+<section id="what-a-transport-is-and-why-there-are-two" class="level2">
+<h2>What a transport is, and why there are two</h2>
+<p>A <strong>transport</strong> is the answer to a boring question: how do the bytes get from the client to the server and back?</p>
+<p>The protocol proper, everything in Chapter <a href="ch02.html#ch:architecture">2</a>, says nothing about that. It describes messages: what a request looks like, what a result looks like, which fields are required. A transport is the binding that carries those messages over some actual channel.</p>
+<p>MCP defines two.</p>
+<dl>
+<dt>stdio</dt>
+<dd>
+<p>The client launches the server as a child process and they talk over the process’s standard input and output streams, the same two pipes a command-line program uses to read and print. Local only, by construction.</p>
+</dd>
+<dt>Streamable HTTP</dt>
+<dd>
+<p>The server is a network service with one URL. The client sends HTTP POST requests to it.</p>
+</dd>
+</dl>
+<p>There used to be a third, and Chapter <a href="appendix-b.html#ch:transport-matrix">B</a> covers migrating off it.</p>
+<p>Everything else in this chapter is the detail of those two, so it is worth saying up front what the choice actually turns on: <strong>stdio when the server runs on the user’s own machine, Streamable HTTP when it is shared.</strong> The rest is consequences.</p>
+</section>
 <section id="json-rpc-and-the-two-things-mcp-adds" class="level2">
 <h2>JSON-RPC, and the two things MCP adds</h2>
-<p>The framing is JSON-RPC 2.0, unmodified, which was a good decision made by people resisting the urge to design something. It has three message types.</p>
-<p><strong>Requests</strong> have an id and expect a response:</p>
+<p>Both transports carry the same messages, and the message format is JSON-RPC 2.0.</p>
+<p>If you have not met it: JSON-RPC is a small, old, deliberately boring specification for calling a procedure over a network using JSON. It defines three message types and almost nothing else. No types, no schemas, no service definitions. It is about two pages long.</p>
+<p>MCP uses it unmodified, which was a good decision made by people resisting the urge to design something.</p>
+<section id="the-three-message-types" class="level3">
+<h3>The three message types</h3>
+<p><strong>A request</strong> has an id, a method name, and parameters. It expects an answer.</p>
 <pre class="json" data-language="json"><code>{ &quot;jsonrpc&quot;: &quot;2.0&quot;, &quot;id&quot;: 1, &quot;method&quot;: &quot;tools/call&quot;, &quot;params&quot;: { ... } }</code></pre>
-<p><strong>Results</strong> come back with the same id:</p>
+<p><strong>A result</strong> comes back carrying the same id, so the client can match it to the request it sent. That matters because several requests may be in flight at once.</p>
 <pre class="json" data-language="json"><code>{ &quot;jsonrpc&quot;: &quot;2.0&quot;, &quot;id&quot;: 1, &quot;result&quot;: { &quot;resultType&quot;: &quot;complete&quot;, ... } }</code></pre>
-<p><strong>Notifications</strong> have no id and get no reply:</p>
+<p><strong>A notification</strong> has no id and gets no reply. It is fire-and-forget, used for things like progress updates where an acknowledgement would be pointless.</p>
 <pre class="json" data-language="json"><code>{ &quot;jsonrpc&quot;: &quot;2.0&quot;, &quot;method&quot;: &quot;notifications/progress&quot;, &quot;params&quot;: { ... } }</code></pre>
-<p>MCP adds exactly two rules on top:</p>
+<p>MCP adds exactly two rules on top of that:</p>
 <ol>
-<li><p><code>result.resultType</code> is required. Chapter <a href="ch02.html#ch:architecture">2</a> covered why: it is the hinge that lets MRTR and Tasks exist without changing anything else.</p></li>
-<li><p>Request ids must not be <code>null</code>, and must be unique among requests you have issued and not yet had answered. Base JSON-RPC allows a null id. MCP does not, because null ids make correlation ambiguous on a shared channel.</p></li>
+<li><p><code>result.resultType</code> is required. Chapter <a href="ch02.html#ch:architecture">2</a> covered why: it lets a client tell which of several completely different result shapes it is holding before it parses the payload.</p></li>
+<li><p>Request ids must not be <code>null</code>, and must be unique among requests you have issued and not yet had answered. Base JSON-RPC permits a null id; MCP does not, because a null id makes correlation ambiguous on a shared channel.</p></li>
 </ol>
-<p>That is the whole extension. Everything interesting is in the payloads.</p>
+<p>That is the whole extension. Everything interesting lives in the payloads.</p>
+</section>
 <section id="error-codes-and-the-range-you-must-not-touch" class="level3">
 <h3>Error codes, and the range you must not touch</h3>
-<p>JSON-RPC reserves <code>-32768</code> to <code>-32000</code>. Within that, it leaves <code>-32000</code> to <code>-32099</code> for implementations, and <code>2026-07-28</code> finally partitioned that space, which needed doing.</p>
+<p>When something goes wrong, the response carries an error instead of a result:</p>
+<pre class="json" data-language="json"><code>{ &quot;jsonrpc&quot;: &quot;2.0&quot;, &quot;id&quot;: 1,
+  &quot;error&quot;: { &quot;code&quot;: -32602, &quot;message&quot;: &quot;Unknown tool: nope&quot; } }</code></pre>
+<p>Those negative numbers are not arbitrary. JSON-RPC reserves the range <code>-32768</code> to <code>-32000</code> for itself, and within that leaves <code>-32000</code> to <code>-32099</code> for implementations to use as they see fit.</p>
+<p>“As they see fit” worked out about as well as you would expect. Different MCP implementations picked overlapping codes for different meanings, so <code>2026-07-28</code> partitioned the space properly.</p>
 <table id="tab:error-ranges">
-<caption>The error-code partition. The middle row is the one people violate, usually by picking a “nice round” number like <code>-32050</code>.</caption>
+<caption>The error-code partition. The middle row is the one people violate, usually by picking a nice round number like <code>-32050</code>.</caption>
 <tbody>
 <tr>
 <td style="text-align: left;"><strong>Range</strong></td>
@@ -227,9 +254,9 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </tr>
 </tbody>
 </table>
-<p>Three codes are currently defined in the reserved range, and each tells the client something actionable:</p>
+<p>Three codes are currently defined in the reserved range, and each one is designed so the client can recover automatically rather than merely reporting failure:</p>
 <table id="tab:mcp-errors">
-<caption>Every one of these carries enough information for the client to recover automatically. That is not an accident, it is the design goal.</caption>
+<caption>Every one of these carries enough information for the client to fix itself. That is not an accident, it is the design goal.</caption>
 <tbody>
 <tr>
 <td style="text-align: left;"><strong>Code</strong></td>
@@ -239,21 +266,22 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <tr>
 <td style="text-align: left;"><code>-32020</code></td>
 <td style="text-align: left;"><code>HeaderMismatch</code></td>
-<td style="text-align: left;">Refetch <code>tools/list</code> (the schema may have changed), then retry with correct headers</td>
+<td style="text-align: left;">Refetch the tool list, since the schema may have changed, then retry with correct headers</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>-32021</code></td>
 <td style="text-align: left;"><code>MissingRequiredClientCapability</code></td>
-<td style="text-align: left;">Read <code>data.requiredCapabilities</code>; either declare them or stop</td>
+<td style="text-align: left;">Read which capability was missing from the error data; declare it or stop</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>-32022</code></td>
 <td style="text-align: left;"><code>UnsupportedProtocolVersion</code></td>
-<td style="text-align: left;">Pick a version from <code>data.supported</code> and retry</td>
+<td style="text-align: left;">Pick a version from the <code>supported</code> list in the error and retry</td>
 </tr>
 </tbody>
 </table>
-<p>Two codes are retired and must never be re-emitted: <code>-32002</code>, which meant “resource not found” until this revision replaced it with <code>-32602</code>, and <code>-32042</code>, which meant “URL elicitation required” for exactly one revision. Clients should still <em>accept</em> <code>-32002</code> from older servers. Servers on this revision must not send it. Meridian has a test for precisely this, because it is the kind of thing that rots quietly:</p>
+<p>Two codes are retired and must never be sent again: <code>-32002</code>, which meant “resource not found” until this revision replaced it with the standard <code>-32602</code>, and <code>-32042</code>, which meant something for exactly one revision. Clients should still <em>accept</em> <code>-32002</code> from older servers. Servers on this revision must not send it.</p>
+<p>That asymmetry, accept the old, emit only the new, is worth internalising because it recurs everywhere in this book. Meridian has a test for this one, because it is exactly the kind of thing that rots quietly:</p>
 <pre class="python" data-language="python"><code>def test_retired_codes_are_never_emitted(self):
     server = tiny_server()
     seen = set()
@@ -269,28 +297,39 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <section id="streamable-http" class="level2">
 <h2>Streamable HTTP</h2>
 <p>One endpoint. POST only. Every JSON-RPC message is its own HTTP request.</p>
-<p>That sentence is doing a lot of work, because it describes something quite different from what the same transport looked like a year ago. Here is what 2026-07-28 deleted:</p>
+<p>That sentence is doing a lot of work, because it describes something quite different from what the same transport looked like a year ago.</p>
 <aside class="box legacy"><p class="box-title">Legacy: What Streamable HTTP used to have</p>
 <p>Protocol versions <code>2025-03-26</code> through <code>2025-11-25</code> used the same transport name and a materially different shape:</p>
 <ul>
 <li><p><code>Mcp-Session-Id</code>, assigned by the server, terminated with HTTP DELETE</p></li>
-<li><p>A standalone <code>GET</code> that opened an SSE stream for server-initiated messages</p></li>
-<li><p>Servers sending JSON-RPC <em>requests</em> on those streams</p></li>
-<li><p>Stream resumability via <code>Last-Event-ID</code> and SSE event ids</p></li>
+<li><p>A standalone <code>GET</code> that opened a long-lived stream for server-initiated messages</p></li>
+<li><p>Servers sending their own JSON-RPC <em>requests</em> on those streams</p></li>
+<li><p>Streams that could be resumed after a disconnect via <code>Last-Event-ID</code></p></li>
 </ul>
-<p>None of it survives. A server on this revision should answer <code>405</code> to GET and DELETE, ignore <code>Mcp-Session-Id</code> without echoing it, and ignore <code>Last-Event-ID</code>.</p>
+<p>None of it survives. A server on this revision should answer <code>405 Method Not Allowed</code> to GET and DELETE, ignore <code>Mcp-Session-Id</code> without echoing it, and ignore <code>Last-Event-ID</code>.</p>
 </aside>
+<section id="server-sent-events-briefly" class="level3">
+<h3>Server-sent events, briefly</h3>
+<p>Before the flow diagrams, one piece of vocabulary, because it appears constantly from here on.</p>
+<p>Most HTTP responses are a single body: the server sends it and closes. But a response can also be a <strong>stream</strong>, where the server holds the connection open and sends pieces over time. The format MCP uses for that is <strong>server-sent events</strong>, or SSE: a text format where each message is a line beginning <code>data:</code>, followed by a blank line.</p>
+<pre class="text" data-language="text"><code>data: {&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;method&quot;:&quot;notifications/progress&quot;,&quot;params&quot;:{...}}
+
+data: {&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;result&quot;:{...}}
+</code></pre>
+<p>It is deliberately simple, it works through ordinary HTTP infrastructure, and it flows one way: the server pushes, the client listens. That last property is why the 2026 design uses it the way it does.</p>
+</section>
 <section id="the-three-shapes-of-traffic" class="level3">
 <h3>The three shapes of traffic</h3>
 <figure id="fig:http-flows">
 <img src="figures/http-flows.svg" />
-<figcaption>Everything that happens on a Streamable HTTP connection. Three shapes, and the third one is still request/response no matter how long it stays open.</figcaption>
+<figcaption>Everything that happens on a Streamable HTTP connection. Three shapes, and the third is still request-and-response no matter how long it stays open.</figcaption>
 </figure>
-<p>The elegance is in the third one. A long-lived notification stream is not a special connection type with its own lifecycle. It is an ordinary POST whose response happens to be an SSE stream that stays open. Its state belongs to the request, not to the connection, which is why it survives the deletion of sessions without needing a replacement concept.</p>
+<p>The first shape is an ordinary request and a single JSON response. The second is a request whose response is an SSE stream, used when the server wants to report progress before delivering the answer. Both are unremarkable.</p>
+<p>The third deserves attention, because it is where the elegance is. A long-lived notification stream is not a special connection type with its own lifecycle. It is an ordinary POST, to the same endpoint, whose response happens to be a stream that stays open. Its state belongs to that request rather than to the connection underneath, which is why it survived the deletion of sessions without needing a replacement concept.</p>
 </section>
 <section id="sec:required-headers" class="level3">
 <h3>Required headers, and why they exist</h3>
-<p>Here is a genuinely new obligation. Every POST must carry these:</p>
+<p>Here is a genuinely new obligation in this revision. Every POST must carry these:</p>
 <pre class="http" data-language="http"><code>POST /mcp HTTP/1.1
 Content-Type: application/json
 Accept: application/json, text/event-stream
@@ -311,17 +350,18 @@ Mcp-Name: assess_account_risk
     }
   }
 }</code></pre>
-<p><code>Mcp-Method</code> mirrors <code>method</code>. <code>Mcp-Name</code> mirrors <code>params.name</code> (or <code>params.uri</code> for <code>resources/read</code>), and is required for <code>tools/call</code>, <code>prompts/get</code>, and <code>resources/read</code>.</p>
-<p>The point is that an intermediary can now do its job without parsing JSON:</p>
+<p>Look at what those three headers contain. <code>Mcp-Method</code> duplicates the <code>method</code> from the body. <code>Mcp-Name</code> duplicates <code>params.name</code>. <code>MCP-Protocol-Version</code> duplicates the version from <code>_meta</code>.</p>
+<p>Duplicating data is normally a smell, so the reason is worth stating: it lets every piece of infrastructure between the client and the server do its job without parsing JSON.</p>
 <ul>
-<li><p>A load balancer routes <code>tools/call</code> to a compute pool and <code>tools/list</code> to a cache tier.</p></li>
-<li><p>A WAF applies a strict policy to one tool name and a relaxed one to another.</p></li>
+<li><p>A load balancer routes <code>tools/call</code> to a compute pool and <code>tools/list</code> to a cache tier, using a header rule it already knows how to write.</p></li>
+<li><p>A web application firewall applies a strict policy to one tool name and a relaxed one to another.</p></li>
 <li><p>Rate limiting works per method rather than per connection, which is the only granularity that means anything now that connections are meaningless.</p></li>
 <li><p>Your access logs become useful without a JSON parser in the log pipeline.</p></li>
 </ul>
+<p>That is a real gain. It also creates a real hazard.</p>
 <aside class="box threat"><p class="box-title">Threat: Two sources of truth is a smuggling primitive</p>
-<p>Mirroring creates an obvious hazard. If a gateway routes on <code>Mcp-Name: read_only_tool</code> and the body says <code>"name": "wire_transfer"</code>, the gateway has approved one thing and the server has executed another.</p>
-<p>So validation is mandatory, not advisory. Any server that processes the body <strong>must</strong> reject a mismatch with <code>400</code> and <code>-32020</code>.</p>
+<p>If a gateway routes on <code>Mcp-Name: read_only_tool</code> and the body says <code>"name": "wire_transfer"</code>, then the gateway has approved one thing and the server has executed another. The attacker’s whole job is finding two components that disagree.</p>
+<p>So validation is mandatory, not advisory. Any server that processes the body <strong>must</strong> reject a mismatch with <code>400</code> and error code <code>-32020</code>.</p>
 </aside>
 <pre class="python" data-language="python"><code>def _validate_headers(self, headers, message: dict) -&gt; None:
     &quot;&quot;&quot;Reject any disagreement between headers and body.&quot;&quot;&quot;
@@ -349,7 +389,7 @@ Mcp-Name: assess_account_risk
         if decode_header_value(name_header) != params.get(source):
             raise errors.HeaderMismatch(
                 f&quot;{HDR_NAME} header does not match body {source}&quot;)</code></pre>
-<p>Meridian tests each failure mode separately, because “we validate headers” is the kind of claim that is true until somebody refactors:</p>
+<p>Meridian tests each failure mode separately, because “we validate headers” is the kind of claim that stays true until somebody refactors:</p>
 <pre class="python" data-language="python"><code>def test_method_header_disagreeing_with_body_is_rejected(self):
     &quot;&quot;&quot;The request-smuggling case. A gateway routing on the header must
     never be able to disagree with the server executing on the body.&quot;&quot;&quot;
@@ -363,7 +403,7 @@ Mcp-Name: assess_account_risk
 </section>
 <section id="mirroring-tool-parameters-into-headers" class="level3">
 <h3>Mirroring tool parameters into headers</h3>
-<p>Servers can go further and expose specific tool arguments as headers, using an <code>x-mcp-header</code> annotation in the input schema:</p>
+<p>Servers can go one step further and expose specific tool <em>arguments</em> as headers, by annotating the tool’s schema:</p>
 <pre class="json" data-language="json"><code>{
   &quot;name&quot;: &quot;assess_account_risk&quot;,
   &quot;inputSchema&quot;: {
@@ -379,8 +419,8 @@ Mcp-Name: assess_account_risk
     &quot;required&quot;: [&quot;accountId&quot;]
   }
 }</code></pre>
-<p>A call with <code>"region": "eu-central"</code> now carries <code>Mcp-Param-Region: eu-central</code>, and your gateway can route EU traffic to EU infrastructure without reading a byte of the body. For a data-residency requirement that is genuinely valuable.</p>
-<p>The constraints are strict, and each one closes a specific hole:</p>
+<p>A call with <code>"region": "eu-central"</code> now carries <code>Mcp-Param-Region: eu-central</code>, and a gateway can route EU traffic to EU infrastructure without reading a byte of the body. For a data-residency requirement that is genuinely valuable, and it is the kind of thing that is miserable to retrofit.</p>
+<p>The constraints on the annotation are strict, and each one closes a specific hole:</p>
 <table id="tab:x-mcp-header">
 <caption>The <code>x-mcp-header</code> rules. The last one is the subtle one, and Meridian validates it recursively.</caption>
 <tbody>
@@ -389,30 +429,30 @@ Mcp-Name: assess_account_risk
 <td style="text-align: left;"><strong>Why</strong></td>
 </tr>
 <tr>
-<td style="text-align: left;">Primitive types only (string, integer, boolean; <em>not</em> number)</td>
-<td style="text-align: left;">Floats do not have a canonical string form, so header and body could disagree while both being “correct”</td>
+<td style="text-align: left;">Primitive types only: string, integer, boolean, and <em>not</em> number</td>
+<td style="text-align: left;">Floating-point values have no single canonical string form, so header and body could disagree while both being “correct”</td>
 </tr>
 <tr>
 <td style="text-align: left;">Case-insensitively unique within the schema</td>
-<td style="text-align: left;">Header names are case-insensitive, so two annotations differing only in case would collide</td>
+<td style="text-align: left;">HTTP header names are case-insensitive, so two annotations differing only in case would collide</td>
 </tr>
 <tr>
-<td style="text-align: left;">No control characters, including CR and LF</td>
-<td style="text-align: left;">Header injection</td>
+<td style="text-align: left;">No control characters, including carriage return and line feed</td>
+<td style="text-align: left;">Otherwise an argument value can inject an entire extra header</td>
 </tr>
 <tr>
-<td style="text-align: left;">Statically reachable from the root, through <code>properties</code> keys only</td>
-<td style="text-align: left;">An intermediary must know from the schema alone which headers a call will carry. No arrays, no <code>oneOf</code>, no <code>$ref</code></td>
+<td style="text-align: left;">Statically reachable from the schema root, through <code>properties</code> keys only</td>
+<td style="text-align: left;">An intermediary must be able to know, from the schema alone, exactly which headers a call will carry. No arrays, no <code>oneOf</code>, no <code>$ref</code></td>
 </tr>
 </tbody>
 </table>
-<p>A client on Streamable HTTP must <em>reject</em> a tool whose annotations violate these rules, and rejection means excluding that one tool from <code>tools/list</code> rather than failing the whole catalogue. One bad tool should not take down the other forty-nine.</p>
+<p>A client on Streamable HTTP must <em>reject</em> a tool whose annotations violate these rules. Rejection means excluding that one tool from the catalogue. One malformed tool should not take down the other forty-nine.</p>
 </section>
 <section id="encoding-values-safely" class="level3">
 <h3>Encoding values safely</h3>
-<p>RFC 9110 allows visible ASCII, space, and tab in header values. Anything else gets wrapped in a sentinel:</p>
+<p>HTTP header values are restricted to visible ASCII, space, and tab. Tool arguments are not. So anything that cannot survive as a plain header value gets wrapped in a sentinel:</p>
 <table id="tab:header-encoding">
-<caption>Header value encoding. The last row is the one that separates a correct implementation from a plausible one.</caption>
+<caption>Header value encoding. The last row separates a correct implementation from a merely plausible one.</caption>
 <tbody>
 <tr>
 <td style="text-align: left;"><strong>Value</strong></td>
@@ -446,7 +486,7 @@ Mcp-Name: assess_account_risk
 </tr>
 </tbody>
 </table>
-<p>That last row deserves a moment. A plain ASCII value that happens to look like the sentinel must <em>also</em> be encoded, otherwise a decoder turns <code>"=?base64?literal?="</code> into something the sender never wrote. It is a tiny rule and exactly the sort of thing that produces a security advisory two years later.</p>
+<p>That last row deserves a moment. A plain ASCII value that happens to <em>look</em> like the sentinel must also be encoded, because otherwise a decoder turns <code>"=?base64?literal?="</code> into whatever those characters decode to, which is not what the sender wrote. It is a tiny rule, and exactly the sort of thing that produces a security advisory two years later.</p>
 <pre class="python" data-language="python"><code>def encode_header_value(value) -&gt; str:
     if isinstance(value, bool):
         text = &quot;true&quot; if value else &quot;false&quot;
@@ -466,17 +506,18 @@ Mcp-Name: assess_account_risk
 </section>
 <section id="no-resumability-and-what-that-means-for-you" class="level3">
 <h3>No resumability, and what that means for you</h3>
-<p>A broken response stream loses the request. There is no <code>Last-Event-ID</code>, no redelivery, no “resume from event 14”. The client re-issues with a <em>new</em> request id and starts over.</p>
-<p>This is a real simplification, and it moves a burden onto you.</p>
+<p>Under the old design, if a streaming response was interrupted, the client could reconnect and say “resume from event 14” using a <code>Last-Event-ID</code> header. The server was expected to have kept the intervening messages.</p>
+<p>That is gone. A broken response stream loses the request. The client re-issues it with a <em>new</em> request id and starts over.</p>
+<p>This is a real simplification for server authors, and it quietly moves a burden onto you.</p>
 <aside class="keyidea">
-<p>Design your servers to be idempotent, because retries are now a normal part of operation rather than an exception. If re-issuing <code>transfer_funds</code> twice moves money twice, the transport will eventually find out for you.</p>
+<p>Design your servers to be idempotent, because retries are now a normal part of operation rather than an exception. If re-issuing <code>transfer_funds</code> twice moves money twice, the transport will eventually find that out for you, at a time of its choosing.</p>
 </aside>
-<p>The usual mechanism is an idempotency key supplied by the caller and honoured for a window on the server. It is not a protocol feature; it is an ordinary tool argument, and Chapter <a href="ch11.html#ch:building-servers">11</a> builds one.</p>
+<p><em>Idempotent</em> here means what it usually means: performing the operation twice has the same effect as performing it once. The usual mechanism is an idempotency key, a unique value supplied by the caller and remembered by the server for some window. It is not a protocol feature. It is an ordinary tool argument, and Chapter <a href="ch11.html#ch:building-servers">11</a> builds one.</p>
 </section>
 <section id="cancellation" class="level3">
 <h3>Cancellation</h3>
-<p>On HTTP, closing the response stream <em>is</em> cancellation. That is the whole mechanism. Because each request has its own stream, a transport-level disconnect is unambiguous, so no <code>notifications/cancelled</code> is sent or expected.</p>
-<p>The server must stop as soon as practical and must send nothing further for that request. In Meridian this falls out of the write path:</p>
+<p>On HTTP, closing the response stream <em>is</em> cancellation. That is the whole mechanism, and it works because each request has its own stream, which makes a transport-level disconnect unambiguous. No separate cancellation message is sent or expected.</p>
+<p>The server must stop as soon as practical and send nothing further for that request. In Meridian this falls out of the write path naturally:</p>
 <pre class="python" data-language="python"><code>def write(msg: dict) -&gt; None:
     with lock:
         try:
@@ -484,12 +525,13 @@ Mcp-Name: assess_account_risk
             h.wfile.flush()
         except (BrokenPipeError, ConnectionResetError):
             raise _ClientGone()</code></pre>
-<p>A client hanging up mid-stream is normal here, not an incident. Which means the stock Python HTTP server’s habit of printing a traceback for every reset connection turns routine operation into alarming log noise, so Meridian suppresses it explicitly. Small thing. Saves somebody a 3 a.m. investigation.</p>
+<p>A client hanging up mid-stream is normal operation here. Which means the stock Python HTTP server’s habit of printing a stack trace for every reset connection turns routine behaviour into alarming log noise, so Meridian suppresses it explicitly. Small thing. Saves somebody a three-in-the-morning investigation into an error that means nothing.</p>
 </section>
 <section id="one-header-that-is-pure-profit" class="level3">
 <h3>One header that is pure profit</h3>
 <pre class="http" data-language="http"><code>X-Accel-Buffering: no</code></pre>
-<p>Reverse proxies buffer responses by default. Without this header nginx will happily accumulate your progress notifications and deliver them in one lump after the final response, at which point you have all the complexity of streaming and none of the benefit. Send it on every SSE response.</p>
+<p>Reverse proxies buffer responses by default, because for ordinary responses buffering is a performance win. For a stream it is a disaster: nginx will happily accumulate your carefully emitted progress notifications and deliver them in one lump after the final response, at which point you have all the complexity of streaming and none of the benefit.</p>
+<p>Send this header on every SSE response. It costs nothing.</p>
 </section>
 </section>
 <section id="stdio" class="level2">
@@ -497,13 +539,13 @@ Mcp-Name: assess_account_risk
 <p>The other transport is a subprocess and two pipes. It is much simpler and it has sharper edges.</p>
 <ul>
 <li><p>The client launches the server as a child process.</p></li>
-<li><p>Messages go over <code>stdin</code> and <code>stdout</code>, one per line.</p></li>
-<li><p>Messages must not contain embedded newlines.</p></li>
+<li><p>Messages go over <code>stdin</code> and <code>stdout</code>, one message per line.</p></li>
+<li><p>Messages must not contain embedded newlines, since a newline ends a message.</p></li>
 <li><p><code>stderr</code> is for logging, and the client may capture, forward, or ignore it.</p></li>
 <li><p>The server must write <strong>nothing</strong> to <code>stdout</code> that is not a valid MCP message.</p></li>
 </ul>
-<p>That last rule is the one that will bite you, and it will not be your code that breaks it. It will be a library that prints a deprecation warning to stdout on import. One stray <code>print()</code> corrupts the stream, and the client sees a parse error it cannot attribute to anything.</p>
-<p>Meridian encodes with no whitespace and asserts the invariant in a test:</p>
+<p>That last rule is the one that will bite you, and it will not be your code that breaks it. It will be a library that prints a deprecation warning on import. One stray line corrupts the stream, and the client sees a parse error it cannot attribute to anything.</p>
+<p>Meridian encodes with no gratuitous whitespace and asserts the invariant in a test:</p>
 <pre class="python" data-language="python"><code>def test_encoded_messages_contain_no_newlines(self):
     &quot;&quot;&quot;stdio framing depends on this and nothing enforces it but us.&quot;&quot;&quot;
     wire = encode({&quot;jsonrpc&quot;: &quot;2.0&quot;, &quot;id&quot;: 1,
@@ -511,12 +553,12 @@ Mcp-Name: assess_account_risk
     self.assertNotIn(&quot;\n&quot;, wire)</code></pre>
 <section id="a-connection-is-not-a-conversation" class="level3">
 <h3>A connection is not a conversation</h3>
-<p>The specification is unusually direct about this, and it is worth quoting the consequence: clients may interleave unrelated requests on the same pipe, and a server must not treat process identity as a proxy for conversation continuity.</p>
-<p>Practically: do not put a user id in a module-level variable at startup. Do not cache “the current account” between calls. The next message on that pipe may belong to an entirely different task.</p>
+<p>The specification is unusually direct about this, and the consequence is worth spelling out: clients may interleave unrelated requests on the same pipe, and a server must not treat process identity as a proxy for conversation continuity.</p>
+<p>Practically, that means: do not put a user id in a module-level variable at startup. Do not cache “the current account” between calls. The next message on that pipe may belong to an entirely different task, for a different user, in a different conversation. The pipe is a wire, not a session.</p>
 </section>
 <section id="cold-start-is-the-number-that-decides-your-topology" class="level3">
 <h3>Cold start is the number that decides your topology</h3>
-<p>Because every message shares one channel and the process must be spawned, stdio has a cost HTTP does not: process startup.</p>
+<p>Because the server is a process that must be spawned, stdio has a cost HTTP does not: process startup.</p>
 <aside class="box measured"><p class="box-title">Measured: stdio cold start versus warm call</p>
 <table>
 <tbody>
@@ -538,9 +580,10 @@ Mcp-Name: assess_account_risk
 </tr>
 </tbody>
 </table>
-<p>Python 3.14 on arm64. Interpreter boot plus imports. A Node server is comparable; a static binary is far better.</p>
+<p>Python 3.14 on arm64: interpreter boot plus imports. A Node server is comparable; a static binary is far better.</p>
 </aside>
-<p>Forty-five milliseconds sounds small until you notice it is 750 times a warm call. Spawn-per-call is therefore indefensible for anything but a one-shot CLI. Keep a warm pool, and Chapter <a href="ch17.html#ch:optimizing">17</a> shows how.</p>
+<p>Forty-five milliseconds sounds small until you notice it is 750 times a warm call. Which means spawning a process per call is indefensible for anything but a one-shot command-line tool: you would spend 99.9 % of your time starting Python.</p>
+<p>Keep a pool of warm processes instead. Chapter <a href="ch17.html#ch:optimizing">17</a> covers how.</p>
 </section>
 <section id="shutdown-done-properly" class="level3">
 <h3>Shutdown, done properly</h3>
@@ -559,16 +602,17 @@ Mcp-Name: assess_account_risk
             self._proc.wait(timeout=2.0)
         except subprocess.TimeoutExpired:
             self._proc.kill()</code></pre>
-<p>Closing stdin is the primary graceful-shutdown signal and the only portable one, so servers should exit promptly on EOF. If yours does not, every client that talks to it will eventually SIGKILL it, and your cleanup handlers will never run. Meridian tests that its servers exit cleanly rather than needing to be killed.</p>
+<p>Closing stdin is the primary graceful-shutdown signal and the only portable one, so servers should exit promptly when they see end-of-file. If yours does not, every client that talks to it will eventually kill it outright, and your cleanup handlers will never run. Meridian tests that its servers exit cleanly rather than needing to be killed.</p>
 </section>
 <section id="cancellation-on-stdio" class="level3">
 <h3>Cancellation on stdio</h3>
-<p>Different from HTTP, and for a good reason: there is no per-request stream to close, so cancellation is an explicit notification.</p>
+<p>Different from HTTP, and for a good reason. There is no per-request stream to close, because everything shares one pipe. So cancellation is an explicit notification:</p>
 <pre class="json" data-language="json"><code>{ &quot;jsonrpc&quot;: &quot;2.0&quot;, &quot;method&quot;: &quot;notifications/cancelled&quot;,
   &quot;params&quot;: { &quot;requestId&quot;: 42 } }</code></pre>
-<p>The server should stop work and must send nothing further for that request, including its response.</p>
+<p>The server should stop work and send nothing further for that request, including its response.</p>
 <aside class="box note"><p class="box-title">The asymmetry is not sloppiness</p>
-<p>It is the transport binding doing its job. On HTTP the disconnect is unambiguous, so a message would be redundant. On stdio the channel is shared, so a message is the only signal available. Same semantics, different mechanism, which is exactly what a transport binding is for.</p>
+<p>It is the transport binding doing its job. On HTTP the disconnect is unambiguous, so a message would be redundant. On stdio the channel is shared, so a message is the only signal available.</p>
+<p>Same semantics, different mechanism, which is exactly what a transport binding is for.</p>
 </aside>
 </section>
 </section>
@@ -576,7 +620,7 @@ Mcp-Name: assess_account_risk
 <h2>Comparing the two, with numbers</h2>
 <figure id="fig:transport-cost">
 <img src="figures/transport-cost.svg" />
-<figcaption>Left: protocol overhead with server execution subtracted out. Right: the same numbers next to actual network distance, on a log scale, which is the honest context.</figcaption>
+<figcaption>Left: protocol overhead with server execution subtracted out. Right: the same numbers next to actual network distance, on a logarithmic scale, which is the honest context.</figcaption>
 </figure>
 <aside class="box measured"><p class="box-title">Measured: Same call, three transports</p>
 <table>
@@ -609,12 +653,13 @@ Mcp-Name: assess_account_risk
 </table>
 <p>The control still serialises and deserialises, so this compares transport mechanics rather than flattering the in-process case.</p>
 </aside>
-<p>Read that right-hand chart carefully, because it is the point of the section. Streamable HTTP costs 0.13 ms more than in-process on loopback. A same-region network hop costs around 1.2 ms. A cross-region hop costs around 68 ms.</p>
+<p>Read the right-hand chart carefully, because it is the point of the whole section. Streamable HTTP costs 0.13 ms more than in-process on loopback. A same-region network hop costs around 1.2 ms. A cross-region hop costs around 68 ms.</p>
+<p>So the transport you choose changes your latency by a tenth of a millisecond, and where you put the server changes it by sixty-eight.</p>
 <aside class="keyidea">
 <p>Transport overhead is not your problem. Distance is your problem, and round trips are how you pay for distance. Choose your transport on operational grounds, then spend your optimisation effort on the number of trips.</p>
 </aside>
 <table id="tab:transport-choice">
-<caption>Choosing. Appendix <a href="appendix-b.html#ch:transport-matrix">B</a> has the long version.</caption>
+<caption>Choosing. Appendix <a href="appendix-b.html#ch:transport-matrix">B</a> has the long version and a checklist for each.</caption>
 <tbody>
 <tr>
 <td style="text-align: left;"></td>
@@ -648,12 +693,12 @@ Mcp-Name: assess_account_risk
 </tr>
 <tr>
 <td style="text-align: left;">Auth</td>
-<td style="text-align: left;">Environment (credentials from the parent)</td>
+<td style="text-align: left;">Environment variables from the parent</td>
 <td style="text-align: left;">OAuth 2.1 (<a href="ch04.html#ch:authorization">Chapter 4</a>)</td>
 </tr>
 <tr>
 <td style="text-align: left;">Scaling</td>
-<td style="text-align: left;">One process per host</td>
+<td style="text-align: left;">One process per machine</td>
 <td style="text-align: left;">Round-robin, any replica</td>
 </tr>
 <tr>
@@ -666,18 +711,18 @@ Mcp-Name: assess_account_risk
 </section>
 <section id="topologies" class="level2">
 <h2>Topologies</h2>
-<p>The stateless core changes what is possible here, so it is worth drawing.</p>
+<p>The stateless core from Chapter <a href="ch02.html#ch:architecture">2</a> changes what is possible here, so it is worth drawing.</p>
 <figure id="fig:topologies">
 <img src="figures/topologies.svg" />
-<figcaption>Three shapes. The middle one is the one that got dramatically easier in 2026-07-28, because round-robin now works without a session store behind it.</figcaption>
+<figcaption>Three shapes. The middle one got dramatically easier in 2026-07-28, because round-robin now works without a session store behind it.</figcaption>
 </figure>
-<p><strong>Sidecar</strong> is stdio, one server process per host, no network. Simple isolation, and you pay the cold start.</p>
-<p><strong>Gateway</strong> is the interesting one. Before this revision, N hosts behind one gateway meant sticky sessions, because request two had to reach whichever replica handled request one. Now it does not, so the gateway is a plain round-robin load balancer with a cache in front of it, and the routing headers from <a href="#sec:required-headers">§3.2.2</a> let it make decisions without parsing bodies.</p>
+<p><strong>Sidecar</strong> is stdio: one server process per machine, no network. Simple isolation, and you pay the cold start.</p>
+<p><strong>Gateway</strong> is the interesting one. Before this revision, many hosts behind one gateway meant sticky sessions, because request two had to reach whichever replica handled request one. Now it does not, so the gateway is a plain round-robin load balancer with a cache in front, and the routing headers from <a href="#sec:required-headers">§3.3.3</a> let it decide without parsing bodies.</p>
 <p><strong>Mesh</strong> is agents talking to agents, where a node is a host on one side and a server on the other. Chapter <a href="ch14.html#ch:multi-agent">14</a> builds this and spends most of its time on the failure modes, because a mesh with no depth limit is a fork bomb with a nicer API.</p>
 </section>
 <section id="meridians-transport-decision" class="level2">
 <h2>Meridian’s transport decision</h2>
-<p>Meridian runs four servers. Here is what each got and why, which is a more useful format than a general recommendation.</p>
+<p>Here is what each Meridian server got, and why.</p>
 <table id="tab:meridian-transports">
 <caption>Meridian’s choices. Everything shared is HTTP; stdio is a development convenience and a good one.</caption>
 <tbody>
@@ -699,33 +744,34 @@ Mcp-Name: assess_account_risk
 <tr>
 <td style="text-align: left;"><code>fraud</code></td>
 <td style="text-align: left;">HTTP</td>
-<td style="text-align: left;">Called in parallel with risk, so it wants connection reuse</td>
+<td style="text-align: left;">Called in parallel with risk, so it benefits from connection reuse</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>marketdata</code></td>
 <td style="text-align: left;">HTTP</td>
-<td style="text-align: left;"><code>cacheScope: public</code> results, so a shared gateway cache is the entire point</td>
+<td style="text-align: left;">Its results are identical for every caller, so a shared cache in front of it pays for everybody at once</td>
 </tr>
 <tr>
 <td style="text-align: left;">Local dev</td>
 <td style="text-align: left;">stdio</td>
-<td style="text-align: left;">No auth, no ports, and <code>.mcp.json</code> just works</td>
+<td style="text-align: left;">No auth, no ports, and the config file just works</td>
 </tr>
 </tbody>
 </table>
-<p>The <code>marketdata</code> row is worth noticing. It is the only server whose results are identical for every caller, which is what makes <code>cacheScope: public</code> honest, which is what makes a shared gateway cache legal. Chapter <a href="ch06.html#ch:resources">6</a> measures that: 577 of 600 reads avoided, at a 96.2 % hit rate.</p>
+<p>The <code>marketdata</code> row is the one worth noticing. It is the only server whose results do not depend on who is asking, which is what makes them safely shareable, which is what makes a cache in front of it legal. Chapter <a href="ch06.html#ch:resources">6</a> measures that: 577 of 600 reads avoided.</p>
 </section>
 <section id="what-to-remember" class="level2">
 <h2>What to remember</h2>
 <ul>
-<li><p>JSON-RPC 2.0, plus required <code>resultType</code> and non-null ids.</p></li>
-<li><p>Never allocate error codes in <code>-32020</code> to <code>-32099</code>. Never re-emit <code>-32002</code> or <code>-32042</code>.</p></li>
-<li><p>Streamable HTTP is POST-only. GET, DELETE, sessions, and resumability are all gone.</p></li>
-<li><p><code>MCP-Protocol-Version</code>, <code>Mcp-Method</code>, and <code>Mcp-Name</code> are mandatory, and a mismatch between header and body must be rejected.</p></li>
-<li><p>No resumability means retries are routine. Make your servers idempotent.</p></li>
+<li><p>A transport is just the binding that carries messages. There are two, and the choice is local versus shared.</p></li>
+<li><p>JSON-RPC 2.0, plus a required <code>resultType</code> and non-null ids.</p></li>
+<li><p>Never allocate error codes in <code>-32020</code> to <code>-32099</code>. Accept <code>-32002</code> from old servers, never emit it.</p></li>
+<li><p>Streamable HTTP is POST-only. Sessions, the GET stream, and resumability are all gone.</p></li>
+<li><p>Three headers are mandatory and must match the body, because a gateway and a server that can disagree is a smuggling primitive.</p></li>
+<li><p>No resumability means retries are routine. Make mutating tools idempotent.</p></li>
 <li><p>Cancellation is a closed stream on HTTP and a notification on stdio.</p></li>
-<li><p>stdio cold start is 44.6 ms, around 750 warm calls. Use a warm pool.</p></li>
-<li><p>Transport overhead is fractions of a millisecond. Distance and round trips are what cost you.</p></li>
+<li><p>stdio cold start is 44.6 ms, roughly 750 warm calls. Use a warm pool.</p></li>
+<li><p>Transport overhead is fractions of a millisecond. Distance and round trips are what actually cost you.</p></li>
 </ul>
 <p>Next: authorization, which is a security chapter with a performance chapter hiding inside it.</p>
 </section>

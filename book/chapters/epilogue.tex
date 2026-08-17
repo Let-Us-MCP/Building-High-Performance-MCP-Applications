@@ -18,12 +18,12 @@ going.
 
 \subsection{Statelessness as an infrastructure bet}
 
-Deleting the handshake was not a tidying-up exercise. It was a decision that MCP
-servers should be ordinary web services, deployable on the same infrastructure,
-scaled by the same tools, operated by the same people.
+Deleting the handshake was a decision that MCP servers should be ordinary web
+services: deployable on the same infrastructure, scaled by the same tools,
+operated by the same people.
 
-Everything followed from it. No sessions, no resumability, no server-initiated
-requests, MRTR instead of callbacks, explicit handles instead of implicit state.
+Everything followed from it. No sessions, no resumability, no server-initiated requests, MRTR in place of callbacks, explicit handles in
+place of implicit state.
 Five deletions and one addition, all serving one idea.
 
 That bet is unlikely to be reversed. It is far easier to add a stateful extension
@@ -76,15 +76,14 @@ Provider function calling & One model to one app's functions & In-process \\
 \label{tab:convergence}
 \end{table}
 
-My read is that these settle rather than merge. MCP owns the agent-to-capability
+My read is that these settle where they are. MCP owns the agent-to-capability
 boundary. A2A owns agent-to-agent. Provider-native function calling owns the
 single-application case where no boundary exists and none is needed.
 
 Chapter~\ref{ch:multi-agent} showed the composition: an agent that consumes MCP
 tools on one side and exposes MCP tools on the other is an ordinary thing, and it
 needed no extension. Whether the peer-to-peer case ends up as A2A or as MCP with
-another extension is, honestly, a coin flip, and it will be decided by which
-ecosystem gets there first rather than by which design is better.
+another extension is, honestly, a coin flip, and it will be decided by which ecosystem gets there first.
 
 \section{Open problems}
 
@@ -96,11 +95,10 @@ Chapter~\ref{ch:threats} was pessimistic on purpose. There is no known reliable
 defence, and everything in that chapter was about limiting blast radius rather
 than preventing the attack.
 
-The honest position is that this is a property of the technology rather than a
-bug in anyone's implementation. Language models process instructions and data in
+The honest position is that this is a property of the technology. Language models process instructions and data in
 one stream. Until that changes, or until something at the model layer provides a
-real boundary, the trifecta framing is the best tool available, and it is a
-mitigation strategy rather than a solution.
+real boundary, the trifecta framing is the best tool available, and it bounds the damage
+without preventing the attack.
 
 If someone solves this properly, a good third of Chapter~\ref{ch:threats} becomes
 obsolete and I will be delighted.
@@ -140,8 +138,7 @@ the wire format is.
 catalogues, and so do the results people stuff into them. The discipline in
 Chapter~\ref{ch:agent-loop} outlives any particular limit.
 
-\textbf{The host will still be the trust boundary.} It follows from the
-architecture rather than from a version. Any design where the model is the
+\textbf{The host will still be the trust boundary.} It follows from the architecture itself. Any design where the model is the
 security boundary is broken, and will still be broken when the models are
 better.
 
@@ -161,16 +158,14 @@ revision at all.
 and some of what is an extension today will be core tomorrow.
 
 \textbf{The SDKs.} By the time you read this they will have caught up with
-\texttt{2026-07-28}, and \texttt{meridian/protocol/} will be a teaching artefact
-rather than a practical necessity. Use the SDKs. Read the wire when something is
+\texttt{2026-07-28}, and \texttt{meridian/protocol/} will be a teaching artefact. Use the SDKs. Read the wire when something is
 confusing, which will be often enough to justify having learned it.
 
 \textbf{The dual-era bridge.} Chapter~\ref{ch:architecture} built one because
 Claude Code and most 2026 clients still open with \texttt{initialize}. That is
 transitional. When your clients have moved, delete
-\texttt{meridian/protocol/legacy.py} and enjoy the diff. Building it as a
-separate wrapper rather than as patches to the core was entirely so that day is a
-deletion rather than an archaeology project.
+\texttt{meridian/protocol/legacy.py} and enjoy the diff. Building it as a separate wrapper was entirely so that day is a one-line
+deletion.
 
 \section{To the reader}
 

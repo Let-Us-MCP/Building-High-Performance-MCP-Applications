@@ -178,7 +178,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <p>Tony Montana, <em>Scarface</em> (1983)</p>
 </aside>
 <p>Tony’s little friend was not little, and that is the joke. Prompts are MCP’s little friend. It is the primitive people skip, the one that gets one paragraph in most tutorials, and it turns out to be the one that quietly standardises a workflow across three teams who were each maintaining their own slightly different version of it.</p>
-<p>It is also the shortest chapter in Part II, because the mechanics really are simple. The interesting content is organisational rather than technical.</p>
+<p>It is also the shortest chapter in Part II, because the mechanics really are simple. The interesting content is organisational.</p>
 <section id="mechanics" class="level2">
 <h2>Mechanics</h2>
 <p>Two methods, and you can guess both.</p>
@@ -224,7 +224,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
     ]
   }
 }</code></pre>
-<p>Messages, plural, with roles. That matters more than it looks. A prompt is not a string you interpolate; it is a conversation prefix. You can seed it with a user turn, an assistant turn demonstrating the desired shape, and another user turn, which is few-shot prompting delivered as a protocol primitive.</p>
+<p>Messages, plural, with roles. That matters more than it looks. A prompt is a conversation prefix, not a string you interpolate. You can seed it with a user turn, an assistant turn demonstrating the desired shape, and another user turn, which is few-shot prompting delivered as a protocol primitive.</p>
 <p>Content blocks can be text, images, audio, resource links, or embedded resources. A prompt that embeds a resource is handing the model reference material and instructions in one round trip, which is a genuinely good use of the primitive.</p>
 <section id="prompts-are-user-controlled" class="level3">
 <h3>Prompts are user-controlled</h3>
@@ -234,7 +234,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <li><p>Resources are <strong>application</strong>-driven. The host decides when.</p></li>
 <li><p>Prompts are <strong>user</strong>-controlled. A person picks one.</p></li>
 </ul>
-<p>In practice that usually means slash commands. The user types <code>/</code> and gets a list of the prompts every connected server offers. That is the whole UX pattern, and it is why prompt names should read like commands rather than like function identifiers.</p>
+<p>In practice that usually means slash commands. The user types <code>/</code> and gets a list of the prompts every connected server offers. That is the whole UX pattern, and it is why prompt names should read like commands.</p>
 <aside class="box note"><p class="box-title">“User-controlled” is about invocation, not authorship</p>
 <p>The server writes the prompt. The user chooses when to fire it. Those are separate, and conflating them leads to the mistake of letting users edit prompt text, at which point you no longer have a standardised workflow, you have 40 divergent ones and no way to tell which is in use.</p>
 </aside>
@@ -246,7 +246,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <section id="because-the-server-owns-the-expertise" class="level3">
 <h3>Because the server owns the expertise</h3>
 <p>Here is the argument that actually convinced me.</p>
-<p>Meridian’s compliance server knows things the host does not: that a Suspicious Activity Report is due within 30 days of <em>detection</em> rather than escalation, that corridor risk is rated on counterparty jurisdiction rather than booking branch, that a flagged transaction needs a named officer.</p>
+<p>Meridian’s compliance server knows things the host does not: that a Suspicious Activity Report is due within 30 days of <em>detection</em>, with the clock starting at detection and not at escalation; that corridor risk is rated on the counterparty’s jurisdiction and not the booking branch; that a flagged transaction needs a named officer.</p>
 <p>If the prompt lives in the host, that knowledge lives in the host, and every host that wants to do compliance review has to know compliance. If it lives on the server, one team who understands the domain maintains one blueprint, and every host gets it right for free.</p>
 <aside class="keyidea">
 <p>A server-owned prompt puts the workflow next to the expertise that defines it. Client-side string concatenation puts it next to whoever happened to be writing UI that week.</p>
@@ -255,7 +255,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <section id="because-it-standardises-across-teams" class="level3">
 <h3>Because it standardises across teams</h3>
 <p>Meridian’s origin story for this primitive is boring and completely typical. Three business units each did compliance review. Each had their own prompt. They had drifted: one asked for a risk score and one did not, one said “be brief” and one said “be thorough”, and the reports that came out the other end were not comparable, which was a problem because comparing them was the entire point.</p>
-<p>One <code>compliance-review</code> prompt on the compliance server fixed it. Not because the prompt was better than the three it replaced, but because there was one of it.</p>
+<p>One <code>compliance-review</code> prompt on the compliance server fixed it. The replacement was no better written than the three it replaced. It was simply the only one.</p>
 </section>
 <section id="because-it-can-be-versioned-and-tested" class="level3">
 <h3>Because it can be versioned and tested</h3>
@@ -289,7 +289,7 @@ def credit_review(ctx: RequestContext, args: dict):
 <pre class="python" data-language="python"><code>def test_second_label_is_what_counts(self):
     self.assertFalse(is_reserved_meta_key(&quot;com.example.mcp/x&quot;))
     self.assertFalse(is_reserved_meta_key(&quot;com.example/x&quot;))</code></pre>
-<p>Why version at all? Because a prompt change alters model behaviour, and when output quality shifts on a Tuesday you need to know whether it was the model, the data, or somebody’s Monday edit to the blueprint. The version in the audit log answers that in five seconds instead of a day.</p>
+<p>Why version at all? Because a prompt change alters model behaviour, and when output quality shifts on a Tuesday you need to know whether it was the model, the data, or somebody’s Monday edit to the blueprint. The version in the audit log answers that in five seconds.</p>
 <section id="breaking-versus-non-breaking" class="level3">
 <h3>Breaking versus non-breaking</h3>
 <p>The same distinction as any other API, applied to prose:</p>
@@ -326,7 +326,7 @@ def credit_review(ctx: RequestContext, args: dict):
 <p>You test the parts that are. Three layers, cheapest first.</p>
 <section id="structural-tests-which-need-no-model-at-all" class="level3">
 <h3>Structural tests, which need no model at all</h3>
-<p>Does the prompt render? Does it reject missing required arguments? Does the rendered text mention the tools it is supposed to invoke? These are ordinary unit tests and they catch most regressions, because most regressions are somebody breaking the template rather than the model changing its mind.</p>
+<p>Does the prompt render? Does it reject missing required arguments? Does the rendered text mention the tools it is supposed to invoke? These are ordinary unit tests and they catch most regressions, because most regressions are somebody breaking the template.</p>
 <pre class="python" data-language="python"><code>def test_prompt_rejects_missing_required_argument(self):
     resp = server.handle(request(&quot;prompts/get&quot;,
                                  {&quot;name&quot;: &quot;credit-review&quot;, &quot;arguments&quot;: {}}))

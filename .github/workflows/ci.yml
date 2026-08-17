@@ -61,6 +61,12 @@ jobs:
       - name: Printed numbers match the committed benchmark run
         run: python3 tools/check_numbers.py
 
+      - name: Every listing traces to real code
+        run: python3 tools/check_listings.py
+
+      - name: Contrastive phrasing stays within budget
+        run: python3 tools/check_contrastive.py
+
       - name: Site links
         # docs/ is committed, so this checks what readers actually get.
         run: python3 tools/check_site.py

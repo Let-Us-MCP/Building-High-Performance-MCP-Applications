@@ -257,7 +257,7 @@ so the window is milliseconds instead of minutes.
 
 \textbf{Treat unexpected errors as invalidation signals.} A \texttt{-32602}
 saying ``unknown tool'' on a tool you know exists means your catalogue is stale.
-Refetch and retry once, rather than reporting failure. The specification
+Refetch and retry once. The specification
 explicitly permits refetching before TTL expiry when you have reason to believe
 the data changed.
 
@@ -304,8 +304,7 @@ iteration one despite doing less.
 That table is the whole economics of agent loops in six numbers. Input grows
 monotonically because everything accumulates. Output stays tiny because the model
 emits a tool call, not an essay. So \textbf{your cost is dominated by re-reading
-what you already read}, and the lever is context management rather than
-prompting.
+what you already read}, and the lever is context management.
 
 \subsection{Model routing}
 
@@ -330,8 +329,7 @@ of turns in a long task, and they are the cheapest to move.}
 \label{tab:model-routing}
 \end{table}
 
-The measurement that matters is the quality/cost frontier, and the honest way to
-find it is to run your eval suite at each mix rather than to reason about it. It
+The measurement that matters is the quality/cost frontier, and the honest way to find it is to run your eval suite at each mix. It
 is common to move the majority of turns to a small model and lose nothing
 measurable, and it is also common to lose a lot, and which one you are in is not
 predictable from first principles.

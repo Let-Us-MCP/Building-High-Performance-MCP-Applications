@@ -259,9 +259,7 @@ def call_tool(self, qualified: str, arguments: dict | None = None, **kw) -> dict
 
 Two details worth copying.
 
-\textbf{A denial returns a tool execution error, not an exception.} The model
-should learn that the call was refused and adapt, rather than have the loop
-crash. ``The user declined'' is information the model can use.
+\textbf{A denial returns a tool execution error, not an exception.} The model should learn that the call was refused and adapt. ``The user declined'' is information the model can use.
 
 \textbf{Audit before executing.} The record is written whatever happens next,
 including if the server times out. An audit log that only records successes is
@@ -357,8 +355,8 @@ class InputProvider:
         return {"action": "decline"}
 \end{py}
 
-The default declines. That is deliberate: a host that has not been wired up
-should refuse rather than invent answers on the user's behalf.
+The default declines. That is deliberate: a host that has not been wired up should refuse. Inventing answers on the
+user's behalf is worse than declining.
 
 \subsection{Task updates}
 
@@ -421,6 +419,7 @@ Servers go down. A host with four of them and one outage should be a host with
 three working servers.
 
 \begin{py}
+# sketch: condensed for the page
 def stats(self) -> dict:
     return {
         "servers": {
@@ -444,8 +443,7 @@ to the catalogue. The model never sees tools it cannot call, so it never plans
 around them.
 
 \textbf{Tell the model, not just the log.} If a capability the user asked for is
-unavailable, that belongs in the context so the model can say so rather than
-looping.
+unavailable, that belongs in the context so the model can say so and stop.
 
 \textbf{Reconnect with backoff and jitter.} A dozen hosts reconnecting to a
 recovering server on a fixed one-second timer is how a recovering server stops
@@ -481,8 +479,7 @@ result = AgentLoop(host, model, max_steps=8,
 \end{py}
 
 Every argument there is a decision Chapter~\ref{ch:agent-loop} will justify. The
-important thing is that they are all in one place, visible, and set to a number
-rather than to infinity.
+important thing is that they are all in one place, visible, and set to a number.
 
 \section{Instrumenting from the start}
 

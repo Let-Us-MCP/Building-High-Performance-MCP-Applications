@@ -227,7 +227,7 @@ def dashboard(ctx: RequestContext, uri: str):
 <dl>
 <dt>Prefetch</dt>
 <dd>
-<p>Fetch and parse the template during idle time, so the first render is instant rather than a fetch plus a parse plus a paint.</p>
+<p>Fetch and parse the template during idle time, so the first render is instant.</p>
 </dd>
 <dt>Cache</dt>
 <dd>
@@ -363,19 +363,19 @@ const rpc = (method, params) =&gt; new Promise(resolve =&gt; {
 
 parent.postMessage({ jsonrpc: &#39;2.0&#39;, id: &#39;init&#39;, method: &#39;ui/initialize&#39;,
                      params: { protocolVersion: &#39;2026-01-26&#39; } }, &#39;*&#39;);</code></pre>
-<p>Note that the app announces <em>its</em> protocol version, <code>2026-01-26</code>, which is the Apps extension’s own revision rather than core MCP’s. Extensions version independently, as Chapter <a href="ch09.html#ch:tasks">9</a> described, and this is what that looks like in practice.</p>
+<p>Note that the app announces <em>its</em> protocol version, <code>2026-01-26</code>, which is the Apps extension’s own revision, not core MCP’s. Extensions version independently, as Chapter <a href="ch09.html#ch:tasks">9</a> described, and this is what that looks like in practice.</p>
 <aside class="box note"><p class="box-title">On <code>targetOrigin: ’*’</code></p>
 <p>Meridian passes <code>’*’</code> because the host’s origin is not known to a template that may be rendered by any host.</p>
 <p>In production, do better where you can. The host should pass its origin during <code>ui/initialize</code> and the app should use it thereafter. And the host must validate the origin of every inbound message regardless, because that side of the check is the one that actually protects anybody.</p>
 </aside>
-<p>Frameworks are entirely optional. The official examples ship starters for React, Vue, Svelte, Preact, Solid, and vanilla JavaScript, and the <code>App</code> class in <code>@modelcontextprotocol/ext-apps</code> is a convenience wrapper rather than a requirement. It is postMessage and JSON-RPC underneath, which means the whole web platform is available and none of it is mandatory.</p>
+<p>Frameworks are entirely optional. The official examples ship starters for React, Vue, Svelte, Preact, Solid, and vanilla JavaScript, and the <code>App</code> class in <code>@modelcontextprotocol/ext-apps</code> is a convenience wrapper. It is postMessage and JSON-RPC underneath, which means the whole web platform is available and none of it is mandatory.</p>
 </section>
 <section id="ux-patterns-worth-copying" class="level2">
 <h2>UX patterns worth copying</h2>
 <p><strong>Render immediately, refine on arrival.</strong> The host can prefetch the template and even stream tool inputs into it before the result exists. Show skeleton state, then fill it. Perceived latency is the latency.</p>
 <p><strong>Keep the app and the conversation in sync.</strong> A user who filters to C-tier accounts in the app and then asks “why are these risky” expects the model to know what “these” means. The app should push a context update; the host should merge it. Without that, the app is a separate application that happens to be drawn in the same window.</p>
 <p><strong>Save state on teardown.</strong> Apps get closed. If a user was three steps into triage, losing that is worse than never having had it.</p>
-<p><strong>Degrade to text.</strong> Not every host renders apps. Your tool must still return useful <code>content</code>, and it must be useful on its own rather than a placeholder saying “see the dashboard”. Meridian’s tools all return complete text results whether or not anything renders them.</p>
+<p><strong>Degrade to text.</strong> Not every host renders apps. Your tool must still return useful <code>content</code>, and it must stand on its own. A placeholder saying “see the dashboard” is a broken tool. Meridian’s tools all return complete text results whether or not anything renders them.</p>
 </section>
 <section id="measuring-an-app" class="level2">
 <h2>Measuring an app</h2>

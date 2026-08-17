@@ -313,13 +313,13 @@ WWW-Authenticate: Bearer resource_metadata=&quot;https://mcp.meridian.example/.w
 <aside class="box legacy"><p class="box-title">Legacy: Dynamic Client Registration (RFC 7591)</p>
 <p>Deprecated as of <code>2026-07-28</code>, eligible for removal no earlier than 2027-07-28. Retained because plenty of 2025-era authorization servers speak nothing else.</p>
 <p>If you must use it, specify <code>application_type</code> explicitly. Omitting it defaults to <code>"web"</code> under OpenID Connect, which rejects the <code>localhost</code> redirect URIs that desktop and CLI clients need. Use <code>"native"</code> for anything local. This is a genuinely common failure and the error message is never helpful.</p>
-<p>Also: key persisted credentials by the authorization server’s <code>issuer</code>. Reusing a client id across authorization servers is a specification violation, and it fails in confusing ways rather than clean ones.</p>
+<p>Also: key persisted credentials by the authorization server’s <code>issuer</code>. Reusing a client id across authorization servers is a specification violation, and it fails in confusing ways.</p>
 </aside>
 </section>
 </section>
 <section id="two-validations-that-stop-real-attacks" class="level2">
 <h2>Two validations that stop real attacks</h2>
-<p>Most of OAuth’s complexity is scar tissue. Two pieces of it are worth understanding rather than merely implementing.</p>
+<p>Most of OAuth’s complexity is scar tissue. Two pieces of it are worth understanding, not merely implementing.</p>
 <section id="audience-binding-or-do-not-be-a-confused-deputy" class="level3">
 <h3>Audience binding, or: do not be a confused deputy</h3>
 <p>RFC 8707. The client must send a <code>resource</code> parameter naming the server the token is for, on both the authorization request and the token request:</p>
@@ -385,7 +385,7 @@ WWW-Authenticate: Bearer error=&quot;insufficient_scope&quot;,
                          scope=&quot;risk:write&quot;,
                          resource_metadata=&quot;https://mcp.meridian.example/.well-known/oauth-protected-resource&quot;,
                          error_description=&quot;Writing a risk override requires risk:write&quot;</code></pre>
-<p>Note 403 rather than 401. A 401 means “I do not know who you are”; a 403 means “I know exactly who you are and you may not do that”. Clients branch on this, so getting it wrong sends them into a re-authentication loop that cannot succeed.</p>
+<p>Note the 403. A 401 means “I do not know who you are”; a 403 means “I know exactly who you are and you may not do that”. Clients branch on this, so getting it wrong sends them into a re-authentication loop that cannot succeed.</p>
 <p>Two rules for servers, both about not being annoying:</p>
 <p><strong>Challenge with everything the operation needs, at once.</strong> Returning one missing scope, then another on the retry, forces a separate consent round trip per scope. Determine the full set, then emit it together.</p>
 <p><strong>Be consistent.</strong> Whatever strategy you pick for constructing scope sets, apply it uniformly. Clients cache and predict; a server that varies its challenges defeats both.</p>
@@ -480,7 +480,8 @@ WWW-Authenticate: Bearer error=&quot;insufficient_scope&quot;,
     never by connection.&quot;&quot;&quot;
     return sorted(self._tools.values(), key=lambda t: t.name)</code></pre>
 <p><strong>Binding MRTR state to a principal.</strong> This is the one that stops a real attack. Meridian seals its <code>requestState</code> with the authenticated subject inside, and rejects state presented by anybody else:</p>
-<pre class="python" data-language="python"><code>return input_required(
+<pre class="python" data-language="python"><code># sketch: elided from the shipped handler
+return input_required(
     input_requests={&quot;approval&quot;: elicit_form(...)},
     request_state=SEALER.seal(
         {&quot;accountId&quot;: account_id, &quot;exposureUsd&quot;: exposure},

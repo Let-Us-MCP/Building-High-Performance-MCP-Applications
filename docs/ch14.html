@@ -186,12 +186,12 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <li><p>On its <strong>provider</strong> side, it is a server: it exposes tools that happen to be implemented by running a loop.</p></li>
 </ul>
 <p>Nothing in the protocol distinguishes “a tool that queries a database” from “a tool that runs a four-step agent loop and returns a synthesis”. The caller sees a tool call. This is a good property, and it is why MCP does not need a multi-agent extension.</p>
-<pre class="python" data-language="python"><code>risk_agent = Server(&quot;meridian-risk-agent&quot;, &quot;1.0.0&quot;, instructions=(
+<pre class="python" data-language="python"><code>agent = Server(name, &quot;1.0.0&quot;, instructions=(
     &quot;Delegated credit analysis. Give it an account and a question; it will &quot;
     &quot;consult the risk, fraud, and market-data servers and return a synthesis.&quot;
 ))
 
-@risk_agent.tool(
+@agent.tool(
     &quot;analyse_account&quot;,
     &quot;Full credit analysis of one account: risk score, fraud signals, and &quot;
     &quot;indicative pricing, synthesised into a recommendation.&quot;,
@@ -206,7 +206,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
     },
 )
 def analyse_account(ctx: RequestContext):
-    budget = _inherit_budget(ctx)          # see below
+    budget = inherit_budget(ctx)
     result = AgentLoop(inner_host, model,
                        max_steps=budget.steps,
                        token_budget=budget.tokens,
@@ -215,7 +215,8 @@ def analyse_account(ctx: RequestContext):
         f&quot;{ctx.arguments.get(&#39;question&#39;, &#39;&#39;)}&quot;)
     return text_result(result.answer,
                        structured={&quot;iterations&quot;: len(result.iterations),
-                                   &quot;costUsd&quot;: result.cost_usd})</code></pre>
+                                   &quot;costUsd&quot;: round(result.cost_usd, 6),
+                                   &quot;depth&quot;: budget.depth})</code></pre>
 <p>A tool whose implementation is a loop. The caller cannot tell, and mostly should not need to.</p>
 </section>
 <section id="three-shapes" class="level2">
@@ -239,21 +240,21 @@ def analyse_account(ctx: RequestContext):
 <section id="hierarchy" class="level3">
 <h3>Hierarchy</h3>
 <p>Levels, each summarising for the one above. Portfolio, sector, account.</p>
-<p><strong>Isolation:</strong> good, and the context property is the real prize: each level sees summaries rather than raw results, so the top-level window stays small regardless of how many accounts exist.</p>
+<p><strong>Isolation:</strong> good, and the context property is the real prize: each level sees summaries, so the top-level window stays small regardless of how many accounts exist.</p>
 <p><strong>Failure mode:</strong> depth multiplies latency. Three levels means the leaf’s model turn, the middle’s model turn, and the top’s model turn, in series. A 1.4-second task becomes a four-second task.</p>
 </section>
 </section>
 <section id="the-four-counters" class="level2">
 <h2>The four counters</h2>
 <p>Whatever the shape, four things must travel with a delegated request, and all four ride in <code>_meta</code>.</p>
-<pre class="python" data-language="python"><code>DEPTH_KEY   = &quot;com.meridian/delegationDepth&quot;
-TOKENS_KEY  = &quot;com.meridian/tokenBudgetRemaining&quot;
+<pre class="python" data-language="python"><code>DEPTH_KEY = &quot;com.meridian/delegationDepth&quot;
+TOKENS_KEY = &quot;com.meridian/tokenBudgetRemaining&quot;
 DOLLARS_KEY = &quot;com.meridian/costBudgetRemaining&quot;
 # `traceparent` is already reserved by the spec for the fourth.
 
 MAX_DELEGATION_DEPTH = 3
 
-def _inherit_budget(ctx: RequestContext) -&gt; Budget:
+def inherit_budget(ctx: RequestContext) -&gt; Budget:
     &quot;&quot;&quot;Read the caller&#39;s remaining budget, or assume the smallest.
 
     An agent that receives no budget must not assume an unlimited one. That
@@ -278,7 +279,7 @@ def _inherit_budget(ctx: RequestContext) -&gt; Budget:
 <p><strong>Budgets are <em>remaining</em>, not allocated.</strong> This is the one people get wrong. Passing “you may spend $0.50” to three children authorises $1.50. Passing what is left, and decrementing as results return, authorises $0.50 total.</p>
 <aside class="box threat"><p class="box-title">Threat: Budget fan-out is multiplicative</p>
 <p>A supervisor with a $1.00 budget delegating to 3 agents, each delegating to 3 more, each running 8 steps: if every level passes its full budget down, the system is authorised to spend $9.00 and will happily do so.</p>
-<p>Depth limits alone do not fix this. You need the budget to be a shared, decrementing quantity rather than a per-node allowance.</p>
+<p>Depth limits alone do not fix this. The budget has to be a shared, decrementing quantity.</p>
 </aside>
 </section>
 <section id="circuit-breakers" class="level2">
@@ -299,7 +300,7 @@ def _inherit_budget(ctx: RequestContext) -&gt; Budget:
         self.failures = 0
         self.opened_at: float | None = None
 
-    def allows(self, now: float) -&gt; bool:
+    def allows(self, now: float | None = None) -&gt; bool:
         if self.opened_at is None:
             return True
         if now - self.opened_at &gt;= self.cooldown:
@@ -308,7 +309,7 @@ def _inherit_budget(ctx: RequestContext) -&gt; Budget:
             return True
         return False
 
-    def record(self, ok: bool, now: float) -&gt; None:
+    def record(self, ok: bool, now: float | None = None) -&gt; None:
         if ok:
             self.failures = 0
             self.opened_at = None
@@ -369,7 +370,8 @@ def _inherit_budget(ctx: RequestContext) -&gt; Budget:
 <section id="meridians-supervisor" class="level2">
 <h2>Meridian’s supervisor</h2>
 <p>Three specialists, one coordinator, one traced request.</p>
-<pre class="python" data-language="python"><code>supervisor = Host(name=&quot;meridian-supervisor&quot;,
+<pre class="python" data-language="python"><code># sketch: illustrative wiring, not extracted from the repository
+supervisor = Host(name=&quot;meridian-supervisor&quot;,
                   consent=ConsentPolicy(auto_allow_read_only=True),
                   tool_token_budget=3000)
 
@@ -399,7 +401,7 @@ result = AgentLoop(supervisor, model,
  |   |- fraud-agent.screen                          [   890 ms]
  |   `- compliance-agent.review                     [ 1,240 ms]
  `- model turn (synthesise)                         [   470 ms]</code></pre>
-<p>Read the shape rather than the numbers. The fan-out costs the <em>maximum</em> of its children (1,820) rather than the sum (3,950), which is what parallelism bought. And the leaf tool calls are 12 ms and 9 ms against model turns of 430 and 410, which is Chapter <a href="ch01.html#ch:primer">1</a>’s point restated at a different scale: you are paying for thinking, not for calling.</p>
+<p>Read the shape first. The fan-out costs the <em>maximum</em> of its children (1,820) rather than the sum (3,950), which is what parallelism bought. And the leaf tool calls are 12 ms and 9 ms against model turns of 430 and 410, which is Chapter <a href="ch01.html#ch:primer">1</a>’s point restated at a different scale: you are paying for thinking, not for calling.</p>
 <aside class="keyidea">
 <p>Every level of delegation adds at least two model turns: one to decide what to delegate and one to read what came back. Delegate because the decomposition genuinely helps, not because the architecture diagram looks tidier.</p>
 </aside>
@@ -422,7 +424,7 @@ result = AgentLoop(supervisor, model,
 </tr>
 <tr>
 <td style="text-align: left;">The sub-task needs different authorization, and the boundary is real</td>
-<td style="text-align: left;">The boundary is organisational rather than technical</td>
+<td style="text-align: left;">The boundary is organisational only</td>
 </tr>
 <tr>
 <td style="text-align: left;">Sub-tasks are independent and parallel fan-out pays</td>

@@ -351,7 +351,7 @@ class Iteration:
      `- model.generate                  [   400 ms]</code></pre>
 <p>Three properties make this worth the effort:</p>
 <p><strong>Iterations are spans.</strong> Not just tool calls. Otherwise your trace shows 54 ms of activity inside a 1,366 ms task and a 1,312 ms hole nobody can explain.</p>
-<p><strong>Transport and execution are separate spans.</strong> That is the subtraction above, done automatically for every call rather than once in a benchmark.</p>
+<p><strong>Transport and execution are separate spans.</strong> That is the subtraction above, done automatically for every call.</p>
 <p><strong>Sibling spans that overlap in time reveal parallelism.</strong> If you fanned out, the trace shows it. If you thought you fanned out and did not, the trace shows that too, which is more useful.</p>
 <aside class="box note"><p class="box-title">What to put in <code>baggage</code></p>
 <p><code>baggage</code> propagates key-value pairs across every hop, which makes it tempting as a general-purpose channel. Resist.</p>

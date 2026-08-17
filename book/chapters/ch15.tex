@@ -32,8 +32,7 @@ slow. That is not a coincidence.}
 \label{tab:test-pyramid}
 \end{table}
 
-Meridian's 134 tests run in 2.3 seconds and use no model at all. The eval suite
-is separate, slower, and gates deploys rather than commits.
+Meridian's 134 tests run in 2.3 seconds and use no model at all. The eval suite is separate, slower, and gates deploys.
 
 \keyidea{If your MCP tests are slow, you are testing the model when you meant to
 test the protocol. Push everything you can down a layer.}
@@ -159,9 +158,8 @@ def test_name_header_disagreeing_with_body_is_rejected(self):
     self.assertEqual(body["error"]["code"], errors.HEADER_MISMATCH)
 \end{py}
 
-Note \texttt{raw\_post}. Not the client. A hand-built HTTP request, because
-testing header validation through a client that constructs correct headers tests
-nothing.
+Note \texttt{raw\_post}: a hand-built HTTP request. Testing header validation
+through a client that constructs correct headers tests nothing.
 
 \section{Integration testing with a stubbed model}
 
@@ -287,7 +285,7 @@ The top of the pyramid: does the thing actually work, with a real model.
 
 Evals are not tests. They are a \emph{regression suite for behaviour}, and they
 have properties tests do not: they are slow, they cost money, they are
-non-deterministic, and their result is a score rather than a pass or fail.
+non-deterministic, and their result is a score.
 
 \subsection{What to measure}
 
@@ -354,7 +352,8 @@ suite will notice.
 
 Non-determinism makes naive assertions flaky. Three habits fix most of it:
 
-\textbf{Assert on structure, not prose.} ``The answer contains 55.4'' is stable.
+\textbf{Assert on structure. ``The answer contains 55.4'' is stable; ``the answer says
+the account is elevated risk'' is not.} ``The answer contains 55.4'' is stable.
 ``The answer says the account is elevated risk'' is not.
 
 \textbf{Run N times, threshold the rate.} A case that passes 19 of 20 times is

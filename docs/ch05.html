@@ -204,7 +204,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
     &quot;cacheScope&quot;: &quot;public&quot;
   }
 }</code></pre>
-<p>Three fields at the bottom that did not exist in 2025 and matter a great deal. <code>nextCursor</code> means catalogues paginate. <code>ttlMs</code> and <code>cacheScope</code> mean the client can stop asking. Chapter <a href="ch06.html#ch:resources">6</a> covers the caching model; here the relevant fact is that a well-behaved client fetches your catalogue once per TTL rather than once per task.</p>
+<p>Three fields at the bottom that did not exist in 2025 and matter a great deal. <code>nextCursor</code> means catalogues paginate. <code>ttlMs</code> and <code>cacheScope</code> mean the client can stop asking. Chapter <a href="ch06.html#ch:resources">6</a> covers the caching model; here the relevant fact is that a well-behaved client fetches your catalogue once per TTL, not once per task.</p>
 <p>There is also a requirement that reads like a footnote and is not:</p>
 <aside class="keyidea">
 <p>Return tools in a deterministic order. The same order, every time, when the underlying set has not changed. Unstable ordering silently destroys the provider’s prompt cache, and nothing in your telemetry will tell you.</p>
@@ -246,7 +246,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
     &quot;isError&quot;: false
   }
 }</code></pre>
-<p>Note that the result carries the same data twice. That is deliberate and recommended: <code>structuredContent</code> for anything that will parse it, <code>content</code> for backwards compatibility and for models that do better with text. Chapter <a href="ch10.html#ch:apps">10</a> shows the third consumer, an MCP App, which reads <code>structuredContent</code> and never puts it in the model’s context at all.</p>
+<p>The result carries the same data twice, deliberately: <code>structuredContent</code> for anything that will parse it, <code>content</code> for backwards compatibility and for models that do better with text. Chapter <a href="ch10.html#ch:apps">10</a> shows the third consumer, an MCP App, which reads <code>structuredContent</code> and never puts it in the model’s context at all.</p>
 </section>
 </section>
 <section id="designing-tools-a-model-can-actually-use" class="level2">
@@ -311,7 +311,8 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <h3>The three rewrites that fix most catalogues</h3>
 <p><strong>Collapse read-then-combine chains.</strong> Any sequence the model performs identically every time is a tool you have not written yet. If your traces show <code>get_x</code> always followed by <code>get_y</code> then <code>compute_z</code>, ship <code>compute_z_for_x</code>.</p>
 <p><strong>Add a batch variant of anything called in a loop.</strong> Meridian has <code>assess_account_risk</code> for one account and <code>rank_portfolio_risk</code> for many. Without the second, a portfolio review of forty accounts is forty round trips and forty model turns. With it, one. The description points at it explicitly, because the model reads descriptions:</p>
-<pre class="python" data-language="python"><code>@server.tool(
+<pre class="python" data-language="python"><code># sketch: elided from the shipped handler
+@server.tool(
     &quot;rank_portfolio_risk&quot;,
     &quot;Rank a set of accounts by risk score in one call. Prefer this over &quot;
     &quot;calling assess_account_risk repeatedly.&quot;,
@@ -364,7 +365,7 @@ band, and the weighted factors behind it.</code></pre>
 <section id="output-schemas-earn-their-keep" class="level3">
 <h3>Output schemas earn their keep</h3>
 <p>Optional, and you should use them anyway.</p>
-<p>Without one, a model receives text and has to parse it. Sometimes it parses wrong, which costs a retry, which costs a model turn. With one, the client validates <code>structuredContent</code> before it ever reaches the model, and a malformed response is caught at the boundary instead of confusing the planner two turns later.</p>
+<p>Without one, a model receives text and has to parse it. Sometimes it parses wrong, which costs a retry, which costs a model turn. With one, the client validates <code>structuredContent</code> before it ever reaches the model, and a malformed response is caught at the boundary, before it can confuse the planner two turns later.</p>
 <pre class="python" data-language="python"><code>output_schema={
     &quot;type&quot;: &quot;object&quot;,
     &quot;properties&quot;: {
@@ -531,7 +532,7 @@ if account is None:
         ...</code></pre>
 <p>Chapter <a href="ch01.html#ch:primer">1</a> measured this: a consistent 2.8<span class="math inline">×</span> on three calls, holding steady as per-call latency rises from 2 ms to 40 ms. The ceiling is 3<span class="math inline">×</span>, and the gap is thread scheduling plus the slowest of the three servers.</p>
 <p>Two things the host must get right for this to work at all.</p>
-<p><strong>Preserve ordering.</strong> Results must come back in the order the calls were issued, whatever order they complete in. Meridian iterates futures in submission order rather than as-completed, for exactly this reason.</p>
+<p><strong>Preserve ordering.</strong> Results must come back in the order the calls were issued, whatever order they complete in. Meridian iterates futures in submission order for exactly this reason.</p>
 <p><strong>Never fail the batch on one failure.</strong> One tool erroring should produce one error result, not an exception that discards the other two successful calls you already paid for.</p>
 <aside class="box note"><p class="box-title">You cannot fan out what the model serialised</p>
 <p>If your tool design forces <code>get_x</code> then <code>get_y</code> then <code>combine</code>, the model <em>cannot</em> parallelise, because each step depends on the last. Parallel fan-out is available only to catalogues whose tools are independent, which is another way of saying tool design and latency are the same problem.</p>
@@ -585,7 +586,7 @@ if account is None:
 <tr>
 <td style="text-align: left;">fraud</td>
 <td style="text-align: left;"><code>explain_signal</code></td>
-<td style="text-align: left;">So the model can explain rather than guess</td>
+<td style="text-align: left;">So the model can explain a signal</td>
 </tr>
 <tr>
 <td style="text-align: left;">marketdata</td>

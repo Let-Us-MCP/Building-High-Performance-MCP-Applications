@@ -86,6 +86,13 @@ lint:
 	$(PY) tools/lint_prose.py
 	$(PY) tools/check_refs.py
 	$(PY) tools/check_numbers.py
+	$(PY) tools/check_listings.py
+	$(PY) tools/check_contrastive.py
+
+review:
+	$(PY) tools/review_prose.py --summary
+	$(PY) tools/audit_style.py --deferrals
+	$(PY) tools/check_contrastive.py
 
 lint-all:
 	$(PY) tools/lint_prose.py --warnings

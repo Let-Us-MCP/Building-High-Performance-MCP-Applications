@@ -195,13 +195,17 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 }
 
 class ScopedRiskServer(Server):
-    def visible_tools(self, ctx):
+    &quot;&quot;&quot;The risk server, with per-tool scopes and row-level account access.&quot;&quot;&quot;
+
+    def visible_tools(self, ctx: RequestContext) -&gt; list[Tool]:
+        &quot;&quot;&quot;Override to filter by scope. The set may vary by authorization,
+        never by connection.&quot;&quot;&quot;
         scopes = set((ctx.auth or {}).get(&quot;scopes&quot;, []))
         return [t for t in super().visible_tools(ctx)
                 if not REQUIRED_SCOPE.get(t.name)
                 or REQUIRED_SCOPE[t.name] in scopes]</code></pre>
 <p>Two properties worth noting.</p>
-<p>The filtering happens in <code>visible_tools</code>, so an unauthorized tool is <em>invisible</em> rather than present-and-forbidden. The model never sees it, never plans around it, and never wastes a turn discovering it cannot call it.</p>
+<p>The filtering happens in <code>visible_tools</code>, so an unauthorized tool is <em>invisible</em>. The model never sees it, never plans around it, and never wastes a turn discovering it cannot call it.</p>
 <p>And <code>super()</code> sorts first, so the filtered list stays deterministic and the prompt-cache property from Chapter <a href="ch05.html#ch:tools">5</a> survives.</p>
 <aside class="box threat"><p class="box-title">Threat: Invisible is not the same as protected</p>
 <p>Filtering the catalogue is a usability feature. It is not access control.</p>
@@ -210,7 +214,8 @@ class ScopedRiskServer(Server):
 </section>
 <section id="per-resource" class="level3">
 <h3>Per-resource</h3>
-<pre class="python" data-language="python"><code>@server.template(&quot;meridian://accounts/{account_id}/summary&quot;, ...)
+<pre class="python" data-language="python"><code># sketch: the shipped handler with an authorization check added inline
+@server.template(&quot;meridian://accounts/{account_id}/summary&quot;, ...)
 def account_summary(ctx: RequestContext, uri: str, params: dict):
     account_id = params[&quot;account_id&quot;]
     if not can_read_account(ctx.auth, account_id):
@@ -223,7 +228,8 @@ def account_summary(ctx: RequestContext, uri: str, params: dict):
 <section id="per-request-which-is-row-level-security" class="level3">
 <h3>Per-request, which is row-level security</h3>
 <p>The finest grain, and the one that actually matters for multi-tenant systems.</p>
-<pre class="python" data-language="python"><code>def rank_portfolio_risk(ctx: RequestContext):
+<pre class="python" data-language="python"><code># sketch: the shipped handler with row-level filtering added inline
+def rank_portfolio_risk(ctx: RequestContext):
     ids = ctx.arguments.get(&quot;accountIds&quot;) or []
     # Intersect what was asked for with what this principal may see, before
     # touching the data. The model can request anything; the server decides.
@@ -287,7 +293,7 @@ def account_summary(ctx: RequestContext, uri: str, params: dict):
     leaks across users, and the cost of being wrong is far higher than the cost
     of a few duplicate entries.
     &quot;&quot;&quot;</code></pre>
-<p>That trades some gateway-level sharing of public resources for making a mislabelling bug harmless. For a financial system it is obviously the right trade. Make the choice deliberately rather than inheriting it.</p>
+<p>That trades some gateway-level sharing of public resources for making a mislabelling bug harmless. For a financial system it is obviously the right trade. Make the choice deliberately.</p>
 <pre class="python" data-language="python"><code>def test_private_entries_are_keyed_by_auth_context(self):
     cache = ResultCache()
     result = {&quot;resultType&quot;: &quot;complete&quot;,
@@ -633,7 +639,7 @@ def account_summary(ctx: RequestContext, uri: str, params: dict):
 </table>
 <p>Regenerate every row with <code>make bench</code> and <code>make test</code>.</p>
 </aside>
-<p>Every number is reproducible on your own machine, and every one of them came from a technique in this book rather than from faster hardware.</p>
+<p>Every number is reproducible on your own machine, and every one of them came from a technique in this book.</p>
 </section>
 <section id="what-to-remember" class="level2">
 <h2>What to remember</h2>

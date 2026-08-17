@@ -189,8 +189,7 @@ Three properties make this worth the effort:
 54\,ms of activity inside a 1,366\,ms task and a 1,312\,ms hole nobody can
 explain.
 
-\textbf{Transport and execution are separate spans.} That is the subtraction
-above, done automatically for every call rather than once in a benchmark.
+\textbf{Transport and execution are separate spans.} That is the subtraction above, done automatically for every call.
 
 \textbf{Sibling spans that overlap in time reveal parallelism.} If you fanned
 out, the trace shows it. If you thought you fanned out and did not, the trace

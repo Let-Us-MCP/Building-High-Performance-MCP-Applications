@@ -183,8 +183,8 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <p>Three bets are visible in <code>2026-07-28</code>, and they tell you where this is going.</p>
 <section id="statelessness-as-an-infrastructure-bet" class="level3">
 <h3>Statelessness as an infrastructure bet</h3>
-<p>Deleting the handshake was not a tidying-up exercise. It was a decision that MCP servers should be ordinary web services, deployable on the same infrastructure, scaled by the same tools, operated by the same people.</p>
-<p>Everything followed from it. No sessions, no resumability, no server-initiated requests, MRTR instead of callbacks, explicit handles instead of implicit state. Five deletions and one addition, all serving one idea.</p>
+<p>Deleting the handshake was a decision that MCP servers should be ordinary web services: deployable on the same infrastructure, scaled by the same tools, operated by the same people.</p>
+<p>Everything followed from it. No sessions, no resumability, no server-initiated requests, MRTR in place of callbacks, explicit handles in place of implicit state. Five deletions and one addition, all serving one idea.</p>
 <p>That bet is unlikely to be reversed. It is far easier to add a stateful extension later than to remove statefulness from a core, and the whole point of the extensions framework is that the stateful things now have somewhere to live.</p>
 </section>
 <section id="extensions-as-the-growth-mechanism" class="level3">
@@ -228,8 +228,8 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </tr>
 </tbody>
 </table>
-<p>My read is that these settle rather than merge. MCP owns the agent-to-capability boundary. A2A owns agent-to-agent. Provider-native function calling owns the single-application case where no boundary exists and none is needed.</p>
-<p>Chapter <a href="ch14.html#ch:multi-agent">14</a> showed the composition: an agent that consumes MCP tools on one side and exposes MCP tools on the other is an ordinary thing, and it needed no extension. Whether the peer-to-peer case ends up as A2A or as MCP with another extension is, honestly, a coin flip, and it will be decided by which ecosystem gets there first rather than by which design is better.</p>
+<p>My read is that these settle where they are. MCP owns the agent-to-capability boundary. A2A owns agent-to-agent. Provider-native function calling owns the single-application case where no boundary exists and none is needed.</p>
+<p>Chapter <a href="ch14.html#ch:multi-agent">14</a> showed the composition: an agent that consumes MCP tools on one side and exposes MCP tools on the other is an ordinary thing, and it needed no extension. Whether the peer-to-peer case ends up as A2A or as MCP with another extension is, honestly, a coin flip, and it will be decided by which ecosystem gets there first.</p>
 </section>
 <section id="open-problems" class="level2">
 <h2>Open problems</h2>
@@ -237,7 +237,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <section id="prompt-injection" class="level3">
 <h3>Prompt injection</h3>
 <p>Chapter <a href="ch19.html#ch:threats">19</a> was pessimistic on purpose. There is no known reliable defence, and everything in that chapter was about limiting blast radius rather than preventing the attack.</p>
-<p>The honest position is that this is a property of the technology rather than a bug in anyone’s implementation. Language models process instructions and data in one stream. Until that changes, or until something at the model layer provides a real boundary, the trifecta framing is the best tool available, and it is a mitigation strategy rather than a solution.</p>
+<p>The honest position is that this is a property of the technology. Language models process instructions and data in one stream. Until that changes, or until something at the model layer provides a real boundary, the trifecta framing is the best tool available, and it bounds the damage without preventing the attack.</p>
 <p>If someone solves this properly, a good third of Chapter <a href="ch19.html#ch:threats">19</a> becomes obsolete and I will be delighted.</p>
 </section>
 <section id="standardised-evals" class="level3">
@@ -256,7 +256,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <p>The part I am willing to be held to.</p>
 <p><strong>Round trips will still be the enemy.</strong> It is arithmetic, not fashion. Every extra loop iteration costs a full model turn, and that ratio holds whatever the wire format is.</p>
 <p><strong>Context will still be the scarce resource.</strong> Windows get bigger; so do catalogues, and so do the results people stuff into them. The discipline in Chapter <a href="ch13.html#ch:agent-loop">13</a> outlives any particular limit.</p>
-<p><strong>The host will still be the trust boundary.</strong> It follows from the architecture rather than from a version. Any design where the model is the security boundary is broken, and will still be broken when the models are better.</p>
+<p><strong>The host will still be the trust boundary.</strong> It follows from the architecture itself. Any design where the model is the security boundary is broken, and will still be broken when the models are better.</p>
 <p><strong>Measurement will still beat intuition.</strong> Chapter <a href="ch17.html#ch:optimizing">17</a> included a section on what did not work, and that section is the most durable thing in the chapter. The specific numbers will age. The habit will not.</p>
 <p><strong>Deprecated features will still be deprecated.</strong> Twelve months minimum, published in a registry. That promise is the reason a book can be pinned to a revision at all.</p>
 </section>
@@ -264,8 +264,8 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <h2>What will change</h2>
 <p><strong>The version number</strong>, obviously.</p>
 <p><strong>The extensions.</strong> Tasks and Apps are the first two. There will be more, and some of what is an extension today will be core tomorrow.</p>
-<p><strong>The SDKs.</strong> By the time you read this they will have caught up with <code>2026-07-28</code>, and <code>meridian/protocol/</code> will be a teaching artefact rather than a practical necessity. Use the SDKs. Read the wire when something is confusing, which will be often enough to justify having learned it.</p>
-<p><strong>The dual-era bridge.</strong> Chapter <a href="ch02.html#ch:architecture">2</a> built one because Claude Code and most 2026 clients still open with <code>initialize</code>. That is transitional. When your clients have moved, delete <code>meridian/protocol/legacy.py</code> and enjoy the diff. Building it as a separate wrapper rather than as patches to the core was entirely so that day is a deletion rather than an archaeology project.</p>
+<p><strong>The SDKs.</strong> By the time you read this they will have caught up with <code>2026-07-28</code>, and <code>meridian/protocol/</code> will be a teaching artefact. Use the SDKs. Read the wire when something is confusing, which will be often enough to justify having learned it.</p>
+<p><strong>The dual-era bridge.</strong> Chapter <a href="ch02.html#ch:architecture">2</a> built one because Claude Code and most 2026 clients still open with <code>initialize</code>. That is transitional. When your clients have moved, delete <code>meridian/protocol/legacy.py</code> and enjoy the diff. Building it as a separate wrapper was entirely so that day is a one-line deletion.</p>
 </section>
 <section id="to-the-reader" class="level2">
 <h2>To the reader</h2>

@@ -364,7 +364,7 @@ if self.cost_budget_usd is not None and result.cost_usd &gt; self.cost_budget_us
 <p>The freshness check handles it, but only if you actually check on access rather than on a timer. And there is a second-order problem: what if the catalogue <em>changed</em> in a way that invalidates the plan the model already made?</p>
 <p>Three defences, in increasing order of paranoia:</p>
 <p><strong>Subscribe.</strong> A <code>listChanged</code> notification invalidates immediately, so the window is milliseconds instead of minutes.</p>
-<p><strong>Treat unexpected errors as invalidation signals.</strong> A <code>-32602</code> saying “unknown tool” on a tool you know exists means your catalogue is stale. Refetch and retry once, rather than reporting failure. The specification explicitly permits refetching before TTL expiry when you have reason to believe the data changed.</p>
+<p><strong>Treat unexpected errors as invalidation signals.</strong> A <code>-32602</code> saying “unknown tool” on a tool you know exists means your catalogue is stale. Refetch and retry once. The specification explicitly permits refetching before TTL expiry when you have reason to believe the data changed.</p>
 <p><strong>Re-plan on catalogue change.</strong> If the tools available to a task change mid-task, the plan may no longer be valid. Expensive, and worth it for long autonomous runs.</p>
 </section>
 <section id="cost-guardrails" class="level2">
@@ -413,7 +413,7 @@ def cost_usd(self) -&gt; float:
 </table>
 <p>Note the input column climbing while the output column does not. That is the context filling with tool results, and it is why iteration three costs more than iteration one despite doing less.</p>
 </aside>
-<p>That table is the whole economics of agent loops in six numbers. Input grows monotonically because everything accumulates. Output stays tiny because the model emits a tool call, not an essay. So <strong>your cost is dominated by re-reading what you already read</strong>, and the lever is context management rather than prompting.</p>
+<p>That table is the whole economics of agent loops in six numbers. Input grows monotonically because everything accumulates. Output stays tiny because the model emits a tool call, not an essay. So <strong>your cost is dominated by re-reading what you already read</strong>, and the lever is context management.</p>
 <section id="model-routing" class="level3">
 <h3>Model routing</h3>
 <p>Not every step needs your best model.</p>
@@ -452,7 +452,7 @@ def cost_usd(self) -&gt; float:
 </tr>
 </tbody>
 </table>
-<p>The measurement that matters is the quality/cost frontier, and the honest way to find it is to run your eval suite at each mix rather than to reason about it. It is common to move the majority of turns to a small model and lose nothing measurable, and it is also common to lose a lot, and which one you are in is not predictable from first principles.</p>
+<p>The measurement that matters is the quality/cost frontier, and the honest way to find it is to run your eval suite at each mix. It is common to move the majority of turns to a small model and lose nothing measurable, and it is also common to lose a lot, and which one you are in is not predictable from first principles.</p>
 </section>
 </section>
 <section id="memory-across-sessions" class="level2">

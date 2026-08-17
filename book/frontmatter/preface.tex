@@ -4,27 +4,18 @@
 
 Here is the moment this book was born.
 
-I was watching a demo. Somebody had wired an AI assistant into four internal
-systems, and it worked. Actual work got done, live, in front of people who had
-been promised this for two years. The room was delighted. Then somebody in the
-back asked how long it took, and the presenter said, cheerfully, ``about forty
-seconds,'' and the room stayed delighted, and I sat there thinking: forty
-seconds? For that? The four systems it called were all sub-hundred-millisecond
-services. I had seen their dashboards. Ninety-nine percent of that forty
-seconds went somewhere, and nobody in the room, including the person who built
-it, could tell you where.
+Somebody asked me why their agent took forty seconds to do four things that each
+took a tenth of a second, and I could not tell them. Not because the answer was
+subtle, but because nobody in the room had any instrument that could see where
+the time went. We had a stopwatch and a shrug.
 
-That is the state of the art. We have built a genuinely new kind of software,
-and we are shipping it with roughly the diagnostic sophistication of a 1996 CGI
-script. We know it works. We do not know why it is slow, what it costs, or
-which of the eleven things we could change would matter. We guess. Then we
-rewrite the server in a faster language and save three milliseconds off a forty
-second task, and we feel good about it, because at least rewriting things in
-faster languages is a problem we know how to have.
+I have since watched that same conversation happen at four companies. The
+details differ. The shape never does: a system that works, a number nobody can
+explain, and a team optimising the one layer their existing monitoring happens
+to cover. Chapter~\ref{ch:primer} tells the full story and then takes the forty
+seconds apart.
 
-\bookfig[0.82]{xkcd-roundtrips}{The optimisation everybody does, and the one
-that works. Chapter~\ref{ch:primer} explains why the gap is this large, and
-Chapter~\ref{ch:optimizing} spends thirty pages exploiting it.}{preface-roundtrips}
+This book is the instrument I wanted that afternoon.
 
 \section*{What this book is}
 
@@ -84,9 +75,8 @@ you know is now wrong, and I will point out exactly which fraction as we go.
 
 But the same revision also adopted a formal feature lifecycle: Active,
 Deprecated, Removed, with a minimum twelve-month window between the middle one
-and the last one. That is the first version of MCP that comes with a promise
-about how it will break. It is not a promise that it will not break. It is
-better than that. It is a promise that it will break \emph{slowly and in
+and the last one. That is the first version of MCP that comes with a promise about how it will
+break. MCP will break. The promise is that it will break \emph{slowly and in
 public}, which is the only kind of promise a protocol can honestly make and the
 only kind that lets you plan.
 
@@ -115,8 +105,8 @@ I did not want to write that book, so this one comes with a program.
 Meridian is a financial analytics assistant: four MCP servers, one host, an
 agent loop, a load-test harness, and a measurement rig. It ships in the
 repository. It has no third-party dependencies, which means it also happens to
-be a complete implementation of \texttt{2026-07-28} in about two thousand lines
-of Python, and every listing in this book is lifted from it. When
+be a complete implementation of \texttt{2026-07-28} in about 3,900 lines of
+Python, and every listing in this book is lifted from it. When
 Chapter~\ref{ch:tools} claims a bloated tool catalogue costs you 4,371 extra
 tokens on every model turn, that number came out of
 \texttt{meridian/bench/results.json}, and you can regenerate it with

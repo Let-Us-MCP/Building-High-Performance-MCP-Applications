@@ -122,8 +122,7 @@ transport time, which is the cheap part.
 
 The measurement above shows the split precisely: batching took 1,751\,ms to
 1,067\,ms, and fan-out took 1,067 to 1,014. Batching is thirteen times more
-valuable, and it is the one that depends on your \emph{tool design} rather than
-on your host code.
+valuable, and it is the one that depends on your \emph{tool design}.
 
 \subsection{Prefetch App templates}
 
@@ -256,8 +255,7 @@ Calls to amortise one spawn    & \textasciitilde{}750 \\
 \end{measurebox}
 
 Spawn-per-call is indefensible for anything but a one-shot CLI. Keep a pool,
-size it to your concurrency, and recycle processes on a schedule rather than per
-request.
+size it to your concurrency, and recycle processes on a schedule.
 
 \subsection{Let the gateway route on headers}
 

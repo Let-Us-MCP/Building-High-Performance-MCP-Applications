@@ -164,8 +164,7 @@ neighbours.
 \end{dangerbox}
 
 \textbf{Pagination is a requirement, not a nicety.} Meridian's market-data
-server has 40 benchmark resources and a page size of 25, which forces the
-pagination path to be exercised rather than theoretical:
+server has 40 benchmark resources and a page size of 25, which forces the pagination path to be exercised:
 
 \begin{py}
 def test_marketdata_paginates_its_resource_list(self):
@@ -286,7 +285,7 @@ def cache_key(server, method, params, auth_context):
 That is a deliberate trade. It gives up gateway-level sharing of public
 resources in exchange for making a mislabelling bug harmless. For a financial
 application that is obviously right. For a public documentation server it may
-not be, and you should make the choice consciously rather than inherit mine.
+not be, so make the choice consciously. Do not inherit mine by default.
 
 \subsection{What it is worth}
 
@@ -310,8 +309,8 @@ Cache hit rate                  & 0\,\% & 96.2\,\% \\
 
 \vspace{6pt}
 \footnotesize
-In-process transport, so this measures the caching logic rather than the
-network. Over a real network the ratio is far larger, because the 577 avoided
+In-process transport, so this measures the caching logic with the network taken
+out. Over a real network the ratio is far larger, because the 577 avoided
 requests each avoid a round trip.
 \end{measurebox}
 
@@ -467,8 +466,7 @@ caches each page under its own cursor.
 
 \textbf{Cross-tenant URIs.} Covered above. Authorize on every read.
 
-\textbf{\texttt{cacheScope: public} on anything personalised.} Covered above,
-and it is a data breach rather than a performance bug.
+\textbf{\texttt{cacheScope: public} on anything personalised.} Covered above, and it is a data breach.
 
 \textbf{Returning enormous blobs with no size hint.} The \texttt{size} field
 exists. Populate it. A host that knows a resource is 4\,MB before reading it can

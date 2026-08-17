@@ -284,7 +284,7 @@ def account_summary(ctx: RequestContext, uri: str, params: dict):
 <p><code>meridian://accounts/{id}/summary</code> is fine only if the server checks authorization on every read. If it does not, the URI space <em>is</em> the attack: a model that has seen one account id can construct another, and the identifiers are sequential.</p>
 <p>Two mitigations, and use both. Authorize every read against the caller. And prefer identifiers that are not enumerable, so a leaked one does not imply the neighbours.</p>
 </aside>
-<p><strong>Pagination is a requirement, not a nicety.</strong> Meridian’s market-data server has 40 benchmark resources and a page size of 25, which forces the pagination path to be exercised rather than theoretical:</p>
+<p><strong>Pagination is a requirement, not a nicety.</strong> Meridian’s market-data server has 40 benchmark resources and a page size of 25, which forces the pagination path to be exercised:</p>
 <pre class="python" data-language="python"><code>def test_marketdata_paginates_its_resource_list(self):
     client = Client(InProcessTransport(marketdata.build_server()))
     first = client.call(&quot;resources/list&quot;)
@@ -364,7 +364,7 @@ def account_summary(ctx: RequestContext, uri: str, params: dict):
     leaks across users, and the cost of being wrong is far higher than the cost
     of a few duplicate entries.
     &quot;&quot;&quot;</code></pre>
-<p>That is a deliberate trade. It gives up gateway-level sharing of public resources in exchange for making a mislabelling bug harmless. For a financial application that is obviously right. For a public documentation server it may not be, and you should make the choice consciously rather than inherit mine.</p>
+<p>That is a deliberate trade. It gives up gateway-level sharing of public resources in exchange for making a mislabelling bug harmless. For a financial application that is obviously right. For a public documentation server it may not be, so make the choice consciously. Do not inherit mine by default.</p>
 </section>
 <section id="what-it-is-worth" class="level3">
 <h3>What it is worth</h3>
@@ -383,7 +383,7 @@ Cache hit rate &amp; 0 % &amp; 96.2 %<br />
 &amp; 6.82<span class="math inline">×</span><br />
 </p>
 </div>
-<p>In-process transport, so this measures the caching logic rather than the network. Over a real network the ratio is far larger, because the 577 avoided requests each avoid a round trip.</p>
+<p>In-process transport, so this measures the caching logic with the network taken out. Over a real network the ratio is far larger, because the 577 avoided requests each avoid a round trip.</p>
 </aside>
 <p>Read the middle row again. 577 of 600 requests never happened. On loopback that saves 10 milliseconds. Across a 68 ms cross-region hop it saves 39 seconds.</p>
 </section>
@@ -489,7 +489,7 @@ Cache hit rate &amp; 0 % &amp; 96.2 %<br />
 <p><strong>Dumping a database as resources.</strong> One resource per row, ten thousand rows. The list response alone exhausts the context window. If your resource list is longer than a person would scroll, it should be a template plus a search tool.</p>
 <p><strong>Ignoring pagination.</strong> Both directions. Servers that return everything, and clients that read page one and stop. Meridian’s client walks to the end and caches each page under its own cursor.</p>
 <p><strong>Cross-tenant URIs.</strong> Covered above. Authorize on every read.</p>
-<p><strong><code>cacheScope: public</code> on anything personalised.</strong> Covered above, and it is a data breach rather than a performance bug.</p>
+<p><strong><code>cacheScope: public</code> on anything personalised.</strong> Covered above, and it is a data breach.</p>
 <p><strong>Returning enormous blobs with no size hint.</strong> The <code>size</code> field exists. Populate it. A host that knows a resource is 4 MB before reading it can decide not to, and a host that finds out afterwards has already spent the budget.</p>
 </section>
 <section id="meridians-resources" class="level2">

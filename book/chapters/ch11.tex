@@ -194,51 +194,59 @@ clients that do not read \texttt{structuredContent} still work.
 
 \section{State without sessions}
 
-The pattern from Chapter~\ref{ch:architecture}, built properly.
+Chapter~\ref{ch:architecture} introduced the handle pattern: a server that needs
+to remember something between calls mints an identifier, returns it, and requires
+it back. It also gave the four rules that keep one safe. This section is about
+the part that chapter left out, which is what the code looks like.
+
+The whole mechanism on the server side is a dictionary and an authorization
+check:
 
 \begin{py}
-# --> tools/call
-{ "name": "create_basket", "arguments": {} }
+@server.tool("add_item", "Add an item to an open basket.", ADD_ITEM_SCHEMA)
+def add_item(ctx: RequestContext):
+    basket_id = ctx.arguments["basket_id"]
+    basket = BASKETS.get(basket_id)
 
-# <-- result
-{ "structuredContent": { "basket_id": "bsk_a1b2c3" } }
+    # A handle names an object. It does not grant access to one, so the
+    # caller's authorization is re-checked here on every single call.
+    if basket is None or not can_access(ctx.auth, basket):
+        return tool_error(
+            f"Basket {basket_id} does not exist or has expired. "
+            "Create a new one with create_basket.")
 
-# --> tools/call, later, possibly to a different replica
-{ "name": "add_item", "arguments": { "basket_id": "bsk_a1b2c3", "sku": "..." } }
+    basket.items.append(ctx.arguments["sku"])
+    basket.touched_at = time.time()
+    return {"structuredContent": {"basket_id": basket_id,
+                                  "itemCount": len(basket.items)}}
 \end{py}
 
-From the wire's point of view, \texttt{basket\_id} is a string argument. There is
-no protocol concept of a handle, which is exactly why it works on every client
-and every transport with no negotiation.
+Three details in that handler are doing real work.
 
-Four rules, and each of them is somebody's incident report:
+The authorization check and the existence check produce the \emph{same} error.
+Distinguishing ``this basket is not yours'' from ``this basket does not exist''
+tells an attacker which identifiers are real, which is how you turn a handle
+space into an enumeration oracle.
 
-\begin{table}[htbp]
-\centering
-\small
-\begin{tabularx}{\textwidth}{@{}lX@{}}
-\toprule
-\thead{Rule} & \thead{What goes wrong without it} \\
-\midrule
-Authorize on every call
-  & A handle becomes a bearer token. Anyone who sees one owns the object \\
-Keep it opaque
-  & \texttt{basket\_user42\_20260728} invites enumeration of user 43 \\
-State the lifetime in the creation tool's description
-  & The model cannot see your retention policy anywhere else \\
-Return a clear expiry error
-  & The model retries a dead handle forever instead of making a new one \\
-\bottomrule
-\end{tabularx}
-\caption{Handle design. The first row is the one that turns a convenience into a
-vulnerability.}
-\label{tab:handle-rules}
-\end{table}
+The error is a tool execution error, so the model reads it. And it names the
+recovery: create a new one. Chapter~\ref{ch:tools} argued for this generally;
+here it is the difference between a model that recovers from an expired basket
+and a model that retries a dead identifier until the step budget stops it.
 
-\keyidea{For an authenticated server, a handle is a name, not a capability.
-Re-check authorization against it on every single call. For an unauthenticated
-server the handle \emph{is} a bearer token, so give it real entropy and a
-bounded life.}
+And \texttt{touched\_at} exists because handles need a retention policy, which
+needs to be visible to the model:
+
+\begin{py}
+@server.tool(
+    "create_basket",
+    "Create a shopping basket and return its id. Baskets expire after 24 "
+    "hours of inactivity; pass the id to add_item and checkout.",
+    {"type": "object", "additionalProperties": False},
+)
+\end{py}
+
+That description is the only place the model can learn the lifetime. It is not
+in the schema, it is not in the protocol, and there is nowhere else to put it.
 
 \section{Idempotency, because retries are routine now}
 
@@ -345,7 +353,11 @@ A scope-aware subclass:
 
 \begin{py}
 class ScopedRiskServer(Server):
-    def visible_tools(self, ctx):
+    """The risk server, with per-tool scopes and row-level account access."""
+
+    def visible_tools(self, ctx: RequestContext) -> list[Tool]:
+        """Override to filter by scope. The set may vary by authorization,
+        never by connection."""
         scopes = set((ctx.auth or {}).get("scopes", []))
         return [t for t in super().visible_tools(ctx)
                 if not REQUIRED_SCOPE.get(t.name)
@@ -469,8 +481,8 @@ def test_all_six_cacheable_methods_carry_hints(self):
             self.assertIn(result["cacheScope"], ("public", "private"))
 \end{py}
 
-\texttt{subTest} means one failing method reports as one failure rather than
-aborting the loop, so you see all six.
+\texttt{subTest} means one failing method reports as one failure, so you see all
+six instead of stopping at the first.
 
 \subsection{Pagination that actually terminates}
 
@@ -526,8 +538,7 @@ fails.
 Meridian's risk server, in order:
 
 \begin{enumerate}[leftmargin=1.6em, itemsep=3pt]
-\item \textbf{Construct}, with instructions written for a model rather than for
-a README.
+\item \textbf{Construct}, with instructions written for a model to read.
 \item \textbf{Three tools}, task-shaped: one account, many accounts, and the
 long-running one.
 \item \textbf{MRTR approval} above the exposure threshold, with sealed state.

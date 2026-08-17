@@ -366,7 +366,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 
     return binding.client.call_tool(name, arguments or {}, **kw)</code></pre>
 <p>Two details worth copying.</p>
-<p><strong>A denial returns a tool execution error, not an exception.</strong> The model should learn that the call was refused and adapt, rather than have the loop crash. “The user declined” is information the model can use.</p>
+<p><strong>A denial returns a tool execution error, not an exception.</strong> The model should learn that the call was refused and adapt. “The user declined” is information the model can use.</p>
 <p><strong>Audit before executing.</strong> The record is written whatever happens next, including if the server times out. An audit log that only records successes is not an audit log.</p>
 <section id="parallel-fan-out" class="level3">
 <h3>Parallel fan-out</h3>
@@ -425,7 +425,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
     &quot;&quot;&quot;
     def elicit(self, key: str, params: dict) -&gt; dict:
         return {&quot;action&quot;: &quot;decline&quot;}</code></pre>
-<p>The default declines. That is deliberate: a host that has not been wired up should refuse rather than invent answers on the user’s behalf.</p>
+<p>The default declines. That is deliberate: a host that has not been wired up should refuse. Inventing answers on the user’s behalf is worse than declining.</p>
 </section>
 <section id="task-updates" class="level3">
 <h3>Task updates</h3>
@@ -466,7 +466,8 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <section id="health-and-degradation" class="level2">
 <h2>Health and degradation</h2>
 <p>Servers go down. A host with four of them and one outage should be a host with three working servers.</p>
-<pre class="python" data-language="python"><code>def stats(self) -&gt; dict:
+<pre class="python" data-language="python"><code># sketch: condensed for the page
+def stats(self) -&gt; dict:
     return {
         &quot;servers&quot;: {
             label: {
@@ -482,7 +483,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
     }</code></pre>
 <p>Three degradation rules:</p>
 <p><strong>Drop the tools, keep the host.</strong> An unhealthy server contributes nothing to the catalogue. The model never sees tools it cannot call, so it never plans around them.</p>
-<p><strong>Tell the model, not just the log.</strong> If a capability the user asked for is unavailable, that belongs in the context so the model can say so rather than looping.</p>
+<p><strong>Tell the model, not just the log.</strong> If a capability the user asked for is unavailable, that belongs in the context so the model can say so and stop.</p>
 <p><strong>Reconnect with backoff and jitter.</strong> A dozen hosts reconnecting to a recovering server on a fixed one-second timer is how a recovering server stops recovering.</p>
 </section>
 <section id="building-a-minimal-host" class="level2">
@@ -510,7 +511,7 @@ host.refresh_catalogue()   # parallel
 result = AgentLoop(host, model, max_steps=8,
                    token_budget=60_000,
                    cost_budget_usd=0.50).run(&quot;Full review of ACC-1042.&quot;)</code></pre>
-<p>Every argument there is a decision Chapter <a href="ch13.html#ch:agent-loop">13</a> will justify. The important thing is that they are all in one place, visible, and set to a number rather than to infinity.</p>
+<p>Every argument there is a decision Chapter <a href="ch13.html#ch:agent-loop">13</a> will justify. The important thing is that they are all in one place, visible, and set to a number.</p>
 </section>
 <section id="instrumenting-from-the-start" class="level2">
 <h2>Instrumenting from the start</h2>

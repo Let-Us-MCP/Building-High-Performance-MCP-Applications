@@ -11,7 +11,7 @@ workflow across three teams who were each maintaining their own slightly
 different version of it.
 
 It is also the shortest chapter in Part~II, because the mechanics really are
-simple. The interesting content is organisational rather than technical.
+simple. The interesting content is organisational.
 
 \section{Mechanics}
 
@@ -66,8 +66,7 @@ And \texttt{prompts/get} returns messages, not a string:
 }
 \end{wire}
 
-Messages, plural, with roles. That matters more than it looks. A prompt is not a
-string you interpolate; it is a conversation prefix. You can seed it with a user
+Messages, plural, with roles. That matters more than it looks. A prompt is a conversation prefix, not a string you interpolate. You can seed it with a user
 turn, an assistant turn demonstrating the desired shape, and another user turn,
 which is few-shot prompting delivered as a protocol primitive.
 
@@ -88,8 +87,7 @@ The third control axis, and the one that completes the set:
 
 In practice that usually means slash commands. The user types \texttt{/} and
 gets a list of the prompts every connected server offers. That is the whole UX
-pattern, and it is why prompt names should read like commands rather than like
-function identifiers.
+pattern, and it is why prompt names should read like commands.
 
 \begin{notebox}{``User-controlled'' is about invocation, not authorship}
 The server writes the prompt. The user chooses when to fire it. Those are
@@ -107,10 +105,9 @@ server?
 
 Here is the argument that actually convinced me.
 
-Meridian's compliance server knows things the host does not: that a Suspicious
-Activity Report is due within 30 days of \emph{detection} rather than
-escalation, that corridor risk is rated on counterparty jurisdiction rather than
-booking branch, that a flagged transaction needs a named officer.
+Meridian's compliance server knows things the host does not: that a Suspicious Activity Report is due within 30 days of \emph{detection},
+with the clock starting at detection and not at escalation; that corridor risk
+is rated on the counterparty's jurisdiction and not the booking branch; that a flagged transaction needs a named officer.
 
 If the prompt lives in the host, that knowledge lives in the host, and every host
 that wants to do compliance review has to know compliance. If it lives on the
@@ -130,9 +127,8 @@ brief'' and one said ``be thorough'', and the reports that came out the other
 end were not comparable, which was a problem because comparing them was the
 entire point.
 
-One \texttt{compliance-review} prompt on the compliance server fixed it. Not
-because the prompt was better than the three it replaced, but because there was
-one of it.
+One \texttt{compliance-review} prompt on the compliance server fixed it. The replacement was no better written than the three it replaced. It was simply
+the only one.
 
 \subsection{Because it can be versioned and tested}
 
@@ -186,8 +182,7 @@ def test_second_label_is_what_counts(self):
 
 Why version at all? Because a prompt change alters model behaviour, and when
 output quality shifts on a Tuesday you need to know whether it was the model,
-the data, or somebody's Monday edit to the blueprint. The version in the audit
-log answers that in five seconds instead of a day.
+the data, or somebody's Monday edit to the blueprint. The version in the audit log answers that in five seconds.
 
 \subsection{Breaking versus non-breaking}
 
@@ -221,8 +216,7 @@ You test the parts that are. Three layers, cheapest first.
 
 Does the prompt render? Does it reject missing required arguments? Does the
 rendered text mention the tools it is supposed to invoke? These are ordinary
-unit tests and they catch most regressions, because most regressions are
-somebody breaking the template rather than the model changing its mind.
+unit tests and they catch most regressions, because most regressions are somebody breaking the template.
 
 \begin{py}
 def test_prompt_rejects_missing_required_argument(self):
