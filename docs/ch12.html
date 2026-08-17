@@ -483,8 +483,25 @@ def stats(self) -&gt; dict:
     }</code></pre>
 <p>Three degradation rules:</p>
 <p><strong>Drop the tools, keep the host.</strong> An unhealthy server contributes nothing to the catalogue. The model never sees tools it cannot call, so it never plans around them.</p>
-<p><strong>Tell the model, not just the log.</strong> If a capability the user asked for is unavailable, that belongs in the context so the model can say so and stop.</p>
+<p><strong>Tell the model as well as the log.</strong> If a capability the user asked for is unavailable, that belongs in the context so the model can say so and stop.</p>
 <p><strong>Reconnect with backoff and jitter.</strong> A dozen hosts reconnecting to a recovering server on a fixed one-second timer is how a recovering server stops recovering.</p>
+<p>That rule has two halves and people implement one of them. Backoff fixes the <em>rate</em>: doubling the delay means a client that has been failing for two minutes is no longer asking twelve times a second. What it does not fix is the <em>synchronisation</em>, because every client that noticed the outage at the same moment doubles in lockstep and they all arrive together anyway, just less often.</p>
+<p>Jitter is the half that fixes the synchronisation, and full jitter is the version worth using: sleep a uniform random amount between zero and the current ceiling. The fleet then smears across the whole window. Adding a small wobble to the ceiling keeps everybody clustered at its edge, which is most of the problem still.</p>
+<pre class="python" data-language="python"><code>def next_delay(self, random_fraction: float) -&gt; float:
+    &quot;&quot;&quot;The delay before attempt N. `random_fraction` is uniform in [0, 1).
+
+    Passed in rather than drawn here so the behaviour is testable, and so a
+    caller can substitute a better source.
+    &quot;&quot;&quot;
+    ceiling = min(self.max_seconds, self.base_seconds * (2 ** self.attempt))
+    self.attempt += 1
+    return ceiling * random_fraction</code></pre>
+<p>And the part everybody forgets, which turns a blip into an outage:</p>
+<pre class="python" data-language="python"><code>def reset(self) -&gt; None:
+    &quot;&quot;&quot;Call on a successful connection, or the next outage starts at the
+    ceiling and a one-second blip costs a minute of downtime.&quot;&quot;&quot;
+    self.attempt = 0</code></pre>
+<p>Without that reset, a client that had a bad afternoon three hours ago is still carrying a 60-second ceiling, and the next one-second network hiccup costs it a minute of unavailability for no reason at all.</p>
 </section>
 <section id="building-a-minimal-host" class="level2">
 <h2>Building a minimal host</h2>
@@ -538,7 +555,26 @@ class CallStats:
         traceparent=traceparent,
     )
     return jsonrpc.Request(self.ids.next(), method, body).to_json()</code></pre>
-<p>W3C trace context in <code>_meta</code>, under the reserved <code>traceparent</code> key. One line, and your host-to-server spans join up in whatever tracing backend you already run.</p>
+<p>W3C trace context in <code>_meta</code>, under the reserved <code>traceparent</code> key. That is one line of code and it is the difference between four systems with four sets of logs and one system you can ask a question of.</p>
+<section id="what-a-traceparent-contains" class="level3">
+<h3>What a <code>traceparent</code> contains</h3>
+<p>Distributed tracing rests on one idea: every operation carries an identifier for the whole request and an identifier for its own step, and every call it makes passes those along. Reassembling the tree afterwards is then a matter of grouping by the first and linking by the second.</p>
+<p>W3C Trace Context is the interoperable spelling of that idea, and the whole thing fits in a header-shaped string of four hyphen-separated fields:</p>
+<pre class="text" data-language="text"><code>00-0af7651916cd43dd8448eb211c80319c-00f067aa0ba902b7-01
+|  |                                |                |
+|  |                                |                +- flags: 01 = sampled
+|  |                                +------------------ parent span, 8 bytes
+|  +--------------------------------------------------- trace id, 16 bytes
++------------------------------------------------------ version</code></pre>
+<p>The <strong>trace id</strong> is the same for every operation in one user request, which is what makes “show me everything that happened when Ade asked for that review” a single query. The <strong>parent span id</strong> names the specific operation that made this call, which is what turns a flat list into a tree with causality in it. The <strong>flags</strong> byte carries the sampling decision, made once at the top and honoured all the way down, so you never get a trace that is half recorded.</p>
+<p>Propagation is mechanical. The host has a current span, it writes <code>traceparent</code> into <code>_meta</code> naming that span as the parent, the server reads it and starts its own span underneath, and if the server calls another server it does the same thing again.</p>
+<p>Three keys are reserved for this, and they are the only <code>_meta</code> keys exempt from the reverse-DNS prefix rule from Chapter <a href="ch07.html#ch:prompts">7</a>: <code>traceparent</code>, <code>tracestate</code> for vendor-specific data alongside it, and <code>baggage</code> for arbitrary key-value pairs that ride along the whole trace. The exemption exists because these names were already load-bearing in every tracing library that exists, and renaming them would have bought nothing.</p>
+<aside class="box threat"><p class="box-title">Threat: <code>baggage</code> travels further than you think</p>
+<p><code>baggage</code> propagates to every downstream service, including ones you do not operate, and it is not encrypted.</p>
+<p>Anything you put in it is visible to every server in the call tree. Tenant ids and feature flags are reasonable. User email addresses are a data-sharing decision you probably did not intend to make.</p>
+</aside>
+<p>The payoff for one line of plumbing is that when a task takes 40 seconds, the question “which of my four servers was slow” is answered by opening a trace. The alternative is correlating timestamps across four log files whose clocks disagree.</p>
+</section>
 </section>
 <section id="what-to-remember" class="level2">
 <h2>What to remember</h2>

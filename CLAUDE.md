@@ -79,7 +79,7 @@ Legend: `[ ]` not started · `[~]` drafted · `[x]` drafted + prose-linted + bui
 - [x] `servers/risk`, `servers/compliance`, `servers/fraud`, `servers/marketdata`
 - [x] `host/` — client, connection pool, capability cache, agent loop
 - [x] `bench/` — measurement harness
-- [x] `tests/` — 186 tests, all passing
+- [x] `tests/` — 191 tests, all passing
 - [x] Verified end-to-end with Claude Code (`.mcp.json` + transcript in `meridian/VERIFICATION.md`)
 
 ### Part I — Protocol Fundamentals

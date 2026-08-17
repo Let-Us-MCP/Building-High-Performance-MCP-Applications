@@ -533,5 +533,35 @@ class TestIdempotency(unittest.TestCase):
                          "second")
 
 
+class TestBackoff(unittest.TestCase):
+    def test_ceiling_doubles(self):
+        b = ops.Backoff(base_seconds=1.0)
+        self.assertEqual([round(b.next_delay(1.0)) for _ in range(4)], [1, 2, 4, 8])
+
+    def test_ceiling_is_capped(self):
+        b = ops.Backoff(base_seconds=1.0, max_seconds=10.0)
+        delays = [b.next_delay(1.0) for _ in range(10)]
+        self.assertLessEqual(max(delays), 10.0)
+
+    def test_jitter_spreads_the_fleet(self):
+        """Full jitter, so two clients that failed together do not retry together."""
+        a, c = ops.Backoff(base_seconds=1.0), ops.Backoff(base_seconds=1.0)
+        a.next_delay(0.9)
+        c.next_delay(0.1)
+        self.assertNotEqual(a.next_delay(0.9), c.next_delay(0.1))
+
+    def test_delay_never_exceeds_the_ceiling(self):
+        b = ops.Backoff(base_seconds=2.0)
+        self.assertLessEqual(b.next_delay(0.999), 2.0)
+
+    def test_reset_returns_to_the_base(self):
+        """Or a one-second blip later costs a minute of downtime."""
+        b = ops.Backoff(base_seconds=1.0)
+        for _ in range(6):
+            b.next_delay(1.0)
+        b.reset()
+        self.assertEqual(b.next_delay(1.0), 1.0)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

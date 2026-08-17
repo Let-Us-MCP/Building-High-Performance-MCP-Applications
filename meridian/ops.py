@@ -120,3 +120,45 @@ def drain(server, subscriptions, *, timeout: float = 5.0) -> dict:
         if time.time() > deadline:
             break
     return {"subscriptionsClosed": closed}
+
+
+# ---------------------------------------------------------------------------
+# Reconnection
+# ---------------------------------------------------------------------------
+
+@dataclass
+class Backoff:
+    """Exponential backoff with full jitter, for reconnecting to a server.
+
+    Two mistakes this exists to prevent, and the second one is the expensive
+    one.
+
+    A fixed interval means every client that noticed the outage at the same
+    moment retries at the same moments forever. The server comes back, takes
+    the whole fleet at once, falls over, and the cycle repeats. Doubling the
+    delay fixes the rate; it does not fix the synchronisation, because
+    everybody doubles in lockstep.
+
+    Full jitter fixes the synchronisation: sleep a uniform random amount
+    between zero and the current ceiling, so the fleet smears across the
+    window. It is a one-line change and it is the entire difference between a
+    recovering service and a service that cannot recover.
+    """
+    base_seconds: float = 0.5
+    max_seconds: float = 60.0
+    attempt: int = 0
+
+    def next_delay(self, random_fraction: float) -> float:
+        """The delay before attempt N. `random_fraction` is uniform in [0, 1).
+
+        Passed in rather than drawn here so the behaviour is testable, and so a
+        caller can substitute a better source.
+        """
+        ceiling = min(self.max_seconds, self.base_seconds * (2 ** self.attempt))
+        self.attempt += 1
+        return ceiling * random_fraction
+
+    def reset(self) -> None:
+        """Call on a successful connection, or the next outage starts at the
+        ceiling and a one-second blip costs a minute of downtime."""
+        self.attempt = 0

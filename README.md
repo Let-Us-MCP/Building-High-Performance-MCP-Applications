@@ -21,7 +21,7 @@ and a formal feature-lifecycle policy.
 |---|---|
 | **20 chapters + epilogue**, five parts | ~48,000 words, 312 pages |
 | **[`meridian/`](meridian/)** | A complete `2026-07-28` implementation, no third-party runtime dependencies |
-| **186 tests** | Contract, transport, integration, and dual-era. About two seconds |
+| **191 tests** | Contract, transport, integration, and dual-era. About two seconds |
 | **9 benchmark scenarios** | Every number printed in the book comes from these |
 | **25 figures** | TikZ and matplotlib, generated to PDF and SVG from one source |
 
@@ -34,7 +34,7 @@ reproducible with `make bench`.
 git clone https://github.com/krimler/Building-Awesome-MCP-Apps
 cd Building-Awesome-MCP-Apps
 
-make test      # 186 tests, about two seconds
+make test      # 191 tests, about two seconds
 make bench     # regenerate every measurement in the book
 ```
 
@@ -134,7 +134,7 @@ meridian/        the companion application
   servers/         risk, compliance, fraud, marketdata
   host/            Host, AgentLoop, and a deterministic model stub
   bench/           the measurement harness and results.json
-  tests/           186 tests
+  tests/           191 tests
 docs/            the generated website (GitHub Pages)
 tools/           build, lint, and verification scripts
 ```
