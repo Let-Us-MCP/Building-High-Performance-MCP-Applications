@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 
+from ..audit import AuditChain
 from ..protocol import (
     RequestContext,
     Server,
@@ -31,7 +32,9 @@ from .data import ACCOUNTS, TRANSACTIONS
 SEALER = StateSealer(secret=b"meridian-compliance-demo-key-not-for-production",
                      ttl_seconds=900)
 
-AUDIT_LOG: list[dict] = []
+# Hash-chained, so an attacker who reaches the store cannot quietly edit the
+# record of what they did. `AuditChain.verify` finds the first broken link.
+AUDIT_LOG = AuditChain()
 
 GUIDANCE = {
     "sar-filing": (
@@ -201,7 +204,7 @@ def build_server(*, poisoned: bool = False) -> Server:
     )
     def export_audit_log(ctx: RequestContext):
         limit = int(ctx.arguments.get("limit") or 50)
-        entries = AUDIT_LOG[-limit:]
+        entries = AUDIT_LOG.tail(limit)
         return {"content": [{"type": "text",
                              "text": f"{len(entries)} audit entries."}],
                 "structuredContent": {"entries": entries}, "isError": False}
@@ -256,7 +259,7 @@ def _find_txn(txn_id: str):
 
 def _audit(ctx: RequestContext, tool: str, subject: str, payload: dict) -> None:
     """Append-only, structured, and written for a regulator rather than a debugger."""
-    AUDIT_LOG.append({
+    return AUDIT_LOG.append({
         "tool": tool,
         "subject": subject,
         "principal": (ctx.auth or {}).get("sub", "anonymous"),

@@ -597,5 +597,60 @@ class TestDelegationCycles(unittest.TestCase):
         self.assertEqual(left[-1], right[-1])
 
 
+class TestAuditChain(unittest.TestCase):
+    """"Append-only" is a property you have to build, not one you can assert."""
+
+    def setUp(self):
+        from meridian.audit import GENESIS, AuditChain
+        self.GENESIS = GENESIS
+        self.chain = AuditChain(clock=lambda: 1000.0)
+        for i in range(4):
+            self.chain.append({"tool": "review_transaction", "subject": f"T{i}"})
+
+    def test_an_untouched_chain_verifies(self):
+        ok, bad = self.chain.verify()
+        self.assertTrue(ok)
+        self.assertIsNone(bad)
+
+    def test_the_first_entry_links_to_genesis(self):
+        self.assertEqual(self.chain[0]["previous"], self.GENESIS)
+
+    def test_editing_an_entry_is_detected(self):
+        self.chain[2]["subject"] = "T-forged"
+        ok, bad = self.chain.verify()
+        self.assertFalse(ok)
+        self.assertEqual(bad, 2)
+
+    def test_deleting_an_entry_is_detected(self):
+        """A gap breaks the link, which is the point of chaining."""
+        del self.chain._entries[1]
+        ok, bad = self.chain.verify()
+        self.assertFalse(ok)
+        self.assertEqual(bad, 1)
+
+    def test_reordering_is_detected(self):
+        e = self.chain._entries
+        e[1], e[2] = e[2], e[1]
+        self.assertFalse(self.chain.verify()[0])
+
+    def test_the_head_covers_every_entry(self):
+        """Publishing one digest is what makes the whole log tamper-evident."""
+        head = self.chain.head
+        self.chain[0]["subject"] = "T-forged"
+        self.chain._entries[0]["digest"] = self.chain[0]["digest"]
+        self.assertEqual(head, self.chain._entries[-1]["digest"])
+        self.assertFalse(self.chain.verify()[0])
+
+    def test_appending_moves_the_head(self):
+        before = self.chain.head
+        self.chain.append({"tool": "export_audit_log", "subject": "-"})
+        self.assertNotEqual(before, self.chain.head)
+
+    def test_the_compliance_server_chains_its_log(self):
+        from meridian.servers import compliance
+        ok, _ = compliance.AUDIT_LOG.verify()
+        self.assertTrue(ok)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

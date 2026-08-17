@@ -433,12 +433,40 @@ def rank_portfolio_risk(ctx: RequestContext):
 <section id="properties-not-just-fields" class="level3">
 <h3>Properties, not just fields</h3>
 <ul>
-<li><p><strong>Append-only.</strong> If it can be edited it is a database, not an audit log.</p></li>
+<li><p><strong>Append-only.</strong> If it can be edited it is a database, not an audit log. <a href="#sec:tamper-evident">§20.4.4</a> is about making that true rather than declaring it.</p></li>
 <li><p><strong>Written before the action.</strong> Meridian audits before executing, so the record exists even when the call times out.</p></li>
 <li><p><strong>Independently queryable.</strong> By principal, by subject, by trace, by time.</p></li>
 <li><p><strong>Retained past the incident.</strong> Compromises are found late. A 30-day retention is a 30-day investigation limit.</p></li>
 <li><p><strong>Not the same store as your application data.</strong> An attacker who reaches your database should not thereby reach the record of what they did.</p></li>
 </ul>
+</section>
+<section id="sec:tamper-evident" class="level3">
+<h3>Making “append-only” true</h3>
+<p>That first bullet is the one everybody writes down and nobody implements. A Python list is not append-only. A Postgres table is not append-only. Both are writable by anybody who can write, which includes the attacker whose actions you were recording, and editing the log is what a competent one does on the way out.</p>
+<p>You cannot stop the edit at the storage layer without giving up the ability to write at all. You can make it <em>detectable</em>, which is enough, because an attacker who cannot cover their tracks is an attacker whose intrusion gets reconstructed.</p>
+<p>The mechanism is a hash chain. Each entry carries a digest computed over its own contents and the previous entry’s digest:</p>
+<pre class="python" data-language="python"><code>def digest(entry: dict, previous: str) -&gt; str:
+    &quot;&quot;&quot;Hash one entry together with its predecessor&#39;s digest.
+
+    Serialised with sorted keys, because two encoders that disagree on field
+    order would produce different digests for identical entries and the chain
+    would fail to verify for a reason that has nothing to do with tampering.
+    &quot;&quot;&quot;
+    body = json.dumps(entry, sort_keys=True, separators=(&quot;,&quot;, &quot;:&quot;),
+                      default=str)
+    return hashlib.sha256(f&quot;{previous}{body}&quot;.encode()).hexdigest()</code></pre>
+<p>Every entry now depends on every entry before it. Edit entry 40 and entry 41’s recorded <code>previous</code> no longer matches entry 40’s recomputed digest, and so on to the end. <code>verify</code> walks the chain and reports the first index where it breaks, which is both an alarm and a pointer at what was touched:</p>
+<pre class="python" data-language="python"><code>def test_editing_an_entry_is_detected(self):
+    self.chain[2][&quot;subject&quot;] = &quot;T-forged&quot;
+    ok, bad = self.chain.verify()
+    self.assertFalse(ok)
+    self.assertEqual(bad, 2)</code></pre>
+<p>Deletion and reordering are caught by the same property, which is worth noting because they are the operations a naive integrity check misses. A per-row checksum detects edits and says nothing about a row that is no longer there.</p>
+<p>Now the honest limitation, because a control whose limits you have not stated is a control somebody will over-trust. An attacker who can write to the log can also recompute the whole chain from their edit onward. Verification then passes against a log that lies.</p>
+<p>What closes that is one number. Publish the head digest, which covers every entry beneath it, somewhere the attacker does not control: a different account, a log-shipping pipeline, a customer’s system, an hourly line in a chat channel. Rewriting the chain now requires also rewriting every published head, and the first one they miss is the alarm.</p>
+<aside class="keyidea">
+<p>Chaining is what makes publishing cheap. One digest an hour covers every entry written in that hour, so tamper-evidence costs a cron job rather than a replicated write path.</p>
+</aside>
 </section>
 </section>
 <section id="wrapping-legacy-systems" class="level2">
@@ -630,7 +658,7 @@ def rank_portfolio_risk(ctx: RequestContext):
 </tr>
 <tr>
 <td style="text-align: left;">Tests</td>
-<td colspan="2" style="text-align: right;">200, all passing</td>
+<td colspan="2" style="text-align: right;">208, all passing</td>
 </tr>
 <tr>
 <td style="text-align: left;">Third-party runtime dependencies</td>

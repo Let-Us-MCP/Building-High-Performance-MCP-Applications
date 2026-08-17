@@ -289,7 +289,7 @@ review needs.
 
 \begin{itemize}[leftmargin=1.6em, itemsep=3pt]
 \item \textbf{Append-only.} If it can be edited it is a database, not an audit
-log.
+log. \secref{tamper-evident} is about making that true rather than declaring it.
 \item \textbf{Written before the action.} Meridian audits before executing, so
 the record exists even when the call times out.
 \item \textbf{Independently queryable.} By principal, by subject, by trace, by
@@ -299,6 +299,67 @@ retention is a 30-day investigation limit.
 \item \textbf{Not the same store as your application data.} An attacker who
 reaches your database should not thereby reach the record of what they did.
 \end{itemize}
+
+\subsection{Making ``append-only'' true}
+\label{sec:tamper-evident}
+
+That first bullet is the one everybody writes down and nobody implements. A
+Python list is not append-only. A Postgres table is not append-only. Both are
+writable by anybody who can write, which includes the attacker whose actions you
+were recording, and editing the log is what a competent one does on the way out.
+
+You cannot stop the edit at the storage layer without giving up the ability to
+write at all. You can make it \emph{detectable}, which is enough, because an
+attacker who cannot cover their tracks is an attacker whose intrusion gets
+reconstructed.
+
+The mechanism is a hash chain. Each entry carries a digest computed over its own
+contents and the previous entry's digest:
+
+\begin{py}
+def digest(entry: dict, previous: str) -> str:
+    """Hash one entry together with its predecessor's digest.
+
+    Serialised with sorted keys, because two encoders that disagree on field
+    order would produce different digests for identical entries and the chain
+    would fail to verify for a reason that has nothing to do with tampering.
+    """
+    body = json.dumps(entry, sort_keys=True, separators=(",", ":"),
+                      default=str)
+    return hashlib.sha256(f"{previous}{body}".encode()).hexdigest()
+\end{py}
+
+Every entry now depends on every entry before it. Edit entry 40 and entry 41's
+recorded \texttt{previous} no longer matches entry 40's recomputed digest, and
+so on to the end. \texttt{verify} walks the chain and reports the first index
+where it breaks, which is both an alarm and a pointer at what was touched:
+
+\begin{py}
+def test_editing_an_entry_is_detected(self):
+    self.chain[2]["subject"] = "T-forged"
+    ok, bad = self.chain.verify()
+    self.assertFalse(ok)
+    self.assertEqual(bad, 2)
+\end{py}
+
+Deletion and reordering are caught by the same property, which is worth noting
+because they are the operations a naive integrity check misses. A per-row
+checksum detects edits and says nothing about a row that is no longer there.
+
+Now the honest limitation, because a control whose limits you have not stated is
+a control somebody will over-trust. An attacker who can write to the log can
+also recompute the whole chain from their edit onward. Verification then passes
+against a log that lies.
+
+What closes that is one number. Publish the head digest, which covers every
+entry beneath it, somewhere the attacker does not control: a different account,
+a log-shipping pipeline, a customer's system, an hourly line in a chat channel.
+Rewriting the chain now requires also rewriting every published head, and the
+first one they miss is the alarm.
+
+\keyidea{Chaining is what makes publishing cheap. One digest an hour covers
+every entry written in that hour, so tamper-evidence costs a cron job rather
+than a replicated write path.}
 
 \section{Wrapping legacy systems}
 
@@ -443,7 +504,7 @@ Cost per task         & \$0.0690 & \$0.0086 \\
 Setup requests (20 tasks) & 164 & 8 \\
 Cache hit rate        & 0\,\% & 96.2\,\% \\
 \midrule
-Tests                 & \multicolumn{2}{r}{200, all passing} \\
+Tests                 & \multicolumn{2}{r}{208, all passing} \\
 Third-party runtime dependencies & \multicolumn{2}{r}{0} \\
 \bottomrule
 \end{tabular}

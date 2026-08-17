@@ -32,7 +32,7 @@ slow. That is not a coincidence.}
 \label{tab:test-pyramid}
 \end{table}
 
-Meridian's 200 tests run in 2.3 seconds and use no model at all. The eval suite is separate, slower, and gates deploys.
+Meridian's 208 tests run in 2.3 seconds and use no model at all. The eval suite is separate, slower, and gates deploys.
 
 \keyidea{If your MCP tests are slow, you are testing the model when you meant to
 test the protocol. Push everything you can down a layer.}
@@ -489,7 +489,7 @@ What Meridian gates on, and roughly what I would gate on generally:
 \toprule
 \thead{Gate} & \thead{Checks} & \thead{Runs on} \\
 \midrule
-Unit and contract & 200 tests, no model & every commit \\
+Unit and contract & 208 tests, no model & every commit \\
 Benchmarks        & Round trips and token counts did not regress & every commit \\
 Prose lint        & Em dashes, slop, repetition, listing encodings & every commit \\
 Reference check   & No \texttt{??} in the finished book & every commit \\
@@ -507,7 +507,7 @@ thousand more tokens per turn, and both are invisible to correctness tests and
 obvious to a benchmark that runs on every commit.
 
 \begin{sh}
-make test      # 200 tests, about two seconds
+make test      # 208 tests, about two seconds
 make bench     # regenerates every number in the book
 make lint      # prose rules plus cross-reference integrity
 \end{sh}

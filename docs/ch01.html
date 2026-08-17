@@ -543,13 +543,13 @@ iteration 2   model reads the question + the catalogue + both results
 <p>Reference interest rates. Everything it returns is identical for every caller, which turns out to make it the one place where shared caching genuinely pays.</p>
 </dd>
 </dl>
-<p>Plus an application that drives them, an agent loop, a measurement harness, and 200 tests.</p>
+<p>Plus an application that drives them, an agent loop, a measurement harness, and 208 tests.</p>
 <p>The whole thing has no third-party runtime dependencies, which was a deliberate and slightly obsessive decision. The official SDKs are good and you should use them in production. But they were still shipping the 2025 protocol while this book was being written, and more importantly, a book about the wire that hides the wire behind somebody’s convenience wrapper is not doing its job. So <code>meridian/protocol/</code> is a complete implementation of <code>2026-07-28</code> in about 3,900 lines of standard-library Python. You can read all of it in an evening, and Appendix <a href="appendix-e.html#ch:companion">E</a> suggests an order.</p>
 <section id="try-it-now" class="level3">
 <h3>Try it now</h3>
 <pre class="bash" data-language="bash"><code>git clone https://github.com/krimler/Building-Awesome-MCP-Apps
 cd Building-Awesome-MCP-Apps
-make test     # 200 tests, roughly two seconds
+make test     # 208 tests, roughly two seconds
 make bench    # every number in this book</code></pre>
 <p>It also connects to real clients. This is Claude Code driving three Meridian servers at once:</p>
 <pre class="bash" data-language="bash"><code>claude -p &quot;Assess ACC-1042 for risk, screen it for fraud, and get the 1Y and

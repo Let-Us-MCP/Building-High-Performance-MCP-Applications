@@ -473,7 +473,7 @@ StdioServerTransport(endpoint).serve_forever()</code></pre>
 <section id="contract-tests" class="level2">
 <h2>Contract tests</h2>
 <p>A server without contract tests is a server that conforms to the specification today.</p>
-<p>Meridian has 200 tests, and the ones in this section are the ones I would write first for any new server. They assert on the wire, not on convenience objects, because the wire is what another implementation has to interoperate with.</p>
+<p>Meridian has 208 tests, and the ones in this section are the ones I would write first for any new server. They assert on the wire, not on convenience objects, because the wire is what another implementation has to interoperate with.</p>
 <section id="the-envelope" class="level3">
 <h3>The envelope</h3>
 <pre class="python" data-language="python"><code>def test_request_without_protocol_version_is_rejected(self):
