@@ -123,7 +123,7 @@ Legend: `[ ]` not started · `[~]` drafted · `[x]` drafted + prose-linted + bui
 ### Publish
 - [x] Full PDF builds clean
 - [x] Site builds
-- [ ] Pushed to GitHub + Pages enabled
+- [x] Pushed to GitHub + Pages enabled
 
 ---
 
