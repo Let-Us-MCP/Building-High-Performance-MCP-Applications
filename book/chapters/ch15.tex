@@ -32,7 +32,7 @@ slow. That is not a coincidence.}
 \label{tab:test-pyramid}
 \end{table}
 
-Meridian's 196 tests run in 2.3 seconds and use no model at all. The eval suite is separate, slower, and gates deploys.
+Meridian's 200 tests run in 2.3 seconds and use no model at all. The eval suite is separate, slower, and gates deploys.
 
 \keyidea{If your MCP tests are slow, you are testing the model when you meant to
 test the protocol. Push everything you can down a layer.}
@@ -287,6 +287,38 @@ Evals are not tests. They are a \emph{regression suite for behaviour}, and they
 have properties tests do not: they are slow, they cost money, they are
 non-deterministic, and their result is a score.
 
+\subsection{Why you cannot just turn determinism on}
+
+The usual first reaction is to set temperature to 0 and expect the problem to go
+away. It is worth understanding why that does not work, because the belief that
+it should is what produces a flaky suite everybody eventually ignores.
+
+Temperature controls how the next token is sampled from the model's output
+distribution. At temperature 0 the sampler takes the highest-probability token
+every time, which removes the deliberate randomness. Two sources of variation
+survive it.
+
+\textbf{Floating-point addition is not associative.} Summing the same numbers in
+a different order gives slightly different results. On a GPU the order depends on
+how work was split across threads, which depends on batch size, which depends on
+who else is being served at that moment. When two tokens are nearly tied, a
+difference in the twelfth decimal place picks a different winner, and the whole
+continuation diverges from there.
+
+\textbf{The provider's system changes underneath you.} Model versions, serving
+stacks, quantisation, and routing all move without your involvement. A suite
+that assumed byte-identical output was going to break on a Tuesday regardless.
+
+So temperature 0 narrows the distribution without collapsing it. Which is why
+the habits below are about tolerating variance: run several times and threshold
+the rate, assert on structure, and gate on movement.
+
+There is a bright side, and it is the reason for the pyramid at the top of this
+chapter. Every layer except the last is genuinely deterministic, because none of
+it involves a model. So when your suite is flaky, the first question to ask is why the flaky
+assertion is at the eval layer at all. Most of them belong two layers down,
+where the answer is a fact about your code and does not move.
+
 \subsection{What to measure}
 
 \begin{table}[htbp]
@@ -352,9 +384,10 @@ suite will notice.
 
 Non-determinism makes naive assertions flaky. Three habits fix most of it:
 
-\textbf{Assert on structure. ``The answer contains 55.4'' is stable; ``the answer says
-the account is elevated risk'' is not.} ``The answer contains 55.4'' is stable.
-``The answer says the account is elevated risk'' is not.
+\textbf{Assert on structure.} ``The answer contains 55.4'' is stable, because the
+number came from your server and the model is quoting it. ``The answer says the
+account is elevated risk'' is not, because there are twenty ways to say that and
+the model will use a different one next week.
 
 \textbf{Run N times, threshold the rate.} A case that passes 19 of 20 times is
 passing. Requiring 20 of 20 is requiring determinism you were told you would not
@@ -386,8 +419,8 @@ else means the server is broken in a more interesting way.
 \subsection{``Everything times out on stdio''}
 
 Something wrote to \texttt{stdout}. Check for a \texttt{print()}, a library
-banner, or a warning. The tell is that the client hangs rather than erroring:
-your line was consumed as a malformed message and no response was ever produced.
+banner, or a warning. The tell is that the client hangs instead of reporting an error: your line was
+consumed as a malformed message and no response was ever produced.
 
 \begin{sh}
 python3 -m meridian.serve risk < /dev/null 2>/dev/null | head -c 200
@@ -456,7 +489,7 @@ What Meridian gates on, and roughly what I would gate on generally:
 \toprule
 \thead{Gate} & \thead{Checks} & \thead{Runs on} \\
 \midrule
-Unit and contract & 196 tests, no model & every commit \\
+Unit and contract & 200 tests, no model & every commit \\
 Benchmarks        & Round trips and token counts did not regress & every commit \\
 Prose lint        & Em dashes, slop, repetition, listing encodings & every commit \\
 Reference check   & No \texttt{??} in the finished book & every commit \\
@@ -474,7 +507,7 @@ thousand more tokens per turn, and both are invisible to correctness tests and
 obvious to a benchmark that runs on every commit.
 
 \begin{sh}
-make test      # 196 tests, about two seconds
+make test      # 200 tests, about two seconds
 make bench     # regenerates every number in the book
 make lint      # prose rules plus cross-reference integrity
 \end{sh}

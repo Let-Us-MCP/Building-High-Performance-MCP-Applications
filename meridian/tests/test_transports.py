@@ -381,5 +381,68 @@ class TestStdio(unittest.TestCase):
         self.assertIsNotNone(transport._proc.poll())
 
 
+class TestConnectionPool(unittest.TestCase):
+    """HTTP/1.1 carries one request per connection at a time."""
+
+    def setUp(self):
+        self.server = StreamableHttpServer(build(), port=0).start()
+
+    def tearDown(self):
+        self.server.stop()
+
+    def test_sequential_calls_reuse_one_connection(self):
+        transport = StreamableHttpClient(self.server.url)
+        client = Client(transport, server_label="wire")
+        for _ in range(5):
+            client.call_tool("echo", {"text": "x"})
+        self.assertEqual(transport.new_connections, 1)
+        self.assertGreaterEqual(transport.reused_connections, 4)
+        transport.close()
+
+    def test_parallel_calls_to_one_server_do_not_serialise(self):
+        """A single shared connection would make the host's fan-out sequential."""
+        transport = StreamableHttpClient(self.server.url, max_connections=4)
+        client = Client(transport, server_label="wire")
+        client.call_tool("echo", {"text": "warm"})
+
+        barrier = threading.Barrier(3, timeout=10)
+
+        def call():
+            barrier.wait()
+            client.call_tool("echo", {"text": "x"})
+
+        threads = [threading.Thread(target=call) for _ in range(3)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(10)
+
+        # Three requests genuinely in flight together needed more than the one
+        # warm connection, so the pool must have opened more.
+        self.assertGreater(transport.new_connections, 1)
+        transport.close()
+
+    def test_the_pool_is_bounded(self):
+        transport = StreamableHttpClient(self.server.url, max_connections=2)
+        client = Client(transport, server_label="wire")
+        threads = [threading.Thread(
+            target=lambda: client.call_tool("echo", {"text": "x"}))
+            for _ in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(10)
+        self.assertLessEqual(transport.new_connections, 2)
+        transport.close()
+
+    def test_close_empties_the_pool(self):
+        transport = StreamableHttpClient(self.server.url)
+        client = Client(transport, server_label="wire")
+        client.call_tool("echo", {"text": "x"})
+        transport.close()
+        self.assertEqual(transport._idle, [])
+
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -385,6 +385,45 @@ class Iteration:
 <aside class="keyidea">
 <p>Report p50, p95, and p99. A mean of 40 ms with a p99 of 4 s is a system where one user in a hundred thinks you are broken, and the mean will never tell you.</p>
 </aside>
+<section id="tail-amplification-which-is-why-fan-out-needs-watching" class="level3">
+<h3>Tail amplification, which is why fan-out needs watching</h3>
+<p>There is a second-order effect here that agent systems run into harder than ordinary services, and it follows from the parallel fan-out this book keeps recommending.</p>
+<p>A fan-out finishes when its <em>slowest</em> branch finishes. So the task’s latency is the maximum over its branches, and maxima are governed by tails.</p>
+<p>Take three independent servers, each with a p99 of two seconds. A task calling all three in parallel is slow whenever <em>any</em> of them is slow. The chance that none is in its slow 1 % is <span class="math inline">0.99<sup>3</sup></span>, about 97 %, so roughly 3 % of tasks hit a two-second branch. What was a one-in-a-hundred event at the server became a one-in-thirty event at the task.</p>
+<p>Widen the fan-out and it gets worse quickly:</p>
+<table>
+<tbody>
+<tr>
+<td style="text-align: right;"><strong>Parallel calls</strong></td>
+<td style="text-align: right;"><strong>Tasks hitting a p99 branch</strong></td>
+<td style="text-align: right;"><strong>Effectively</strong></td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">1.0 %</td>
+<td style="text-align: right;">p99</td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">3.0 %</td>
+<td style="text-align: right;">p97</td>
+</tr>
+<tr>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">9.6 %</td>
+<td style="text-align: right;">p90</td>
+</tr>
+<tr>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">33.1 %</td>
+<td style="text-align: right;">p67</td>
+</tr>
+</tbody>
+</table>
+<p>Arithmetic, assuming independence: <span class="math inline">1 − 0.99<sup><em>n</em></sup></span>. Real branches correlate, so treat this as the optimistic case.</p>
+<p>Read the last row against Chapter <a href="ch05.html#ch:tools">5</a>’s advice to add batch tools. A 40-account portfolio review fanned out as 40 parallel calls hits a p99 branch in a third of all tasks. The same review through <code>rank_portfolio_risk</code> is one call and hits it in one task in a hundred. Batching is a tail-latency optimisation as much as a token one, and that is the argument nobody makes for it.</p>
+<p>Two practical consequences. Your server’s p99 is your task’s typical experience once you fan out past a handful of branches, so it deserves the attention people reserve for the mean. And a hedge, sending a duplicate request when one branch passes a threshold, buys more in an agent system than in ordinary RPC, because the branch you are waiting on is holding up a model turn behind it.</p>
+</section>
 </section>
 <section id="instrumenting-the-client" class="level2">
 <h2>Instrumenting the client</h2>

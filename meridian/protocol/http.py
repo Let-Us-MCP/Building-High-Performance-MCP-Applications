@@ -486,7 +486,8 @@ class _ClientGone(Exception):
 class StreamableHttpClient:
     """The client half. Keeps connections warm, because handshakes are not free."""
 
-    def __init__(self, url: str, *, token: str | None = None, timeout: float = 30.0):
+    def __init__(self, url: str, *, token: str | None = None, timeout: float = 30.0,
+                 max_connections: int = 6):
         from urllib.parse import urlparse
 
         parsed = urlparse(url)
@@ -497,23 +498,45 @@ class StreamableHttpClient:
         self.scheme = parsed.scheme
         self.token = token
         self.timeout = timeout
-        self._conn = None
+        self.max_connections = max(1, max_connections)
+        self._idle: list = []
         self._lock = threading.Lock()
+        self._slots = threading.Semaphore(self.max_connections)
         self.reused_connections = 0
         self.new_connections = 0
 
-    def _connection(self):
-        """Reuse the connection. HTTP/1.1 keep-alive is the cheapest win in the
-        whole transport and costs one line of bookkeeping."""
+    def _acquire(self):
+        """Take an idle connection, or make one.
+
+        A pool rather than a single connection, because HTTP/1.1 has no
+        multiplexing: one connection carries one request at a time, so three
+        parallel tool calls sharing one connection run in sequence and the
+        fan-out buys nothing. The pool is what makes the host's parallel path
+        parallel when every call goes to the same server.
+        """
         import http.client
 
-        if self._conn is not None:
-            self.reused_connections += 1
-            return self._conn
-        cls = http.client.HTTPSConnection if self.scheme == "https" else http.client.HTTPConnection
-        self._conn = cls(self.host, self.port, timeout=self.timeout)
-        self.new_connections += 1
-        return self._conn
+        self._slots.acquire()
+        with self._lock:
+            if self._idle:
+                self.reused_connections += 1
+                return self._idle.pop()
+            self.new_connections += 1
+        cls = (http.client.HTTPSConnection if self.scheme == "https"
+               else http.client.HTTPConnection)
+        return cls(self.host, self.port, timeout=self.timeout)
+
+    def _release(self, conn, *, reusable: bool = True) -> None:
+        """Return a connection to the pool, or discard it."""
+        if reusable and conn is not None:
+            with self._lock:
+                self._idle.append(conn)
+        elif conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+        self._slots.release()
 
     def _headers(self, message: dict, tool_schema: dict | None = None) -> dict:
         method = message.get("method", "")
@@ -546,15 +569,20 @@ class StreamableHttpClient:
         body = jsonrpc.encode(message).encode("utf-8")
         headers = self._headers(message, tool_schema)
 
-        with self._lock:
-            conn = self._connection()
+        conn = self._acquire()
+        try:
             try:
                 conn.request("POST", self.path, body=body, headers=headers)
                 resp = conn.getresponse()
             except (http.client.HTTPException, OSError):
                 # A dropped keep-alive is normal. Reconnect once and retry.
-                self._conn = None
-                conn = self._connection()
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+                cls = (http.client.HTTPSConnection if self.scheme == "https"
+                       else http.client.HTTPConnection)
+                conn = cls(self.host, self.port, timeout=self.timeout)
                 conn.request("POST", self.path, body=body, headers=headers)
                 resp = conn.getresponse()
 
@@ -567,21 +595,23 @@ class StreamableHttpClient:
                         break
                     if on_notification:
                         on_notification(msg)
-                # The stream is single-use; do not try to reuse the connection.
-                self._conn = None
-                try:
-                    conn.close()
-                except Exception:
-                    pass
+                # The stream is single-use; do not put it back in the pool.
+                self._release(conn, reusable=False)
+                conn = None
                 if final is None:
                     raise ConnectionError("stream ended before a response arrived")
                 return final
 
             payload = resp.read()
-            if resp.getheader("Connection", "").lower() == "close":
-                self._conn = None
-                conn.close()
+            reusable = resp.getheader("Connection", "").lower() != "close"
+            self._release(conn, reusable=reusable)
+            conn = None
             return jsonrpc.parse_message(payload)
+        except BaseException:
+            if conn is not None:
+                self._release(conn, reusable=False)
+                conn = None
+            raise
 
     def listen(self, message: dict, on_notification: Callable[[dict], None],
                stop: threading.Event | None = None) -> None:
@@ -604,9 +634,9 @@ class StreamableHttpClient:
 
     def close(self) -> None:
         with self._lock:
-            if self._conn is not None:
-                try:
-                    self._conn.close()
-                except Exception:
-                    pass
-                self._conn = None
+            idle, self._idle = self._idle, []
+        for conn in idle:
+            try:
+                conn.close()
+            except Exception:
+                pass

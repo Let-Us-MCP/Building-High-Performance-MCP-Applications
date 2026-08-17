@@ -246,6 +246,56 @@ def percentile(self, p: float) -> float:
 system where one user in a hundred thinks you are broken, and the mean will never
 tell you.}
 
+\subsection{Tail amplification, which is why fan-out needs watching}
+
+There is a second-order effect here that agent systems run into harder than
+ordinary services, and it follows from the parallel fan-out this book keeps
+recommending.
+
+A fan-out finishes when its \emph{slowest} branch finishes. So the task's latency
+is the maximum over its branches, and maxima are governed by tails.
+
+Take three independent servers, each with a p99 of two seconds. A task calling
+all three in parallel is slow whenever \emph{any} of them is slow. The chance
+that none is in its slow 1\,\% is $0.99^3$, about 97\,\%, so roughly 3\,\% of
+tasks hit a two-second branch. What was a one-in-a-hundred event at the server
+became a one-in-thirty event at the task.
+
+Widen the fan-out and it gets worse quickly:
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{@{}rrr@{}}
+\toprule
+\thead{Parallel calls} & \thead{Tasks hitting a p99 branch} & \thead{Effectively} \\
+\midrule
+1  & 1.0\,\%  & p99 \\
+3  & 3.0\,\%  & p97 \\
+10 & 9.6\,\%  & p90 \\
+40 & 33.1\,\% & p67 \\
+\bottomrule
+\end{tabular}
+\vspace{6pt}
+\footnotesize
+
+Arithmetic, assuming independence: $1 - 0.99^{n}$. Real branches correlate, so
+treat this as the optimistic case.
+\end{table}
+
+Read the last row against Chapter~\ref{ch:tools}'s advice to add batch tools. A
+40-account portfolio review fanned out as 40 parallel calls hits a p99 branch in
+a third of all tasks. The same review through \texttt{rank\_portfolio\_risk} is
+one call and hits it in one task in a hundred. Batching is a tail-latency
+optimisation as much as a token one, and that is the argument nobody makes for
+it.
+
+Two practical consequences. Your server's p99 is your task's typical experience
+once you fan out past a handful of branches, so it deserves the attention people
+reserve for the mean. And a hedge, sending a duplicate request when one branch
+passes a threshold, buys more in an agent system than in ordinary RPC, because
+the branch you are waiting on is holding up a model turn behind it.
+
 \section{Instrumenting the client}
 
 \begin{py}

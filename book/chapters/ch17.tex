@@ -219,28 +219,68 @@ The smallest category, included because it is cheap and because people ask.
 \subsection{Reuse connections}
 
 \begin{py}
-def _connection(self):
-    """Reuse the connection. HTTP/1.1 keep-alive is the cheapest win in the
-    whole transport and costs one line of bookkeeping."""
-    if self._conn is not None:
-        self.reused_connections += 1
-        return self._conn
-    ...
-\end{py}
-
-\begin{py}
-def test_connection_is_reused(self):
-    transport = StreamableHttpClient(self.url)
+def test_sequential_calls_reuse_one_connection(self):
+    transport = StreamableHttpClient(self.server.url)
     client = Client(transport, server_label="wire")
     for _ in range(5):
         client.call_tool("echo", {"text": "x"})
     self.assertEqual(transport.new_connections, 1)
     self.assertGreaterEqual(transport.reused_connections, 4)
+    transport.close()
 \end{py}
 
 On loopback this saves almost nothing. Over TLS to another region it saves a TCP
 handshake plus a TLS handshake per call, which is two extra round trips, which at
 68\,ms each is 136\,ms you were about to pay repeatedly.
+
+\subsection{One connection is not enough, and this one bit me}
+
+Reuse the connection, and then notice what you have built. HTTP/1.1 carries one
+request at a time per connection: the next request cannot start until the
+previous response has been read. That is head-of-line blocking, and it is why a
+browser opens six connections per origin.
+
+Now put that under the parallel fan-out this chapter recommends. A host that
+issues three tool calls concurrently, all to the same server, through one warm
+keep-alive connection, gets three requests queued behind each other. The fan-out
+code runs, the threads start, and the wall clock is the sum. The optimisation is
+present, measurable in the code, and worth zero.
+
+Meridian had exactly this shape, and the book's 2.8$\times$ fan-out figure hid it
+in plain sight, because that measurement fans out across \emph{different}
+servers, each with its own client and its own connection. Every number in this
+book is honest and the reader fanning out to one server would have got nothing.
+
+The fix is a pool:
+
+\begin{py}
+def _acquire(self):
+    """Take an idle connection, or make one.
+
+    A pool rather than a single connection, because HTTP/1.1 has no
+    multiplexing: one connection carries one request at a time, so three
+    parallel tool calls sharing one connection run in sequence and the
+    fan-out buys nothing. The pool is what makes the host's parallel path
+    parallel when every call goes to the same server.
+    """
+\end{py}
+
+Bounded, because unbounded is its own failure: a host that opens a connection per
+concurrent call will exhaust file descriptors on the client and connection slots
+on the server, and does so first during the traffic spike you built the fan-out
+for. Six is the number browsers settled on and it is a reasonable default.
+
+\begin{notebox}{HTTP/2 makes this disappear}
+HTTP/2 multiplexes many streams over one connection, so the pool becomes
+unnecessary and the head-of-line blocking moves down to the TCP layer, where a
+lost packet stalls every stream sharing the connection. HTTP/3 fixes that in
+turn by running over QUIC.
+
+Meridian is HTTP/1.1 because it is built on the standard library and the point
+was to show the protocol rather than the plumbing. If your deployment already
+speaks HTTP/2 end to end, you get the concurrency for free and can set the pool
+to one.
+\end{notebox}
 
 \subsection{Warm pools for stdio}
 
