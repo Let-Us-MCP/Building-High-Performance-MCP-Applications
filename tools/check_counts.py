@@ -69,7 +69,13 @@ def book_text() -> str:
 # Any number in this range that appears next to the word "tests" is claiming to
 # be the test count. Anything else is a different fact that happens to be a
 # number, so the pattern has to be anchored on the word.
-TEST_CLAIM = re.compile(r"\b(\d{2,4})\s*(?:\\,)?\s*tests\b", re.IGNORECASE)
+#
+# Except when it is quoted. Prose that discusses a wrong count — this file's own
+# docstring, the notes recording that the book once said "134 tests" — is
+# reporting the string rather than claiming it, and a checker that cannot tell
+# the difference makes writing about its own findings impossible.
+TEST_CLAIM = re.compile(
+    r"""(?<!["'`])\b(\d{2,4})\s*(?:\\,)?\s*tests\b(?!["'`])""", re.IGNORECASE)
 FILES_CLAIM = re.compile(r"tests across (\w+) files", re.IGNORECASE)
 
 WORDS = {"two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7,
