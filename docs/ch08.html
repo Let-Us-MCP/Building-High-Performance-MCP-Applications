@@ -336,11 +336,27 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
                              separators=(&quot;,&quot;, &quot;:&quot;)).encode()
         return (f&quot;{self.VERSION}.{self._b64e(payload)}&quot;
                 f&quot;.{self._b64e(self._mac(payload))}&quot;)</code></pre>
-<p>Four bindings, each closing one door:</p>
+<section id="what-a-mac-is-and-why-the-comparison-is-the-interesting-part" class="level3">
+<h3>What a MAC is, and why the comparison is the interesting part</h3>
+<p>A message authentication code is a short tag computed from a message and a secret key. Anyone holding the key can compute the tag and check it; anyone without the key cannot produce a valid one for a message they invented. So the tag proves two things at once: that the message was written by a holder of the key, and that nobody has changed a byte since.</p>
+<p>It is not encryption. The payload here is base64, which is an encoding anybody can reverse in one line. Whoever holds the token can read what is inside it, which is exactly why the docstring says to put correlation data in there and never secrets.</p>
+<p>The obvious construction, hash the key concatenated with the message, is broken against certain hash functions by length-extension attacks: an attacker who has one valid tag can compute a valid tag for a longer message without knowing the key. HMAC exists to close that. It hashes twice, with two derived keys, and the construction is old, boring, and available in every standard library. Use it rather than inventing something.</p>
+<p>The subtle part is the comparison, and Meridian uses <code>hmac.compare_digest</code> where <code>==</code> would look fine:</p>
+<pre class="python" data-language="python"><code>if not hmac.compare_digest(mac, self._mac(payload)):
+    raise StateTampered()</code></pre>
+<p>An ordinary string comparison returns as soon as it finds a byte that differs. That makes its running time depend on how many leading bytes matched, and that dependency is information. An attacker who can send many candidate tokens and time the responses can learn the first byte of the correct tag, then the second, because a guess with one more correct byte comes back measurably later. That turns forging a 32-byte tag from 2<sup>256</sup> guesses into roughly <span class="math inline">32 × 256</span> of them, which is a few thousand requests.</p>
+<p>A constant-time comparison looks at every byte regardless and returns a single answer at the end, so the timing carries nothing. The difference between the two functions is invisible in every test you will write and is the entire security of the check.</p>
+<aside class="box note"><p class="box-title">The <code>v1.</code> prefix is for key rotation</p>
+<p>Meridian’s format is <code>v1.&lt;payload&gt;.&lt;mac&gt;</code>, and <code>open</code> rejects anything whose first component is not <code>v1</code>.</p>
+<p>That prefix is how you change the signing key or the algorithm later without a flag day. A server can accept <code>v1</code> and <code>v2</code> for a transition window while minting only <code>v2</code>, and states in flight keep working. Without it, rotating the key means every half-completed approval in the world fails at the same instant, and you find out how many there were.</p>
+</aside>
+</section>
+<section id="four-bindings-each-closing-one-door" class="level3">
+<h3>Four bindings, each closing one door</h3>
 <dl>
 <dt>The MAC</dt>
 <dd>
-<p>stops tampering. Verified in constant time, so a timing oracle cannot walk the signature out of you.</p>
+<p>stops tampering, and stops it whether the client edited the payload deliberately or a proxy mangled it by accident.</p>
 </dd>
 <dt><code>sub</code>, the principal</dt>
 <dd>
@@ -395,6 +411,7 @@ self.assertIn(&quot;structuredContent&quot;, third[&quot;result&quot;])</code></
 <p>If an operation must happen at most once (a payment, a one-time redemption), the server has to track consumption itself. There is no protocol feature that will do it for you, and the specification says so explicitly.</p>
 </aside>
 <p>Two more rules that fall out of the format. Sign with a secret shared across your fleet, not a per-process one, or a retry that lands on another replica cannot open state its sibling sealed. And put no secrets inside: HMAC gives integrity, not confidentiality, and anyone holding the blob can read it.</p>
+</section>
 </section>
 <section id="elicitation" class="level2">
 <h2>Elicitation</h2>
@@ -485,6 +502,9 @@ if not approver:
 <li><p>Must open it where neither the client nor the model can inspect the contents. On iOS that means <code>SFSafariViewController</code>, not <code>WKWebView</code>.</p></li>
 <li><p>Should highlight the domain, and warn on Punycode.</p></li>
 </ul>
+<p>That last one needs unpacking, because it is the rule most likely to be skipped by somebody who does not know what it refers to. Domain names are ASCII on the wire, so internationalised domains are encoded into ASCII by a scheme called Punycode and marked with an <code>xn--</code> prefix. <code>münchen.example</code> travels as <code>xn--mnchen-3ya.example</code>.</p>
+<p>The attack is that many Unicode characters are visually identical to ASCII ones. Cyrillic small A, U+0430, renders identically to Latin <code>a</code> in nearly every font, and Greek omicron is indistinguishable from Latin <code>o</code>. So an attacker registers a domain that displays as <code>meridian.example</code> in your UI, character for character, with one of those substitutions inside it, and it is a different domain entirely. A user checking the URL carefully, doing exactly what you asked of them, sees the right thing.</p>
+<p>The mitigation is to show the encoded form when a domain contains mixed scripts, so the user sees <code>xn--meridin-...</code> and knows something is off. Most browsers do this already. A client rendering a server-supplied URL in its own trusted chrome has taken on the browser’s job here.</p>
 <aside class="box threat"><p class="box-title">Threat: The URL-mode phishing attack</p>
 <p>Alice, a legitimate user of a benign server, triggers a URL-mode elicitation that starts a third-party OAuth flow. Her client shows the link. Instead of clicking it, Alice sends it to Bob. Bob opens it, authorizes, and believes he has connected his own account. The server receives the callback, assumes it belongs to Alice’s pending elicitation, and binds <em>Bob’s</em> third-party tokens to <em>Alice’s</em> identity.</p>
 <p>The fix is that the server must verify that the user who <em>opens</em> the URL is the user for whom it was minted. In practice: point the elicitation at your own <code>/connect</code> route, check a session cookie against the <code>sub</code> claim from your authorization server, and only then redirect onward.</p>
@@ -543,7 +563,7 @@ if not approver:
 <h3>Four ways to not need it</h3>
 <p><strong>Put it in the schema.</strong> The best elicitation is the one that never happens. If a tool always needs an approver for large exposures, make <code>approver</code> an optional argument and let the model supply it when the user already said it. Zero round trips when it works.</p>
 <p><strong>Ask for everything at once.</strong> <code>inputRequests</code> is a map. Three questions in one interim result cost one round trip; three separate interim results cost three.</p>
-<p><strong>Ask early, not late.</strong> An elicitation on step one of a five-step task costs one model turn. On step four, it costs a model turn plus the risk that the user has wandered off and the context has gone stale.</p>
+<p><strong>Ask early.</strong> An elicitation on step one of a five-step task costs one model turn. On step four, it costs a model turn plus the risk that the user has wandered off and the context has gone stale.</p>
 <p><strong>Consider whether you need to ask at all.</strong> Chapter <a href="ch05.html#ch:tools">5</a> put it as a question: should the tool schema have captured this? Often yes. The elicitation is sometimes a symptom of a tool that was designed around an existing API rather than around the task.</p>
 <table id="tab:ask-who">
 <caption>Elicitation versus prompting versus neither. The third row is more common than people admit.</caption>

@@ -232,11 +232,63 @@ class StateSealer:
                 f".{self._b64e(self._mac(payload))}")
 \end{py}
 
-Four bindings, each closing one door:
+\subsection{What a MAC is, and why the comparison is the interesting part}
+
+A message authentication code is a short tag computed from a message and a
+secret key. Anyone holding the key can compute the tag and check it; anyone
+without the key cannot produce a valid one for a message they invented. So the
+tag proves two things at once: that the message was written by a holder of the
+key, and that nobody has changed a byte since.
+
+It is not encryption. The payload here is base64, which is an encoding anybody can reverse in one
+line. Whoever holds the token can read what is inside it, which is
+exactly why the docstring says to put correlation data in there and never
+secrets.
+
+The obvious construction, hash the key concatenated with the message, is broken
+against certain hash functions by length-extension attacks: an attacker who has
+one valid tag can compute a valid tag for a longer message without knowing the
+key. HMAC exists to close that. It hashes twice, with two derived keys, and the
+construction is old, boring, and available in every standard library. Use it
+rather than inventing something.
+
+The subtle part is the comparison, and Meridian uses \texttt{hmac.compare\_digest} where \texttt{==} would look
+fine:
+
+\begin{py}
+if not hmac.compare_digest(mac, self._mac(payload)):
+    raise StateTampered()
+\end{py}
+
+An ordinary string comparison returns as soon as it finds a byte that differs.
+That makes its running time depend on how many leading bytes matched, and that
+dependency is information. An attacker who can send many candidate tokens and
+time the responses can learn the first byte of the correct tag, then the second,
+because a guess with one more correct byte comes back measurably later. That
+turns forging a 32-byte tag from 2\textsuperscript{256} guesses into roughly
+$32 \times 256$ of them, which is a few thousand requests.
+
+A constant-time comparison looks at every byte regardless and returns a single
+answer at the end, so the timing carries nothing. The difference between the two
+functions is invisible in every test you will write and is the entire security
+of the check.
+
+\begin{notebox}{The \texttt{v1.} prefix is for key rotation}
+Meridian's format is \texttt{v1.<payload>.<mac>}, and \texttt{open} rejects
+anything whose first component is not \texttt{v1}.
+
+That prefix is how you change the signing key or the algorithm later without a
+flag day. A server can accept \texttt{v1} and \texttt{v2} for a transition
+window while minting only \texttt{v2}, and states in flight keep working.
+Without it, rotating the key means every half-completed approval in the world
+fails at the same instant, and you find out how many there were.
+\end{notebox}
+
+\subsection{Four bindings, each closing one door}
 
 \begin{description}[leftmargin=1.4em, style=nextline, itemsep=3pt]
-\item[The MAC] stops tampering. Verified in constant time, so a timing oracle
-cannot walk the signature out of you.
+\item[The MAC] stops tampering, and stops it whether the client edited the
+payload deliberately or a proxy mangled it by accident.
 \item[\texttt{sub}, the principal] stops cross-user replay.
 \item[\texttt{req}, a request digest] stops cross-request replay. Note carefully
 what it covers: the method, the name, and the arguments, but \emph{not}
@@ -423,6 +475,24 @@ contents. On iOS that means \texttt{SFSafariViewController}, not
 \item Should highlight the domain, and warn on Punycode.
 \end{itemize}
 
+That last one needs unpacking, because it is the rule most likely to be skipped
+by somebody who does not know what it refers to. Domain names are ASCII on the
+wire, so internationalised domains are encoded into ASCII by a scheme called
+Punycode and marked with an \texttt{xn--} prefix. \texttt{münchen.example}
+travels as \texttt{xn--mnchen-3ya.example}.
+
+The attack is that many Unicode characters are visually identical to ASCII ones.
+Cyrillic small A, U+0430, renders identically to Latin \texttt{a} in nearly
+every font, and Greek omicron is indistinguishable from Latin \texttt{o}. So an attacker registers a domain that displays as \texttt{meridian.example} in
+your UI, character for character, with one of those substitutions inside it,
+and it is a different domain entirely. A user checking the URL carefully, doing exactly what
+you asked of them, sees the right thing.
+
+The mitigation is to show the encoded form when a domain contains mixed scripts,
+so the user sees \texttt{xn--meridin-...} and knows something is off. Most
+browsers do this already. A client rendering a server-supplied URL in its own
+trusted chrome has taken on the browser's job here.
+
 \begin{dangerbox}{The URL-mode phishing attack}
 Alice, a legitimate user of a benign server, triggers a URL-mode elicitation
 that starts a third-party OAuth flow. Her client shows the link. Instead of
@@ -483,7 +553,7 @@ already said it. Zero round trips when it works.
 questions in one interim result cost one round trip; three separate interim
 results cost three.
 
-\textbf{Ask early, not late.} An elicitation on step one of a five-step task
+\textbf{Ask early.} An elicitation on step one of a five-step task
 costs one model turn. On step four, it costs a model turn plus the risk that the
 user has wandered off and the context has gone stale.
 

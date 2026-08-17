@@ -270,6 +270,24 @@ def lint_file(path: Path, sentence_index: dict) -> list[Finding]:
                         + " ".join(f"{c!r} (U+{ord(c):04X})" for c in offenders))
             )
 
+    # Rule 5b. The same constraint applies to prose, and it bit once: a chapter
+    # about homograph attacks reached for a Cyrillic glyph to demonstrate one.
+    # pdflatex refuses it and names no file, so the whole build dies pointing at
+    # a page number. Name the codepoint instead of typesetting it.
+    #
+    # A handful of characters ARE set up: the preamble declares them, and en
+    # dashes and accented Latin come through the T1 encoding fine.
+    allowed = set(" –‘’“”…×→")
+    stripped = _ENV_RE.sub(" ", raw)
+    offenders = sorted({c for c in stripped if ord(c) > 0xFF and c not in allowed})
+    if offenders:
+        first = stripped.index(offenders[0])
+        findings.append(
+            Finding(path, line_of(raw, first), "prose-encoding",
+                    "prose contains characters T1 cannot set: "
+                    + " ".join(f"{c!r} (U+{ord(c):04X})" for c in offenders))
+        )
+
     # Rule 3. Repetition. Collect first, compare globally after all files load.
     #
     # The closing summary of a chapter restates that chapter on purpose, so it
