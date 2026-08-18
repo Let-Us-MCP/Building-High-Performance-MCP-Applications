@@ -89,6 +89,7 @@ lint:
 	$(PY) tools/check_counts.py
 	$(PY) tools/check_listings.py
 	$(PY) tools/check_contrastive.py
+	$(PY) tools/check_cadence.py
 
 review:
 	$(PY) tools/review_prose.py --summary

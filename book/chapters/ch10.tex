@@ -4,15 +4,16 @@
 \epigraph{``Pay no attention to that man behind the curtain.''}{The Wizard,
 \emph{The Wizard of Oz} (1939)}
 
-An MCP App is a curtain. The user sees a button; the server decides what the
-button does and what the button says it does. Those are two separate things
-under one party's control, which is a sentence worth reading twice.
+An MCP App is HTML that a server sends you, that your host renders, and that
+your user clicks on. The user sees a button. The server decides both what the
+button does and what the button says it does, and those two things being under
+one party's control is the entire security content of this chapter.
 
-That tension runs through this whole chapter. Interactive interfaces are
+The same tension runs through the rest of it. Interactive interfaces are
 genuinely the right answer for some tool results and genuinely dangerous, and
-both facts come from the same source: the HTML arrived from somebody else's
-server. So: when an app beats a paragraph, and what the host has to do to make
-rendering one safe.
+both of those facts have the same cause, which is that the markup arrived from
+somebody else's server. So: when an app beats a paragraph of text, and what a
+host has to do before rendering one is safe.
 
 \section{The problem}
 
@@ -249,8 +250,6 @@ Chapter~\ref{ch:threats} treats this properly, including what an audit log has
 to record to make an incident reconstructible.
 
 \section{\texttt{structuredContent} and the context budget}
-
-Here is the thing that makes Apps interesting to a performance book.
 
 A tool result has two payloads. \texttt{content} is for the model.
 \texttt{structuredContent} is for programs. An app reads the second one, and the

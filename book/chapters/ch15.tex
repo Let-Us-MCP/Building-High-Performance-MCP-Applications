@@ -3,14 +3,15 @@
 
 \epigraph{``Houston, we have a problem.''}{Jim Lovell, \emph{Apollo 13} (1995)}
 
-What made Apollo 13 survivable was not heroism. It was that the ground had a
-simulator, telemetry on everything, and the discipline to reproduce the failure
-before attempting a fix. That is the whole content of this chapter, applied to
-systems where one of the components is a language model and therefore cannot be
-made deterministic.
+Testing a system with a language model in it sounds impossible, and the
+impossibility is routinely overstated. Almost none of an MCP application is the
+model. Almost all of it is a protocol, and protocols are extremely testable:
+deterministic, inspectable, and cheap enough to exercise thousands of times a
+second.
 
-The good news: almost none of MCP is the model. Almost all of it is a protocol,
-and protocols are extremely testable.
+This chapter is about pushing as much of your suite as possible down into that
+testable part, and then being deliberate about the thin layer at the top where
+you genuinely do need a model and genuinely cannot have determinism.
 
 \section{The testing pyramid, adapted}
 
@@ -60,7 +61,8 @@ a control group. One class, two jobs.
 
 \subsection{Assert on the wire}
 
-The most important habit in this chapter.
+Assert on the bytes a client would actually receive, not on the objects your
+server used to produce them.
 
 \begin{py}
 def test_server_identifies_itself_in_every_result(self):
@@ -91,7 +93,8 @@ only the second would pass for an encoder that does nothing at all.
 Conformance to \texttt{2026-07-28}, and this is the suite that will still be
 useful when you rewrite the server.
 
-Five families, and Meridian has all five.
+Contract tests come in five families. Meridian has all five, and their value is
+that they keep working after you rewrite the server underneath them.
 
 \subsection{The envelope}
 
@@ -401,7 +404,8 @@ than 3 points against the last release'' is a gate you can actually keep green.
 
 \section{Debugging}
 
-Four failures cover most of what you will meet.
+Four failures cover most of what you will meet, and each has a tell that
+identifies it in seconds once you know to look for it.
 
 \subsection{``The client cannot connect''}
 

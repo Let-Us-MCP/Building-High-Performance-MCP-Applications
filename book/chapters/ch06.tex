@@ -4,15 +4,15 @@
 \epigraph{``Roads? Where we're going, we don't need roads.''}{Doc Brown,
 \emph{Back to the Future} (1985)}
 
-Doc is wrong, of course. They need roads constantly for the rest of the
-trilogy. But the line captures a real feeling, which is the moment you realise
-the constraint you had been designing around is not actually the constraint.
+The constraint people design resources around is ``how do I get data to the
+model''. The real constraint is ``how do I get data to the model without
+spending the context budget on data it will never read''. Those are different
+problems with different solutions, and mistaking the second for the first is how
+you end up with a 200,000-token context window and no room left in it to think.
 
-With resources, the constraint people design around is ``how do I get data to
-the model''. The actual constraint is ``how do I get data to the model
-\emph{without} spending the context budget on data it will not read''. Those are
-different problems, and confusing them is how you end up with a 200,000-token
-context window and no room to think in.
+Resources are the primitive built for the second problem, and they are also
+where the protocol's caching model lives. That combination makes this the
+chapter with the largest measured speedup in the book.
 
 \section{What a resource is, and what it is not}
 
@@ -56,7 +56,7 @@ resource and as part of \texttt{assess\_account\_risk}.
 
 \section{Mechanics}
 
-Four methods, and they should look familiar by now.
+Four methods, and their shapes should look familiar from the previous chapter:
 
 \begin{wire}
 resources/list             -> the concrete resources available
@@ -236,8 +236,6 @@ and duplicates rows when the underlying set shifts between pages. If your list
 comes from a database, encode a sort key instead.
 
 \section{The 2026 caching model}
-
-Here is the part of the chapter that will pay for the book.
 
 Six operations carry caching hints: \texttt{server/discover},
 \texttt{tools/list}, \texttt{prompts/list}, \texttt{resources/list},
@@ -489,7 +487,8 @@ reconnections.
 
 \section{Who chooses what goes into context}
 
-Three strategies, three cost profiles, and most applications need all three.
+Context gets filled in three ways, with three different cost profiles, and most
+applications use all three without ever having decided to.
 
 \begin{table}[htbp]
 \centering
@@ -534,7 +533,7 @@ covers when to embed instead.
 
 \section{Anti-patterns}
 
-Five, in rough order of how often I encounter them.
+Five anti-patterns, in rough order of how often I meet them in review.
 
 \textbf{Dumping a database as resources.} One resource per row, ten thousand
 rows. The list response alone exhausts the context window. If your resource list

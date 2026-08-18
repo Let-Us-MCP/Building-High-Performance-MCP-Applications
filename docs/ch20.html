@@ -178,12 +178,12 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <p><em>“Follow the money.”</em></p>
 <p>Deep Throat, <em>All the President’s Men</em> (1976)</p>
 </aside>
-<p>The line is about tracing accountability through a system that was designed to diffuse it. Which is the audit problem exactly. In an agentic application the chain runs user, model, host, client, server, data, and every link is a place where responsibility can go missing if nobody wrote it down.</p>
-<p>This chapter is about writing it down, and about the access controls that make the record worth having.</p>
+<p>In an agentic application the chain of responsibility runs user, model, host, client, server, data. Every link is a place where accountability can go missing if nobody wrote it down, and the components most likely to be blamed afterwards are usually the ones with the least ability to record anything useful.</p>
+<p>This chapter is about writing it down, and about the access controls that make the record worth having. An audit log full of actions that should never have been permitted is a precise description of an incident.</p>
 <section id="scoped-authorization-in-practice" class="level2">
 <h2>Scoped authorization, in practice</h2>
 <p>Chapter <a href="ch04.html#ch:authorization">4</a> did the wire mechanics. Here is what to do with them.</p>
-<p>Three granularities, and you probably need all three.</p>
+<p>Authorization decisions land at three different granularities, and a system of any size needs all three. Each one catches something the other two cannot see.</p>
 <section id="per-tool" class="level3">
 <h3>Per-tool</h3>
 <p>The coarsest and the easiest. A scope per tool, or per group of tools.</p>
@@ -228,7 +228,7 @@ def account_summary(ctx: RequestContext, uri: str, params: dict):
 </section>
 <section id="per-request-which-is-row-level-security" class="level3">
 <h3>Per-request, which is row-level security</h3>
-<p>The finest grain, and the one that actually matters for multi-tenant systems.</p>
+<p>The finest grain, and the one multi-tenancy actually rests on: the same tool, called by two principals with the same arguments, has to return different rows.</p>
 <pre class="python" data-language="python"><code># sketch: the shipped handler with row-level filtering added inline
 def rank_portfolio_risk(ctx: RequestContext):
     ids = ctx.arguments.get(&quot;accountIds&quot;) or []
@@ -555,7 +555,7 @@ def rank_portfolio_risk(ctx: RequestContext):
 </section>
 <section id="measuring-success" class="level2">
 <h2>Measuring success</h2>
-<p>The KPIs that survive contact with a steering committee.</p>
+<p>These are the numbers that survive contact with a steering committee, which is a different requirement from the numbers that help you engineer the thing.</p>
 <table id="tab:kpis">
 <caption>The last two are the ones nobody tracks. Both predict whether the system survives contact with real users.</caption>
 <tbody>

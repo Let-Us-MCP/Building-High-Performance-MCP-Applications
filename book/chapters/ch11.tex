@@ -4,15 +4,15 @@
 \epigraph{``Do, or do not. There is no try.''}{Yoda, \emph{The Empire Strikes
 Back} (1980)}
 
-Yoda is talking about commitment, and he is also, accidentally, describing
-error handling. A tool either did the thing or it did not, and the worst
-possible outcome is a response that leaves the model unsure which. Half the
-craft of building a good server is making sure every response says
-unambiguously which of those two happened.
+This chapter builds a server from an empty directory. Not a toy one: the risk
+server that ships with this book, with everything real in it. MRTR approvals,
+TTL'd resources, the Tasks extension, a dual-era bridge, and a contract test
+suite that passes.
 
-This chapter builds one from an empty directory. Not a toy. The risk server that
-ships with this book, with everything real: MRTR approvals, TTL'd resources,
-Tasks, a dual-era bridge, and contract tests that pass.
+Half the craft turns out to be in the error handling, and the standard to hold
+yourself to is easy to state and easy to miss. A tool either did the thing or it
+did not. The worst response you can send is one that leaves the caller unable to
+tell which of those happened.
 
 \section{Anatomy of a 2026 server}
 

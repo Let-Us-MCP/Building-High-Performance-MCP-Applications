@@ -178,8 +178,8 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <p><em>“Every second I’m in this room, I’m getting worse.”</em></p>
 <p>Frankie Dunn, <em>Million Dollar Baby</em> (2004)</p>
 </aside>
-<p>This is the chapter the rest of the book has been setting up. Everything from here is a technique, a measurement, and an honest note about when it does not help.</p>
-<p>One ground rule before we start, and it is the whole discipline: <strong>every change gets attributed</strong>. Not “we did six things and it got faster”. Six numbers, one per change, including the ones that turned out to be worth nothing. Chapter <a href="ch16.html#ch:measuring">16</a> gave you the instrument; this chapter uses it.</p>
+<p>This is the chapter the rest of the book has been setting up: a catalogue of techniques, each with a measurement attached, each with an honest note about the conditions under which it does nothing.</p>
+<p>One ground rule first, because it is the whole discipline. Every change gets attributed individually. Not “we did six things and it got faster”, which tells you nothing and cannot be selectively undone, but six numbers, one per change, including the changes that turned out to be worth nothing at all. Chapter <a href="ch16.html#ch:measuring">16</a> built the instrument; this chapter uses it.</p>
 <section id="the-meridian-optimisation-pass" class="level2">
 <h2>The Meridian optimisation pass</h2>
 <p>Same task throughout: score an account for credit risk, screen it for fraud, and fetch the reference curve. Four servers, 12 ms simulated per-call latency.</p>
@@ -245,7 +245,6 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </section>
 <section id="cut-round-trips" class="level2">
 <h2>Cut round trips</h2>
-<p>The category that returns the most, always.</p>
 <section id="front-load-mrtr-inputs" class="level3">
 <h3>Front-load MRTR inputs</h3>
 <p>An elicitation costs about 375 ms, of which 35 is transport and 340 is the model turn it forces (Chapter <a href="ch08.html#ch:mrtr">8</a>). So the cheapest elicitation is the one that never happens.</p>
@@ -601,7 +600,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </section>
 <section id="what-did-not-help" class="level2">
 <h2>What did not help</h2>
-<p>The section every performance chapter should have and almost none do.</p>
+<p>Four changes I measured that returned nothing, or close enough to nothing that the effort was wasted. Every one of them is something I would have recommended on intuition.</p>
 <p><strong>Trimming the catalogue did not reduce latency.</strong> Zero milliseconds, twice measured. Tokens and time are different budgets.</p>
 <p><strong>Caching did not speed up the loop itself.</strong> Meridian fetches its catalogue before the loop starts, so the loop never touches the cache. Caching helped the setup path enormously and the loop not at all. If you had measured only the loop, you would have concluded caching was useless.</p>
 <p><strong>Parallel fan-out returned 5 % at 12 ms per call.</strong> Real, worth keeping, and not the story. At 40 ms it is worth three times more, which is a reminder that the value of an optimisation depends on the environment you measured it in.</p>

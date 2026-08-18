@@ -4,13 +4,14 @@
 \epigraph{``What we do in life echoes in eternity.''}{Maximus,
 \emph{Gladiator} (2000)}
 
-Or, in the agentic case, it echoes in the context window, which is worse,
-because eternity is free and the context window is billed per token on every
-subsequent turn.
+An agent loop is three steps repeated: think, act, observe. Everything difficult
+about operating one comes from the fact that the observations accumulate. Each
+tool result joins the context, stays there, is re-read on every subsequent turn,
+and is paid for again each time.
 
-This chapter is about the loop: how it terminates, where state lives now that
-the protocol holds none, and how to stop the context filling with the corpses of
-completed steps.
+This chapter is about the loop as a thing you run in production: how it
+terminates, where state lives now that the protocol holds none of it, and how to
+stop the context filling up with the remains of steps that finished long ago.
 
 \section{The loop, instrumented}
 

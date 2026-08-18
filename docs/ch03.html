@@ -178,8 +178,8 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <p><em>“Show me the money!”</em></p>
 <p>Rod Tidwell, <em>Jerry Maguire</em> (1996)</p>
 </aside>
-<p>Rod had spent years being told about value in the abstract and wanted to see the actual figure on the actual page. This chapter is that demand, applied to MCP.</p>
-<p>We are going to look at literal bytes on a literal connection, because every claim about performance from here on rests on knowing what is genuinely on the wire and what you merely imagined was there. I have found that most arguments about protocol overhead are settled in about ninety seconds by printing one request.</p>
+<p>This chapter looks at literal bytes on a literal connection, because every performance claim that follows depends on the difference between what is genuinely on the wire and what you assumed was there. Those two diverge more often than is comfortable. Most arguments about protocol overhead can be settled in about ninety seconds by printing one request, and almost nobody prints the request before having the argument.</p>
+<p>There are two transports. They are not interchangeable, and the choice between them fixes your deployment topology, your failure modes, and a good part of your latency budget.</p>
 <section id="what-a-transport-is-and-why-there-are-two" class="level2">
 <h2>What a transport is, and why there are two</h2>
 <p>A <strong>transport</strong> is the answer to a boring question: how do the bytes get from the client to the server and back?</p>
@@ -311,8 +311,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </aside>
 <section id="server-sent-events-briefly" class="level3">
 <h3>Server-sent events, briefly</h3>
-<p>Before the flow diagrams, one piece of vocabulary, because it appears constantly from here on.</p>
-<p>Most HTTP responses are a single body: the server sends it and closes. But a response can also be a <strong>stream</strong>, where the server holds the connection open and sends pieces over time. The format MCP uses for that is <strong>server-sent events</strong>, or SSE: a text format where each message is a line beginning <code>data:</code>, followed by a blank line.</p>
+<p>One piece of vocabulary first, because it appears constantly from here on. Most HTTP responses are a single body: the server sends it and closes. But a response can also be a <strong>stream</strong>, where the server holds the connection open and sends pieces over time. The format MCP uses for that is <strong>server-sent events</strong>, or SSE: a text format where each message is a line beginning <code>data:</code>, followed by a blank line.</p>
 <pre class="text" data-language="text"><code>data: {&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;method&quot;:&quot;notifications/progress&quot;,&quot;params&quot;:{...}}
 
 data: {&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;result&quot;:{...}}
@@ -723,7 +722,7 @@ Mcp-Name: assess_account_risk
 </section>
 <section id="meridians-transport-decision" class="level2">
 <h2>Meridian’s transport decision</h2>
-<p>Here is what each Meridian server got, and why.</p>
+<p>Meridian runs four servers and they do not all make the same choice:</p>
 <table id="tab:meridian-transports">
 <caption>Meridian’s choices. Everything shared is HTTP; stdio is a development convenience and a good one.</caption>
 <tbody>

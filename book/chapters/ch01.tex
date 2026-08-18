@@ -4,17 +4,17 @@
 \epigraph{``I feel the need. The need for speed.''}{Maverick and Goose,
 \emph{Top Gun} (1986)}
 
-Everybody quotes that line. Almost nobody remembers what happens next, which is
-that the two of them proceed to fly recklessly, get chewed out by a superior
-officer, and eventually lose an aircraft and a friend. The need for speed is an appetite. What turns an appetite into engineering is
-knowing which control surface actually moves the aircraft.
+Before we look at a single byte of the Model Context Protocol, this chapter
+spends its pages on the physics underneath it. Every design decision in the rest
+of the book is a trade against one of exactly three budgets: the latency a user
+sits through, the context a model reads, and the money the whole thing costs.
+The three are coupled, they are not interchangeable, and almost every expensive
+mistake in an agentic application comes from optimising one of them in the
+belief that you were optimising another.
 
-So before we look at a single byte of the Model Context Protocol, we are going
-to spend a chapter on the physics. Every design decision in the rest of this book is a trade against one of
-exactly three budgets, and if you do not have those three in your head, you will
-spend three weeks optimising something that does not matter.
-
-I have done this. Let me tell you about it.
+I have made that mistake myself, at a scale that cost three weeks and returned
+half of one percent. The story is short, and it explains the rest of the chapter
+better than the theory does, so it goes first.
 
 \section{The forty-second demo}
 
@@ -265,7 +265,8 @@ and I will introduce it properly in \secref{meridian}. For now, all you need to
 know is that it runs the three-step task from \secref{what-is-a-loop} against
 four MCP servers, and that it is instrumented.
 
-Here is where its wall clock goes.
+Running that task once, with every millisecond charged to the component that
+spent it:
 
 \begin{measurebox}{Meridian baseline, one task, three iterations}
 \begin{tabular}{@{}lrr@{}}
@@ -299,8 +300,6 @@ faster, then the protocol does not matter and this book is pointless. Also this
 is a strange thing for the author to admit on page seven.}
 \end{quote}
 
-It is a fair objection and it deserves a proper answer.
-
 That green sliver is not the point. The point is the \emph{number of blue
 bands}. There are three of them, and there are three of them because the loop
 ran three times. Delete an iteration and you delete an entire blue band, which
@@ -319,8 +318,6 @@ it is 3.9\,\% of the chart.
 
 \section{Round trips are the enemy}
 \label{sec:round-trips}
-
-If you take one idea from this chapter, take this one.
 
 An extra round trip is not an extra 20 milliseconds of network time. It is an
 extra \emph{model turn}, because the model has to look at what came back and
@@ -395,8 +392,6 @@ expensive suggestion in a design review than it sounds.
 
 \subsection{The same arithmetic, running the other way}
 
-Now the good news, because the round-trip rule cuts both ways.
-
 When a model asks for three tools in a single turn, it is telling you something
 useful: it believes those three do not depend on each other. It would have
 sequenced them if they did.
@@ -464,7 +459,7 @@ you get a standard nobody adopts.
 
 \subsection{But why not a framework?}
 
-Fair question, and frameworks got there first.
+Frameworks got there first, and for a while they were the obvious answer.
 
 A framework is a library you import. It works beautifully as long as everything
 is in one process, in one language, on one release cadence. The moment your risk

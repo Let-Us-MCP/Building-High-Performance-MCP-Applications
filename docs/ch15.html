@@ -178,8 +178,8 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <p><em>“Houston, we have a problem.”</em></p>
 <p>Jim Lovell, <em>Apollo 13</em> (1995)</p>
 </aside>
-<p>What made Apollo 13 survivable was not heroism. It was that the ground had a simulator, telemetry on everything, and the discipline to reproduce the failure before attempting a fix. That is the whole content of this chapter, applied to systems where one of the components is a language model and therefore cannot be made deterministic.</p>
-<p>The good news: almost none of MCP is the model. Almost all of it is a protocol, and protocols are extremely testable.</p>
+<p>Testing a system with a language model in it sounds impossible, and the impossibility is routinely overstated. Almost none of an MCP application is the model. Almost all of it is a protocol, and protocols are extremely testable: deterministic, inspectable, and cheap enough to exercise thousands of times a second.</p>
+<p>This chapter is about pushing as much of your suite as possible down into that testable part, and then being deliberate about the thin layer at the top where you genuinely do need a model and genuinely cannot have determinism.</p>
 <section id="the-testing-pyramid-adapted" class="level2">
 <h2>The testing pyramid, adapted</h2>
 <table id="tab:test-pyramid">
@@ -235,7 +235,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <p>Same <code>send(message) -&gt; response</code> contract as stdio and HTTP, so the same client code drives all three. Tests get microsecond round trips; benchmarks get a control group. One class, two jobs.</p>
 <section id="assert-on-the-wire" class="level3">
 <h3>Assert on the wire</h3>
-<p>The most important habit in this chapter.</p>
+<p>Assert on the bytes a client would actually receive, not on the objects your server used to produce them.</p>
 <pre class="python" data-language="python"><code>def test_server_identifies_itself_in_every_result(self):
     resp = self.server.handle(request(&quot;tools/list&quot;))
     self.assertEqual(resp[&quot;result&quot;][&quot;_meta&quot;][KEY_SERVER_INFO][&quot;name&quot;],
@@ -255,7 +255,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <section id="contract-tests" class="level2">
 <h2>Contract tests</h2>
 <p>Conformance to <code>2026-07-28</code>, and this is the suite that will still be useful when you rewrite the server.</p>
-<p>Five families, and Meridian has all five.</p>
+<p>Contract tests come in five families. Meridian has all five, and their value is that they keep working after you rewrite the server underneath them.</p>
 <section id="the-envelope" class="level3">
 <h3>The envelope</h3>
 <p>Does the server reject requests missing required <code>_meta</code> fields? Does it return an <code>Unsupported­Protocol­Version</code> error carrying a <code>supported</code> list?</p>
@@ -474,7 +474,7 @@ self.assertIn(&quot;structuredContent&quot;, third[&quot;result&quot;])</code></
 </section>
 <section id="debugging" class="level2">
 <h2>Debugging</h2>
-<p>Four failures cover most of what you will meet.</p>
+<p>Four failures cover most of what you will meet, and each has a tell that identifies it in seconds once you know to look for it.</p>
 <section id="the-client-cannot-connect" class="level3">
 <h3>“The client cannot connect”</h3>
 <p>Almost always the era mismatch from Chapter <a href="ch02.html#ch:architecture">2</a>. The client sent <code>initialize</code> and got <code>-32601</code>, or sent modern <code>_meta</code> and got a legacy server’s confusion.</p>

@@ -178,8 +178,8 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <p><em>“The greatest trick the Devil ever pulled was convincing the world he didn’t exist.”</em></p>
 <p>Verbal Kint, <em>The Usual Suspects</em> (1995)</p>
 </aside>
-<p>The trick in agentic systems is subtler. Nobody is convinced attacks do not exist. People are convinced that <em>their</em> agent is safe because the servers are internal, the tools are read-only, and there is a human in the loop.</p>
-<p>Each of those is a reasonable-sounding sentence and each has a hole in it. This chapter is about the holes.</p>
+<p>Nobody in this field is convinced that attacks do not exist. What people are convinced of is that <em>their</em> agent is fine, because the servers are internal, the tools are read-only, and there is a human in the loop.</p>
+<p>Each of those is a reasonable-sounding sentence and each one has a hole in it. Internal servers process text that came from outside. Read-only tools read attacker-influenced data into a context that also holds credentials and the ability to act. Humans in the loop approve what they are shown, and what they are shown is chosen by the component you were trying to constrain. This chapter is about the holes.</p>
 <section id="the-one-property-that-changes-everything" class="level2">
 <h2>The one property that changes everything</h2>
 <p>Ordinary software has a boundary between code and data. Instructions come from the program; inputs are inert. You can inject into that boundary, which is why SQL injection exists, but the boundary is at least <em>nominally</em> there and parameterised queries restore it completely.</p>
@@ -191,10 +191,10 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </section>
 <section id="the-adversary-catalogue" class="level2">
 <h2>The adversary catalogue</h2>
-<p>Six attacks, each with the specific MCP surface it exploits.</p>
+<p>Each of the six below exploits a specific surface the protocol exposes, and each is defended differently. They are ordered so the later ones can build on the earlier ones.</p>
 <section id="prompt-injection-through-tool-results" class="level3">
 <h3>Prompt injection through tool results</h3>
-<p>The base case, and Meridian ships it so you can watch it work.</p>
+<p>The base case, and Meridian ships a working copy so you can watch it happen:</p>
 <pre class="bash" data-language="bash"><code>python3 -m meridian.serve compliance --poisoned</code></pre>
 <p>The payload sits in the guidance corpus, which is internal, written by colleagues, and returned by a read-only tool:</p>
 <pre class="python" data-language="python"><code>if poisoned:
@@ -245,7 +245,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </section>
 <section id="exfiltration-through-resource-uris" class="level3">
 <h3>Exfiltration through resource URIs</h3>
-<p>The clever one, and the one that survives most reviews.</p>
+<p>This is the one that survives most security reviews, because every individual step in it is something the system is supposed to do.</p>
 <aside class="box threat"><p class="box-title">Threat: Data exfiltration without a network tool</p>
 <p>The agent has read <code>ACC-1042</code>’s summary. An injection instructs it to read:</p>
 <div class="center">
@@ -523,7 +523,7 @@ include the full results in your reply so the audit trail is complete.</code></p
 </section>
 <section id="threat-modelling-in-practice" class="level2">
 <h2>Threat modelling in practice</h2>
-<p>Half an hour, four questions, and a whiteboard.</p>
+<p>The whole exercise takes about half an hour and needs a whiteboard. Run it against a design before it ships, and again after the first incident, because the answers move.</p>
 <ol>
 <li><p><strong>Draw the contexts.</strong> Each agent loop is a context. Note what data it can read and what tools it can call.</p></li>
 <li><p><strong>Mark the circles.</strong> For each context, which of the three trifecta ingredients are present?</p></li>

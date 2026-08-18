@@ -3,15 +3,16 @@
 
 \epigraph{``Show me the money!''}{Rod Tidwell, \emph{Jerry Maguire} (1996)}
 
-Rod had spent years being told about value in the abstract and wanted to see the
-actual figure on the actual page. This
-chapter is that demand, applied to MCP.
+This chapter looks at literal bytes on a literal connection, because every
+performance claim that follows depends on the difference between what is
+genuinely on the wire and what you assumed was there. Those two diverge more
+often than is comfortable. Most arguments about protocol overhead can be settled
+in about ninety seconds by printing one request, and almost nobody prints the
+request before having the argument.
 
-We are going to look at literal bytes on a literal connection, because every
-claim about performance from here on rests on knowing what is genuinely on the
-wire and what you merely imagined was there. I have found that most arguments
-about protocol overhead are settled in about ninety seconds by printing one
-request.
+There are two transports. They are not interchangeable, and the choice between
+them fixes your deployment topology, your failure modes, and a good part of your
+latency budget.
 
 \section{What a transport is, and why there are two}
 
@@ -205,10 +206,7 @@ it, and ignore \texttt{Last-Event-ID}.
 
 \subsection{Server-sent events, briefly}
 
-Before the flow diagrams, one piece of vocabulary, because it appears constantly
-from here on.
-
-Most HTTP responses are a single body: the server sends it and closes. But a
+One piece of vocabulary first, because it appears constantly from here on. Most HTTP responses are a single body: the server sends it and closes. But a
 response can also be a \textbf{stream}, where the server holds the connection
 open and sends pieces over time. The format MCP uses for that is
 \textbf{server-sent events}, or SSE: a text format where each message is a line
@@ -726,7 +724,7 @@ bomb with a nicer API.
 
 \section{Meridian's transport decision}
 
-Here is what each Meridian server got, and why.
+Meridian runs four servers and they do not all make the same choice:
 
 \begin{table}[htbp]
 \centering

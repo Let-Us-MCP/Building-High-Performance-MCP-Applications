@@ -70,6 +70,9 @@ jobs:
       - name: Contrastive phrasing stays within budget
         run: python3 tools/check_contrastive.py
 
+      - name: Paragraph cadence
+        run: python3 tools/check_cadence.py
+
       - name: Site links
         # docs/ is committed, so this checks what readers actually get.
         run: python3 tools/check_site.py

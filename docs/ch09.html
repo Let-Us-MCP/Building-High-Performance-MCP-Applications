@@ -178,8 +178,8 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <p><em>“I’ll be back.”</em></p>
 <p>The Terminator, <em>The Terminator</em> (1984)</p>
 </aside>
-<p>The whole appeal of that line is the confidence of the deferral. Not “wait here”. Not “I will hold this door open indefinitely”. Just: this is going to take a while, and I will return.</p>
-<p>That is the Tasks extension in one sentence. And Tasks arriving as an extension is the other half of this chapter, because the extensions framework is how MCP now grows without breaking.</p>
+<p>Some work takes longer than anybody wants to hold a connection open for. Underwriting a loan, running a batch, waiting on a human being to make up their mind. The Tasks extension is how a server says “this will take a while, here is a handle, come back for it”, and the second half of this chapter is how that works in detail.</p>
+<p>The first half is about the fact that Tasks arrives as an <em>extension</em> at all. The extensions framework is how MCP now grows without breaking implementations that already exist, and Tasks is the worked example: it used to be in core, and this revision moved it out.</p>
 <section id="the-extensions-framework" class="level2">
 <h2>The extensions framework</h2>
 <p>The problem every successful protocol hits: a feature that half the ecosystem needs and the other half never will. Put it in core and you burden everyone. Put it nowhere and it gets reinvented five incompatible ways.</p>
@@ -480,7 +480,7 @@ def _update(ctx: RequestContext) -&gt; dict:
 </section>
 <section id="where-tasks-live-and-why-it-matters" class="level2">
 <h2>Where tasks live, and why it matters</h2>
-<p>Here is the part that turns a nice feature into an operational hazard.</p>
+<p>A task outlives the request that created it, so something has to store it. Where that something lives decides whether your deployment survives having more than one replica.</p>
 <aside class="box threat"><p class="box-title">Threat: An in-memory task store reinvents sticky sessions</p>
 <p>The client polls with <code>tasks/get</code>. Behind a load balancer, that poll lands on whichever replica the balancer chooses, which is almost certainly not the one that created the task.</p>
 <p>If your task store is a process-local dictionary, the poll returns “unknown task” and the work is lost. The fix is not session affinity. The fix is a shared, durable store, because the whole point of statelessness was to stop needing affinity.</p>
@@ -505,7 +505,6 @@ def _update(ctx: RequestContext) -&gt; dict:
 </section>
 <section id="when-not-to-use-tasks" class="level2">
 <h2>When not to use Tasks</h2>
-<p>The chapter’s most useful section, because the failure mode here is enthusiasm.</p>
 <p>Tasks add a polling loop, a durable store, an expiry policy, and a second code path in every client. That is real complexity, and for short work it buys nothing.</p>
 <table id="tab:when-tasks">
 <caption>Thresholds. The 10-to-60-second band is where measurement beats opinion.</caption>

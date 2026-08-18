@@ -178,8 +178,8 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <p><em>“You shall not pass!”</em></p>
 <p>Gandalf, <em>The Fellowship of the Ring</em> (2001)</p>
 </aside>
-<p>Gandalf’s line is the most famous authorization decision in cinema, and it is worth noticing what it actually was. He did not check a credential. He asserted a boundary, at a chokepoint, against something that had every intention of walking straight through. That is the job. The credential is just the paperwork.</p>
-<p>This is a security chapter with a performance chapter hiding inside it, which is the same structure <em>High Performance Browser Networking</em> used for TLS, and for the same reason. Auth is not a policy you configure once. It is a sequence of network round trips that happen before your application does any work at all, and if you do not amortise them you will pay for them forever.</p>
+<p>This is a security chapter with a performance chapter hiding inside it, which is the structure <em>High Performance Browser Networking</em> used for TLS and for the same reason. Authorization is not a policy you configure once and stop thinking about. It is a sequence of network round trips, all of which happen before your application does any useful work, and each of which the user experiences as your application being slow to start.</p>
+<p>Done properly you pay that sequence once and cache the result for hours. Done carelessly you pay it on every request forever, and because each individual round trip looks cheap in isolation, nobody notices until the total is the largest single item in your latency budget.</p>
 <section id="the-shape-of-it" class="level2">
 <h2>The shape of it</h2>
 <p>MCP does not invent an auth scheme. It profiles OAuth 2.1 and a stack of RFCs around it, taking a deliberately small subset. The roles map cleanly:</p>

@@ -178,8 +178,8 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <p><em>“What we’ve got here is failure to communicate.”</em></p>
 <p>The Captain, <em>Cool Hand Luke</em> (1967)</p>
 </aside>
-<p>The Captain says it right before demonstrating that he has no interest in communicating at all. Which is roughly what a 2025-era MCP server did when it needed something from you: it stopped, held the connection hostage, and sent its own request back down the pipe.</p>
-<p>That mechanism is gone. What replaced it is one of the cleanest pieces of design in the whole revision, and it costs more than people expect. Both halves of that sentence matter, so this chapter does the mechanism first and the price second.</p>
+<p>A 2025-era server that needed something from you mid-call stopped, held the connection open, and sent its own JSON-RPC request back down the pipe at you. That mechanism is gone, and what replaced it is one of the cleanest pieces of design in the revision.</p>
+<p>It also costs more than people expect, which is why this chapter does the mechanism first and the price second. Both halves matter. The mechanism is what you implement; the price is what changes your design once you have measured it.</p>
 <section id="the-problem" class="level2">
 <h2>The problem</h2>
 <p>A server is halfway through a tool call and needs something only the client can supply. A username. An approval. A confirmation from a human who has authority the server does not.</p>
@@ -305,7 +305,6 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </section>
 <section id="requeststate-is-attacker-controlled" class="level2">
 <h2><code>requestState</code> is attacker-controlled</h2>
-<p>Here is the part that deserves your full attention.</p>
 <p><code>requestState</code> leaves your server, passes through a client you do not control, and comes back. It may come back modified. It may come back from a different user. It may come back attached to a different tool call. It may come back next week.</p>
 <aside class="box threat"><p class="box-title">Threat: Three attacks on a naive <code>requestState</code></p>
 <p><strong>Tampering.</strong> Server seals <code>{"exposure": 9000000}</code>. Client edits it to <code>{"exposure": 100}</code> to slip under the approval threshold.</p>

@@ -3,12 +3,16 @@
 
 \epigraph{``I'll be back.''}{The Terminator, \emph{The Terminator} (1984)}
 
-The whole appeal of that line is the confidence of the deferral. Not ``wait
-here''. Not ``I will hold this door open indefinitely''. Just: this is going to
-take a while, and I will return.
+Some work takes longer than anybody wants to hold a connection open for.
+Underwriting a loan, running a batch, waiting on a human being to make up their
+mind. The Tasks extension is how a server says ``this will take a while, here is
+a handle, come back for it'', and the second half of this chapter is how that
+works in detail.
 
-That is the Tasks extension in one sentence. And Tasks arriving as an extension is the other half of this chapter, because the
-extensions framework is how MCP now grows without breaking.
+The first half is about the fact that Tasks arrives as an \emph{extension} at
+all. The extensions framework is how MCP now grows without breaking
+implementations that already exist, and Tasks is the worked example: it used to
+be in core, and this revision moved it out.
 
 \section{The extensions framework}
 
@@ -387,7 +391,9 @@ asserting something the protocol does not promise.
 
 \section{Where tasks live, and why it matters}
 
-Here is the part that turns a nice feature into an operational hazard.
+A task outlives the request that created it, so something has to store it. Where
+that something lives decides whether your deployment survives having more than
+one replica.
 
 \begin{dangerbox}{An in-memory task store reinvents sticky sessions}
 The client polls with \texttt{tasks/get}. Behind a load balancer, that poll
@@ -428,8 +434,6 @@ anyone who can guess an id can read somebody's underwriting decision.
 \end{itemize}
 
 \section{When not to use Tasks}
-
-The chapter's most useful section, because the failure mode here is enthusiasm.
 
 Tasks add a polling loop, a durable store, an expiry policy, and a second code
 path in every client. That is real complexity, and for short work it buys

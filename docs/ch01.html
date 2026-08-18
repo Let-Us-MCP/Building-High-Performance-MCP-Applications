@@ -178,9 +178,8 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <p><em>“I feel the need. The need for speed.”</em></p>
 <p>Maverick and Goose, <em>Top Gun</em> (1986)</p>
 </aside>
-<p>Everybody quotes that line. Almost nobody remembers what happens next, which is that the two of them proceed to fly recklessly, get chewed out by a superior officer, and eventually lose an aircraft and a friend. The need for speed is an appetite. What turns an appetite into engineering is knowing which control surface actually moves the aircraft.</p>
-<p>So before we look at a single byte of the Model Context Protocol, we are going to spend a chapter on the physics. Every design decision in the rest of this book is a trade against one of exactly three budgets, and if you do not have those three in your head, you will spend three weeks optimising something that does not matter.</p>
-<p>I have done this. Let me tell you about it.</p>
+<p>Before we look at a single byte of the Model Context Protocol, this chapter spends its pages on the physics underneath it. Every design decision in the rest of the book is a trade against one of exactly three budgets: the latency a user sits through, the context a model reads, and the money the whole thing costs. The three are coupled, they are not interchangeable, and almost every expensive mistake in an agentic application comes from optimising one of them in the belief that you were optimising another.</p>
+<p>I have made that mistake myself, at a scale that cost three weeks and returned half of one percent. The story is short, and it explains the rest of the chapter better than the theory does, so it goes first.</p>
 <section id="the-forty-second-demo" class="level2">
 <h2>The forty-second demo</h2>
 <p>I was watching a demo. Somebody had wired an AI assistant into four internal systems, and it worked. Actual work got done, live, in front of people who had been promised this for two years. Somebody in the back asked how long it took. The presenter said, cheerfully, “about forty seconds,” and the room stayed delighted.</p>
@@ -318,7 +317,7 @@ iteration 2   model reads the question + the catalogue + both results
 <section id="what-the-proportions-actually-are" class="level3">
 <h3>What the proportions actually are</h3>
 <p>Enough theory. Meridian is the reference application that ships with this book, and I will introduce it properly in <a href="#sec:meridian">§1.7</a>. For now, all you need to know is that it runs the three-step task from <a href="#sec:what-is-a-loop">§1.2</a> against four MCP servers, and that it is instrumented.</p>
-<p>Here is where its wall clock goes.</p>
+<p>Running that task once, with every millisecond charged to the component that spent it:</p>
 <aside class="box measured"><p class="box-title">Measured: Meridian baseline, one task, three iterations</p>
 <table>
 <tbody>
@@ -354,7 +353,6 @@ iteration 2   model reads the question + the catalogue + both results
 <blockquote>
 <p><em>Hang on. If 96 % of the time is the model, and I cannot make the model faster, then the protocol does not matter and this book is pointless. Also this is a strange thing for the author to admit on page seven.</em></p>
 </blockquote>
-<p>It is a fair objection and it deserves a proper answer.</p>
 <p>That green sliver is not the point. The point is the <em>number of blue bands</em>. There are three of them, and there are three of them because the loop ran three times. Delete an iteration and you delete an entire blue band, which is 400-odd milliseconds, which is roughly eight times the whole green sliver.</p>
 <p>So the lever is the count of the bands.</p>
 <aside class="keyidea">
@@ -365,7 +363,6 @@ iteration 2   model reads the question + the catalogue + both results
 </section>
 <section id="sec:round-trips" class="level2">
 <h2>Round trips are the enemy</h2>
-<p>If you take one idea from this chapter, take this one.</p>
 <p>An extra round trip is not an extra 20 milliseconds of network time. It is an extra <em>model turn</em>, because the model has to look at what came back and decide what to do next. On the Meridian baseline that is roughly 440 milliseconds, plus another 1,300 tokens of input, plus the money those tokens cost, every time.</p>
 <p>Let me show you that with something concrete, and to do that I need to introduce one protocol feature early. I will keep it to what you need.</p>
 <section id="a-worked-example-the-server-asks-a-question" class="level3">
@@ -424,7 +421,6 @@ iteration 2   model reads the question + the catalogue + both results
 </section>
 <section id="the-same-arithmetic-running-the-other-way" class="level3">
 <h3>The same arithmetic, running the other way</h3>
-<p>Now the good news, because the round-trip rule cuts both ways.</p>
 <p>When a model asks for three tools in a single turn, it is telling you something useful: it believes those three do not depend on each other. It would have sequenced them if they did.</p>
 <p>An application that honours that runs all three at once and waits for the slowest. An application that ignores it runs them one after another and waits for the sum.</p>
 <aside class="box measured"><p class="box-title">Measured: Serial versus parallel fan-out, three independent tools</p>
@@ -475,7 +471,7 @@ iteration 2   model reads the question + the catalogue + both results
 <p>The reason it worked is that the waist was narrow enough to implement in a weekend and expressive enough to be worth implementing. Miss on either side and you get a standard nobody adopts.</p>
 <section id="but-why-not-a-framework" class="level3">
 <h3>But why not a framework?</h3>
-<p>Fair question, and frameworks got there first.</p>
+<p>Frameworks got there first, and for a while they were the obvious answer.</p>
 <p>A framework is a library you import. It works beautifully as long as everything is in one process, in one language, on one release cadence. The moment your risk team ships Python, your platform team ships TypeScript, and a vendor ships a binary you cannot recompile, a library is the wrong shape. You need something that survives a process boundary and a version skew.</p>
 <p>That is a protocol. And once it is a protocol it needs a wire format, a versioning story, and a deprecation policy, which is precisely what Chapter <a href="ch02.html#ch:architecture">2</a> is about.</p>
 </section>

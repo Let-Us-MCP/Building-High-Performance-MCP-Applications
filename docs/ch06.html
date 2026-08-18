@@ -178,8 +178,8 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <p><em>“Roads? Where we’re going, we don’t need roads.”</em></p>
 <p>Doc Brown, <em>Back to the Future</em> (1985)</p>
 </aside>
-<p>Doc is wrong, of course. They need roads constantly for the rest of the trilogy. But the line captures a real feeling, which is the moment you realise the constraint you had been designing around is not actually the constraint.</p>
-<p>With resources, the constraint people design around is “how do I get data to the model”. The actual constraint is “how do I get data to the model <em>without</em> spending the context budget on data it will not read”. Those are different problems, and confusing them is how you end up with a 200,000-token context window and no room to think in.</p>
+<p>The constraint people design resources around is “how do I get data to the model”. The real constraint is “how do I get data to the model without spending the context budget on data it will never read”. Those are different problems with different solutions, and mistaking the second for the first is how you end up with a 200,000-token context window and no room left in it to think.</p>
+<p>Resources are the primitive built for the second problem, and they are also where the protocol’s caching model lives. That combination makes this the chapter with the largest measured speedup in the book.</p>
 <section id="what-a-resource-is-and-what-it-is-not" class="level2">
 <h2>What a resource is, and what it is not</h2>
 <p>A resource is addressable, readable context, identified by a URI.</p>
@@ -222,7 +222,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </section>
 <section id="mechanics" class="level2">
 <h2>Mechanics</h2>
-<p>Four methods, and they should look familiar by now.</p>
+<p>Four methods, and their shapes should look familiar from the previous chapter:</p>
 <pre class="json" data-language="json"><code>resources/list             -&gt; the concrete resources available
 resources/templates/list   -&gt; parameterised families of resources
 resources/read             -&gt; the contents of one URI
@@ -349,7 +349,6 @@ def account_summary(ctx: RequestContext, uri: str, params: dict):
 </section>
 <section id="the-2026-caching-model" class="level2">
 <h2>The 2026 caching model</h2>
-<p>Here is the part of the chapter that will pay for the book.</p>
 <p>Six operations carry caching hints: <code>server/discover</code>, <code>tools/list</code>, <code>prompts/list</code>, <code>resources/list</code>, <code>resources/templates/list</code>, and <code>resources/read</code>. Two fields:</p>
 <dl>
 <dt><code>ttlMs</code></dt>
@@ -505,7 +504,7 @@ Cache hit rate &amp; 0 % &amp; 96.2 %<br />
 </section>
 <section id="who-chooses-what-goes-into-context" class="level2">
 <h2>Who chooses what goes into context</h2>
-<p>Three strategies, three cost profiles, and most applications need all three.</p>
+<p>Context gets filled in three ways, with three different cost profiles, and most applications use all three without ever having decided to.</p>
 <table id="tab:context-strategies">
 <caption>Three ways context gets filled. The third one is where the waste accumulates, because nobody has to decide anything for it to happen.</caption>
 <tbody>
@@ -543,7 +542,7 @@ Cache hit rate &amp; 0 % &amp; 96.2 %<br />
 </section>
 <section id="anti-patterns" class="level2">
 <h2>Anti-patterns</h2>
-<p>Five, in rough order of how often I encounter them.</p>
+<p>Five anti-patterns, in rough order of how often I meet them in review.</p>
 <p><strong>Dumping a database as resources.</strong> One resource per row, ten thousand rows. The list response alone exhausts the context window. If your resource list is longer than a person would scroll, it should be a template plus a search tool.</p>
 <p><strong>Ignoring pagination.</strong> Both directions. Servers that return everything, and clients that read page one and stop. Meridian’s client walks to the end and caches each page under its own cursor.</p>
 <p><strong>Cross-tenant URIs.</strong> Covered above. Authorize on every read.</p>

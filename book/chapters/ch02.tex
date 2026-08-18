@@ -4,20 +4,21 @@
 \epigraph{``Forget it, Jake. It's Chinatown.''}{Lawrence Walsh,
 \emph{Chinatown} (1974)}
 
-That line lands because Jake spent the whole film assuming he understood the
-system he was operating inside. He did not, and people died. Every architecture
-chapter should open with a warning like that, because architecture is exactly
-the thing you think you understand right up until it bites.
+MCP looks like RPC. It is shaped like RPC: requests go out, responses come back,
+and if you squint it is a slightly opinionated JSON API carried over one of two
+transports. Building on that reading is the most common architectural mistake in
+the ecosystem, and it produces applications that work perfectly in development
+and are insecure the first time they meet a server somebody else wrote.
 
-The subtlety in MCP is this. It looks like RPC. It is shaped like RPC. Requests
-go out, responses come back, and if you squint it is just a slightly opinionated
-JSON API. If you treat it that way you will build something insecure, because
-the interesting part of the architecture is the trust boundary, and the trust
-boundary sits somewhere most people do not guess.
+The reason is that the request-response mechanics are the least interesting part
+of the architecture. What matters is the trust boundary: where it sits, what
+crosses it, and which component is answerable for the crossing. It sits
+somewhere most people do not guess, and once you know where, a surprising number
+of the protocol's odder decisions turn out to be arranged around protecting it.
 
-This chapter builds the model from nothing. Three roles, then the thing that
-changed in 2026, then the contract that tells you how long any of this will
-remain true.
+This chapter builds the model from nothing. Three roles and the lines between
+them, then the change that made the 2026 revision worth writing a book about,
+then the lifecycle contract that tells you how long any of it will remain true.
 
 \section{Three roles}
 
@@ -109,8 +110,6 @@ creating every client itself. Which also means a sloppy host can undo all three,
 and Chapter~\ref{ch:building-hosts} is partly a list of ways to avoid that.
 
 \section{The stateless core}
-
-Now the change, and it is genuinely large.
 
 \subsection{What it used to be}
 
@@ -246,8 +245,8 @@ was never on the server, losing a connection costs you one request.
 
 \subsection{What it costs}
 
-Honesty time, because this is not free and the costs come in two very different
-sizes.
+The envelope is not free, and its two costs are different enough in size that
+lumping them together is how people end up optimising the wrong one.
 
 \textbf{Bytes on every request.} The envelope is not tiny:
 
@@ -711,9 +710,6 @@ Not ``untrusted if the server is third-party''. Untrusted, always, because a
 first-party server can be compromised, and a first-party server routinely
 returns data that some third party wrote.
 \end{dangerbox}
-
-Let me make that concrete, because the abstract version does not change
-anybody's design.
 
 Meridian's compliance server has a tool called \texttt{search\_guidance} that
 returns policy text from an internal corpus. It is read-only. It changes nothing.

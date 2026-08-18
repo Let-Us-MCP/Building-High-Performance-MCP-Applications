@@ -178,8 +178,8 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <p><em>“I’m the guy doing his job. You must be the other guy.”</em></p>
 <p>Sean Dignam, <em>The Departed</em> (2006)</p>
 </aside>
-<p>Dignam’s whole character is about who is actually accountable when several parties are nominally responsible. Which is the host’s problem exactly. The model suggests, the server executes, the user watches, and when something goes wrong the host is the guy doing his job or the other guy. There is no third option, because the host is the only component that can see all of it.</p>
-<p>Building a server is mostly craft. Building a host is mostly judgement, and this chapter is about the five judgements that matter.</p>
+<p>The host is the only component that can see all of it. The model proposes, the server executes, the user watches, and when something goes wrong the host was the only party in a position to have prevented it. That makes it the accountable component whether or not anybody designed it to be, which is worth deciding deliberately rather than discovering during an incident.</p>
+<p>Building a server is mostly craft: implement the methods, honour the contract, test the wire. Building a host is mostly judgement. This chapter is about the five judgements that matter, two of which get skipped in every prototype and retrofitted in almost none.</p>
 <section id="what-a-host-is-actually-for" class="level2">
 <h2>What a host is actually for</h2>
 <p>A client is thin: attach <code>_meta</code>, send, parse, run the MRTR loop. A few hundred lines, and Meridian’s is one file.</p>
@@ -287,7 +287,6 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </section>
 <section id="the-context-budget" class="level2">
 <h2>The context budget</h2>
-<p>Here is the job nobody assigns to anybody, so it does not get done.</p>
 <aside class="keyidea">
 <p>The host is the context window’s memory allocator. Nothing else can be: a server cannot see the other servers, and the model cannot see its own budget. If the host does not enforce a limit, there is no limit.</p>
 </aside>
@@ -386,7 +385,6 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </section>
 <section id="consent-that-people-do-not-rage-click" class="level2">
 <h2>Consent that people do not rage-click</h2>
-<p>The hardest UX problem in this book.</p>
 <p>Prompt for everything and users learn to click Approve without reading, which is worse than not prompting because now you have the audit trail of consent without any of the reality. Prompt for nothing and the model gets to do anything.</p>
 <p>Meridian’s default policy:</p>
 <pre class="python" data-language="python"><code>class ConsentPolicy:

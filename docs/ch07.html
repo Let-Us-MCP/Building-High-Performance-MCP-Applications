@@ -178,8 +178,8 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <p><em>“Say hello to my little friend.”</em></p>
 <p>Tony Montana, <em>Scarface</em> (1983)</p>
 </aside>
-<p>Tony’s little friend was not little, and that is the joke. Prompts are MCP’s little friend. It is the primitive people skip, the one that gets one paragraph in most tutorials, and it turns out to be the one that quietly standardises a workflow across three teams who were each maintaining their own slightly different version of it.</p>
-<p>It is also the shortest chapter in Part II, because the mechanics really are simple. The interesting content is organisational.</p>
+<p>Prompts are the primitive people skip. They get one paragraph in most tutorials, they are the last thing anybody implements, and they turn out to be the one that quietly standardises a workflow across three teams who had each been maintaining their own slightly different version of it.</p>
+<p>The mechanics are genuinely simple, which is why this is the shortest chapter in Part II. The interesting content is organisational: who owns a workflow, where that ownership belongs, and what it costs when it sits in the wrong place.</p>
 <section id="mechanics" class="level2">
 <h2>Mechanics</h2>
 <p>Two methods for the primitive itself, and you can guess both. A third, <code>completion/complete</code>, exists to make them usable by a human, and <a href="#sec:prompt-completion">§7.1.2</a> covers it.</p>
@@ -315,7 +315,6 @@ def complete_account_id(value: str, filled: dict) -&gt; list[str]:
 <p>Fair question. You can concatenate strings in your host. Why put prompts on the server?</p>
 <section id="because-the-server-owns-the-expertise" class="level3">
 <h3>Because the server owns the expertise</h3>
-<p>Here is the argument that actually convinced me.</p>
 <p>Meridian’s compliance server knows things the host does not: that a Suspicious Activity Report is due within 30 days of <em>detection</em>, with the clock starting at detection and not at escalation; that corridor risk is rated on the counterparty’s jurisdiction and not the booking branch; that a flagged transaction needs a named officer.</p>
 <p>If the prompt lives in the host, that knowledge lives in the host, and every host that wants to do compliance review has to know compliance. If it lives on the server, one team who understands the domain maintains one blueprint, and every host gets it right for free.</p>
 <aside class="keyidea">

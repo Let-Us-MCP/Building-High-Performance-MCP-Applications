@@ -4,20 +4,22 @@
 \epigraph{``Follow the money.''}{Deep Throat, \emph{All the President's Men}
 (1976)}
 
-The line is about tracing accountability through a system that was designed to
-diffuse it. Which is the audit problem exactly. In an agentic application the
-chain runs user, model, host, client, server, data, and every link is a place
-where responsibility can go missing if nobody wrote it down.
+In an agentic application the chain of responsibility runs user, model, host,
+client, server, data. Every link is a place where accountability can go missing
+if nobody wrote it down, and the components most likely to be blamed afterwards
+are usually the ones with the least ability to record anything useful.
 
 This chapter is about writing it down, and about the access controls that make
-the record worth having.
+the record worth having. An audit log full of actions that should never have
+been permitted is a precise description of an incident.
 
 \section{Scoped authorization, in practice}
 
 Chapter~\ref{ch:authorization} did the wire mechanics. Here is what to do with
 them.
 
-Three granularities, and you probably need all three.
+Authorization decisions land at three different granularities, and a system of
+any size needs all three. Each one catches something the other two cannot see.
 
 \subsection{Per-tool}
 
@@ -80,7 +82,8 @@ enumeration oracle. Return the same thing for both.
 
 \subsection{Per-request, which is row-level security}
 
-The finest grain, and the one that actually matters for multi-tenant systems.
+The finest grain, and the one multi-tenancy actually rests on: the same tool,
+called by two principals with the same arguments, has to return different rows.
 
 \begin{py}
 # sketch: the shipped handler with row-level filtering added inline
@@ -439,7 +442,8 @@ is identical: mark it Deprecated, publish the migration, wait, then remove.
 
 \section{Measuring success}
 
-The KPIs that survive contact with a steering committee.
+These are the numbers that survive contact with a steering committee, which is a
+different requirement from the numbers that help you engineer the thing.
 
 \begin{table}[htbp]
 \centering

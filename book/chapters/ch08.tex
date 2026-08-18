@@ -4,14 +4,15 @@
 \epigraph{``What we've got here is failure to communicate.''}{The Captain,
 \emph{Cool Hand Luke} (1967)}
 
-The Captain says it right before demonstrating that he has no interest in
-communicating at all. Which is roughly what a 2025-era MCP server did when it
-needed something from you: it stopped, held the connection hostage, and sent its
-own request back down the pipe.
+A 2025-era server that needed something from you mid-call stopped, held the
+connection open, and sent its own JSON-RPC request back down the pipe at you.
+That mechanism is gone, and what replaced it is one of the cleanest pieces of
+design in the revision.
 
-That mechanism is gone. What replaced it is one of the cleanest pieces of design
-in the whole revision, and it costs more than people expect. Both halves of that
-sentence matter, so this chapter does the mechanism first and the price second.
+It also costs more than people expect, which is why this chapter does the
+mechanism first and the price second. Both halves matter. The mechanism is what
+you implement; the price is what changes your design once you have measured
+it.
 
 \section{The problem}
 
@@ -178,8 +179,6 @@ the operation cannot proceed, which the model can relay to the user, who can go
 and use a client that supports elicitation.
 
 \section{\texttt{requestState} is attacker-controlled}
-
-Here is the part that deserves your full attention.
 
 \texttt{requestState} leaves your server, passes through a client you do not
 control, and comes back. It may come back modified. It may come back from a

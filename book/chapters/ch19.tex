@@ -4,12 +4,16 @@
 \epigraph{``The greatest trick the Devil ever pulled was convincing the world he
 didn't exist.''}{Verbal Kint, \emph{The Usual Suspects} (1995)}
 
-The trick in agentic systems is subtler. Nobody is convinced attacks do not
-exist. People are convinced that \emph{their} agent is safe because the servers
-are internal, the tools are read-only, and there is a human in the loop.
+Nobody in this field is convinced that attacks do not exist. What people are
+convinced of is that \emph{their} agent is fine, because the servers are
+internal, the tools are read-only, and there is a human in the loop.
 
-Each of those is a reasonable-sounding sentence and each has a hole in it. This
-chapter is about the holes.
+Each of those is a reasonable-sounding sentence and each one has a hole in it.
+Internal servers process text that came from outside. Read-only tools read
+attacker-influenced data into a context that also holds credentials and the
+ability to act. Humans in the loop approve what they are shown, and what they
+are shown is chosen by the component you were trying to constrain. This chapter
+is about the holes.
 
 \section{The one property that changes everything}
 
@@ -33,11 +37,13 @@ be complete.
 
 \section{The adversary catalogue}
 
-Six attacks, each with the specific MCP surface it exploits.
+Each of the six below exploits a specific surface the protocol exposes, and
+each is defended differently. They are ordered so the later ones can build on
+the earlier ones.
 
 \subsection{Prompt injection through tool results}
 
-The base case, and Meridian ships it so you can watch it work.
+The base case, and Meridian ships a working copy so you can watch it happen:
 
 \begin{sh}
 python3 -m meridian.serve compliance --poisoned
@@ -129,7 +135,8 @@ security boundary.
 
 \subsection{Exfiltration through resource URIs}
 
-The clever one, and the one that survives most reviews.
+This is the one that survives most security reviews, because every individual
+step in it is something the system is supposed to do.
 
 \begin{dangerbox}{Data exfiltration without a network tool}
 The agent has read \texttt{ACC-1042}'s summary. An injection instructs it to
@@ -442,7 +449,9 @@ it as one has one layer of defence written in English.
 
 \section{Threat modelling in practice}
 
-Half an hour, four questions, and a whiteboard.
+The whole exercise takes about half an hour and needs a whiteboard. Run it
+against a design before it ships, and again after the first incident, because
+the answers move.
 
 \begin{enumerate}[leftmargin=1.6em, itemsep=3pt]
 \item \textbf{Draw the contexts.} Each agent loop is a context. Note what data it

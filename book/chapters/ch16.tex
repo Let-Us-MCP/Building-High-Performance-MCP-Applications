@@ -4,14 +4,16 @@
 \epigraph{``It's about getting things down to one number.''}{Peter Brand,
 \emph{Moneyball} (2011)}
 
-Brand's point was not that one number is enough. It was that an argument
-conducted in adjectives cannot be settled, and an argument conducted in numbers
-can. Everyone in that room had been scouting on instinct for thirty years and
-each of them was certain.
+Everything before this chapter was mechanism. Everything after it is
+optimisation, and optimisation without measurement is superstition with a build
+pipeline attached. So this is the hinge.
 
-This is the chapter the book was written for. Everything before it was
-mechanism. Everything after it is optimisation, and optimisation without
-measurement is superstition with a build pipeline.
+The specific difficulty in an agentic system is that the obvious instruments
+measure the wrong thing. Requests per second describes your server, and your
+server is three percent of what the user waits for. A latency graph averaged
+over all calls hides the one that ran during a fan-out and held up a model turn
+behind it. This chapter is about which numbers actually move when your system
+gets better, and how to collect them without rebuilding anything.
 
 \section{The metrics that matter}
 
@@ -53,7 +55,9 @@ enough that nobody notices from the inside.
 
 \section{Decomposing the loop}
 
-The single most useful thing in this chapter.
+A task is a sequence of iterations, and each iteration divides cleanly into four
+bands of time. Recording them separately is what turns ``it feels slow'' into a
+number with a component's name attached.
 
 \begin{py}
 @dataclass
@@ -117,8 +121,6 @@ to answer ``is my server slow or is my transport slow'', and it takes ten minute
 to set up.
 
 \section{Distributed tracing, done properly}
-
-Here is where MCP gives you something genuinely nice.
 
 \texttt{traceparent}, \texttt{tracestate}, and \texttt{baggage} are reserved
 \texttt{\_meta} keys, carved out as an explicit exception to the reverse-DNS
@@ -500,7 +502,8 @@ wrong for every deployment except the one that set them.}
 
 \section{The harness}
 
-Meridian's measurement rig, and the shape is worth copying whatever you build.
+Meridian's measurement rig is about eighty lines, and its shape is worth copying
+whatever you end up building it on top of.
 
 \begin{py}
 def time_it(fn, *, n: int = 200, warmup: int = 20, label: str = "") -> Timing:

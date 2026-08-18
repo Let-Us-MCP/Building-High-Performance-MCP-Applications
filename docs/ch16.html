@@ -178,8 +178,8 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <p><em>“It’s about getting things down to one number.”</em></p>
 <p>Peter Brand, <em>Moneyball</em> (2011)</p>
 </aside>
-<p>Brand’s point was not that one number is enough. It was that an argument conducted in adjectives cannot be settled, and an argument conducted in numbers can. Everyone in that room had been scouting on instinct for thirty years and each of them was certain.</p>
-<p>This is the chapter the book was written for. Everything before it was mechanism. Everything after it is optimisation, and optimisation without measurement is superstition with a build pipeline.</p>
+<p>Everything before this chapter was mechanism. Everything after it is optimisation, and optimisation without measurement is superstition with a build pipeline attached. So this is the hinge.</p>
+<p>The specific difficulty in an agentic system is that the obvious instruments measure the wrong thing. Requests per second describes your server, and your server is three percent of what the user waits for. A latency graph averaged over all calls hides the one that ran during a fan-out and held up a model turn behind it. This chapter is about which numbers actually move when your system gets better, and how to collect them without rebuilding anything.</p>
 <section id="the-metrics-that-matter" class="level2">
 <h2>The metrics that matter</h2>
 <p>Nine. Not twenty, because a dashboard nobody reads is a dashboard that does not exist.</p>
@@ -244,7 +244,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </section>
 <section id="decomposing-the-loop" class="level2">
 <h2>Decomposing the loop</h2>
-<p>The single most useful thing in this chapter.</p>
+<p>A task is a sequence of iterations, and each iteration divides cleanly into four bands of time. Recording them separately is what turns “it feels slow” into a number with a component’s name attached.</p>
 <pre class="python" data-language="python"><code>@dataclass
 class Iteration:
     &quot;&quot;&quot;One trip round the loop, with the milliseconds attributed.&quot;&quot;&quot;
@@ -305,7 +305,6 @@ class Iteration:
 </section>
 <section id="distributed-tracing-done-properly" class="level2">
 <h2>Distributed tracing, done properly</h2>
-<p>Here is where MCP gives you something genuinely nice.</p>
 <p><code>traceparent</code>, <code>tracestate</code>, and <code>baggage</code> are reserved <code>_meta</code> keys, carved out as an explicit exception to the reverse-DNS prefix rule specifically so W3C Trace Context works unchanged.</p>
 <pre class="json" data-language="json"><code>{
   &quot;jsonrpc&quot;: &quot;2.0&quot;,
@@ -635,7 +634,7 @@ def estimate_cost_usd(input_tokens: int, output_tokens: int) -&gt; float:
 </section>
 <section id="the-harness" class="level2">
 <h2>The harness</h2>
-<p>Meridian’s measurement rig, and the shape is worth copying whatever you build.</p>
+<p>Meridian’s measurement rig is about eighty lines, and its shape is worth copying whatever you end up building it on top of.</p>
 <pre class="python" data-language="python"><code>def time_it(fn, *, n: int = 200, warmup: int = 20, label: str = &quot;&quot;) -&gt; Timing:
     for _ in range(warmup):
         fn()

@@ -178,8 +178,8 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <p><em>“Pay no attention to that man behind the curtain.”</em></p>
 <p>The Wizard, <em>The Wizard of Oz</em> (1939)</p>
 </aside>
-<p>An MCP App is a curtain. The user sees a button; the server decides what the button does and what the button says it does. Those are two separate things under one party’s control, which is a sentence worth reading twice.</p>
-<p>That tension runs through this whole chapter. Interactive interfaces are genuinely the right answer for some tool results and genuinely dangerous, and both facts come from the same source: the HTML arrived from somebody else’s server. So: when an app beats a paragraph, and what the host has to do to make rendering one safe.</p>
+<p>An MCP App is HTML that a server sends you, that your host renders, and that your user clicks on. The user sees a button. The server decides both what the button does and what the button says it does, and those two things being under one party’s control is the entire security content of this chapter.</p>
+<p>The same tension runs through the rest of it. Interactive interfaces are genuinely the right answer for some tool results and genuinely dangerous, and both of those facts have the same cause, which is that the markup arrived from somebody else’s server. So: when an app beats a paragraph of text, and what a host has to do before rendering one is safe.</p>
 <section id="the-problem" class="level2">
 <h2>The problem</h2>
 <p>Tool results are text. Sometimes text is wrong.</p>
@@ -333,7 +333,6 @@ sandbox=&quot;allow-scripts allow-same-origin&quot;    the sandbox is now decora
 </section>
 <section id="structuredcontent-and-the-context-budget" class="level2">
 <h2><code>structuredContent</code> and the context budget</h2>
-<p>Here is the thing that makes Apps interesting to a performance book.</p>
 <p>A tool result has two payloads. <code>content</code> is for the model. <code>structuredContent</code> is for programs. An app reads the second one, and the first one can be small.</p>
 <pre class="json" data-language="json"><code>{
   &quot;content&quot;: [

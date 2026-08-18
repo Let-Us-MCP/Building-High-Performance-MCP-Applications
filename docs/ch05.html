@@ -178,8 +178,8 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <p><em>“You’re gonna need a bigger boat.”</em></p>
 <p>Chief Brody, <em>Jaws</em> (1975)</p>
 </aside>
-<p>Brody says it after seeing the thing he has been theorising about, at actual scale, for the first time. Everybody has this moment with tool catalogues. You design six tools, they work beautifully, you ship. Eighteen months later there are forty-one, three of them do nearly the same thing, and the model has started picking the wrong one about a fifth of the time and nobody can say when that started.</p>
-<p>This chapter is about not getting there. Tools are the primitive that does the work, and they are the primitive where design mistakes compound fastest, because their cost is charged on every request forever.</p>
+<p>Everybody has the same experience with tool catalogues. You design six tools, they work beautifully, you ship. Eighteen months later there are forty-one, three of them do nearly the same thing, the model picks the wrong one about a fifth of the time, and nobody can say when that started or which change caused it.</p>
+<p>This chapter is about not arriving there. Tools are the primitive that does the work, and they are the primitive where design mistakes compound fastest, for a structural reason worth stating early: the catalogue is re-sent to the model on every request, so a bad decision is charged to you again on every turn of every task for as long as the tool exists.</p>
 <section id="mechanics-first" class="level2">
 <h2>Mechanics first</h2>
 <p>Two methods. That is the entire surface.</p>
@@ -290,14 +290,13 @@ while True:
 </section>
 <section id="designing-tools-a-model-can-actually-use" class="level2">
 <h2>Designing tools a model can actually use</h2>
-<p>Now the part that matters more than the mechanics.</p>
 <section id="stop-mirroring-your-rest-api" class="level3">
 <h3>Stop mirroring your REST API</h3>
 <p>The single most common failure. You have an API. It has endpoints. Wrapping each endpoint as a tool is mechanical, fast, and completable in an afternoon, which is exactly why so many people do it.</p>
 <p>Meridian shipped this way. You can still run it:</p>
 <pre class="bash" data-language="bash"><code>python3 -m meridian.serve risk --fat</code></pre>
 <p>It exposes <code>get_account</code> and <code>list_account</code>, then <code>create_exposure</code>, then <code>update_covenant</code>, then <code>delete_collateral</code>, and two dozen more in the same shape. Every one is a faithful wrapper around a REST endpoint. Every one works.</p>
-<p>Here is what it costs.</p>
+<p>Both catalogues expose the same underlying system and can answer the same questions. Here is what the difference costs, per turn and then compounded across a task:</p>
 <figure id="fig:catalogue-cost">
 <img src="figures/catalogue-cost.svg" />
 <figcaption>The same server, two catalogues. Left: what the catalogue costs. Right: what it costs by turn eight, which is the number that should change your mind.</figcaption>
@@ -469,7 +468,6 @@ band, and the weighted factors behind it.</code></pre>
 </section>
 <section id="errors-the-distinction-that-decides-whether-a-model-recovers" class="level2">
 <h2>Errors: the distinction that decides whether a model recovers</h2>
-<p>This is the most consequential paragraph in the chapter, so here it is plainly.</p>
 <p>There are two error mechanisms, they are not interchangeable, and mislabelling one as the other either burns tokens or kills tasks.</p>
 <p><strong>Protocol errors</strong> are JSON-RPC errors. They mean the request was structurally wrong: unknown tool, malformed parameters, server on fire. Models are unlikely to recover from these, because the problem lies in the shape of the request and the model can only vary its arguments.</p>
 <pre class="json" data-language="json"><code>{ &quot;jsonrpc&quot;: &quot;2.0&quot;, &quot;id&quot;: 3,
