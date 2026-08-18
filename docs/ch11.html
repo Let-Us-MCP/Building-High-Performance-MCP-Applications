@@ -282,6 +282,27 @@ def assess_account_risk(ctx: RequestContext):
     ...</code></pre>
 <p>Four things in that declaration earn their place, and each connects to an earlier chapter.</p>
 <p>The <code>pattern</code> catches a malformed id at the boundary, so the handler never sees it. The <code>description</code> on <code>exposureUsd</code> tells the model about the approval threshold, so it can warn the user <em>before</em> triggering an MRTR round trip that costs 375 milliseconds. The <code>x-mcp-header</code> lets a gateway route by region without parsing the body. And the annotations let a host auto-approve, because scoring an account changes nothing.</p>
+<section id="naming-the-surface" class="level3">
+<h3>Naming the surface</h3>
+<p>Tool names look like a free choice and are governed by a short list of SHOULDs worth following exactly, because the cost of ignoring them lands on somebody else’s client.</p>
+<ul>
+<li><p>One to 128 characters.</p></li>
+<li><p>Case-sensitive.</p></li>
+<li><p>Letters, digits, underscore, hyphen, and dot. Nothing else, and in particular no spaces or commas.</p></li>
+<li><p>Unique within your server.</p></li>
+</ul>
+<p>Meridian refuses anything outside that set at registration time, so a bad name fails when you add the tool and not when a user finds it:</p>
+<pre class="python" data-language="python"><code>TOOL_NAME_RE = re.compile(r&quot;^[A-Za-z0-9_.-]{1,128}$&quot;)</code></pre>
+<p>Read that last bullet carefully, because it is narrower than it looks. Uniqueness is scoped to <em>one server</em>. Two servers may both expose <code>search</code>, and neither is doing anything wrong. That is a fact about the protocol, not an accident, and it pushes a problem onto whoever aggregates them, which is the subject of the next chapter.</p>
+<p>There is one trap in how that problem gets solved, and the specification calls it out. <code>serverInfo.name</code> is <strong>not</strong> guaranteed unique across servers, so it must not be used to disambiguate. Two vendors can each ship a server calling itself <code>search-server</code>, and a host that namespaced on that string has just merged two catalogues into one broken one. The name a host namespaces with has to be assigned by the host.</p>
+</section>
+<section id="name-and-title-are-different-jobs" class="level3">
+<h3><code>name</code> and <code>title</code> are different jobs</h3>
+<p>Tools, resources, and prompts all carry both, and the split is worth respecting.</p>
+<p><code>name</code> is the identifier. The model emits it, your router matches it, your audit log records it, and it must be stable forever because it appears in conversation history that outlives your deployment.</p>
+<p><code>title</code> is for humans. It is the string a consent dialog shows, and it should read clearly to somebody who has never seen your domain vocabulary. <code>assess_account_risk</code> against “Assess account risk”.</p>
+<p>Clients fall back to <code>name</code> when <code>title</code> is absent, which is why omitting the title is survivable and still worse than providing one: the person approving the call reads an identifier where a sentence belongs, and Chapter <a href="ch12.html#ch:building-hosts">12</a> argues that what the consent dialog says is most of whether consent means anything.</p>
+</section>
 <section id="validate-at-the-edge-then-trust" class="level3">
 <h3>Validate at the edge, then trust</h3>
 <p>Meridian validates arguments against the input schema before calling the handler:</p>

@@ -19,11 +19,11 @@ and a formal feature-lifecycle policy.
 
 | | |
 |---|---|
-| **20 chapters + epilogue**, five parts | ~59,000 words, 346 pages |
+| **20 chapters + epilogue**, five parts | ~60,000 words, 354 pages |
 | **[`meridian/`](meridian/)** | A complete `2026-07-28` implementation, no third-party runtime dependencies |
 | **210 tests** | Contract, transport, integration, and dual-era. About four seconds |
 | **9 benchmark scenarios** | Every number printed in the book comes from these |
-| **25 figures** | TikZ and matplotlib, generated to PDF and SVG from one source |
+| **31 figures** | TikZ and matplotlib, generated to PDF and SVG from one source |
 
 Every listing in the book is extracted from Meridian. Every measurement is
 reproducible with `make bench`.

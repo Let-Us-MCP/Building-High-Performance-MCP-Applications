@@ -148,6 +148,56 @@ round trip that costs 375 milliseconds. The \texttt{x-mcp-header} lets a gateway
 route by region without parsing the body. And the annotations let a host
 auto-approve, because scoring an account changes nothing.
 
+\subsection{Naming the surface}
+
+Tool names look like a free choice and are governed by a short list of SHOULDs
+worth following exactly, because the cost of ignoring them lands on somebody else's client.
+
+\begin{itemize}[leftmargin=1.6em, itemsep=2pt]
+\item One to 128 characters.
+\item Case-sensitive.
+\item Letters, digits, underscore, hyphen, and dot. Nothing else, and in
+particular no spaces or commas.
+\item Unique within your server.
+\end{itemize}
+
+Meridian refuses anything outside that set at registration time, so a bad name
+fails when you add the tool and not when a user finds it:
+
+\begin{py}
+TOOL_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
+\end{py}
+
+Read that last bullet carefully, because it is narrower than it looks.
+Uniqueness is scoped to \emph{one server}. Two servers may both expose
+\texttt{search}, and neither is doing anything wrong. That is a fact about the
+protocol, not an accident, and it pushes a problem onto whoever aggregates
+them, which is the subject of the next chapter.
+
+There is one trap in how that problem gets solved, and the specification calls
+it out. \texttt{serverInfo.name} is \textbf{not} guaranteed unique across
+servers, so it must not be used to disambiguate. Two vendors can each ship a
+server calling itself \texttt{search-server}, and a host that namespaced on
+that string has just merged two catalogues into one broken one. The name a host
+namespaces with has to be assigned by the host.
+
+\subsection{\texttt{name} and \texttt{title} are different jobs}
+
+Tools, resources, and prompts all carry both, and the split is worth respecting.
+
+\texttt{name} is the identifier. The model emits it, your router matches it,
+your audit log records it, and it must be stable forever because it appears in
+conversation history that outlives your deployment.
+
+\texttt{title} is for humans. It is the string a consent dialog shows, and it
+should read clearly to somebody who has never seen your domain vocabulary.
+\texttt{assess\_account\_risk} against ``Assess account risk''.
+
+Clients fall back to \texttt{name} when \texttt{title} is absent, which is why
+omitting the title is survivable and still worse than providing one: the person approving the call reads an identifier where a sentence belongs, and
+Chapter~\ref{ch:building-hosts} argues that what the consent dialog says is
+most of whether consent means anything.
+
 \subsection{Validate at the edge, then trust}
 
 Meridian validates arguments against the input schema before calling the

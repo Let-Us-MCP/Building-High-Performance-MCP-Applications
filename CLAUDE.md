@@ -18,8 +18,10 @@ Live progress log for the book. Updated as work lands.
 4. **No AI slop.** No "it's important to note", no "in today's fast-paced world", no
    tricolon padding, no restating the paragraph you just wrote. `tools/lint_prose.py` flags
    a banned-phrase list and near-duplicate sentences.
-5. **Movie dialogue epigraph** opens every chapter, chosen to actually land on the chapter's
-   argument rather than for decoration.
+5. **No epigraphs.** Chapters open on their argument. The movie-dialogue rule from
+   `desc` produced a paragraph per chapter explaining how the quotation bore on the
+   topic, and that paragraph was always the weakest on the page. `tools/lint_prose.py`
+   now forbids them.
 6. **xkcd-style figures** alongside the technical diagrams. Hand-drawn look, dry joke, real point.
 7. **Everything runs.** Code in the book comes from `meridian/`, which is tested. Numbers in
    the book come from `meridian/bench/`, which is run.
@@ -160,6 +162,19 @@ Legend: `[ ]` not started · `[~]` drafted · `[x]` drafted + prose-linted + bui
   situation every reader shipping in 2026 is actually in. MRTR has no legacy equivalent,
   so the bridge refuses it with an explanatory error instead of sending a shape the client
   cannot parse; that limitation is documented rather than hidden.
+
+- **Worked examples live outside the four benchmarked servers.** The catalogue
+  numbers in five chapters come from `_wire()`, which builds risk, compliance,
+  fraud, and marketdata. Adding chapter 11's `book_facility` to the risk server
+  moved the slim catalogue from 10 tools to 11 and would have invalidated every
+  quoted figure, so it lives on its own server in `servers/scoped.py` instead.
+  New examples go there, or the benchmark gets re-pinned and the prose updated
+  with it.
+- **Claims get checked against the SEP archive, not just the spec text.** The
+  specification says what the protocol is; `proto/modelcontextprotocol/docs/seps/`
+  says why, and the book makes a lot of "why" claims. Auditing against it found
+  a real bug (SEP-1303: argument validation is a tool execution error, and both
+  the book and Meridian had it as a protocol error) and two rationale errors.
 
 ## Style rules discovered in review (binding from here on)
 

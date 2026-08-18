@@ -174,7 +174,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <main>
 <section id="ch:building-hosts" class="level1">
 <h1>Building Hosts and Clients</h1>
-<p>The host is the only component that can see all of it. The model proposes, the server executes, the user watches, and when something goes wrong the host was the only party in a position to have prevented it. That makes it the accountable component whether or not anybody designed it to be, which is worth deciding deliberately rather than discovering during an incident.</p>
+<p>The host is the only component that can see all of it. The model proposes, the server executes, the user watches, and when something goes wrong the host was the only party in a position to have prevented it. That makes it the accountable component whether or not anybody designed it to be, which is worth deciding deliberately before an incident decides it for you.</p>
 <p>Building a server is mostly craft: implement the methods, honour the contract, test the wire. Building a host is mostly judgement. This chapter is about the five judgements that matter, two of which get skipped in every prototype and retrofitted in almost none.</p>
 <section id="what-a-host-is-actually-for" class="level2">
 <h2>What a host is actually for</h2>
@@ -280,10 +280,19 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
     self.assertEqual(
         host.call_tool(&quot;beta.search&quot;)[&quot;content&quot;][0][&quot;text&quot;], &quot;from beta&quot;)</code></pre>
 <p>Note <code>sorted(self.bindings)</code>. Deterministic ordering across servers, for the same prompt-cache reason as Chapter <a href="ch05.html#ch:tools">5</a>. A host that iterates a dictionary in insertion order will reorder its catalogue whenever a server reconnects, and quietly lose every prompt-cache hit.</p>
+<section id="where-the-label-comes-from" class="level3">
+<h3>Where the label comes from</h3>
+<p>The obvious implementation is to namespace on something the server tells you, and the specification closes that door explicitly: <code>serverInfo.name</code> is not guaranteed unique across servers and must not be used to disambiguate.</p>
+<p>The reason is worth sitting with, because the failure is quiet. Two vendors each ship something reasonably called <code>search-server</code>. A host that namespaces on the reported name now has two servers claiming the prefix <code>search-server</code>, and the merged catalogue contains <code>search-server.query</code> twice. One of them wins. Which one depends on dictionary ordering, so it varies between restarts, and the symptom a user reports is that a tool sometimes talks to the wrong system.</p>
+<p>The label therefore has to be assigned by the host, from configuration, and it has to be stable across restarts because it ends up in conversation history and audit records. Meridian takes it as the first argument to <code>connect</code> for exactly that reason: it is a decision the operator makes once, not a value a server gets to influence.</p>
+<pre class="python" data-language="python"><code>def connect(self, label: str, transport, *, input_provider=None,
+            auth_context: str = &quot;anon&quot;) -&gt; ServerBinding:</code></pre>
+<p>This is the same principle as <code>clientInfo</code> in Chapter <a href="ch02.html#ch:architecture">2</a> and the annotations in Chapter <a href="ch05.html#ch:tools">5</a>, arriving for the third time: anything the other party reports about itself is useful for display and unusable as a key. Here the key is a routing decision, and routing on a self-reported string means a server can choose which of your other servers it collides with.</p>
 <aside class="box note"><p class="box-title">Choosing a separator</p>
 <p>Meridian uses <code>.</code>, giving <code>risk.assess_account_risk</code>. Tool names allow letters, digits, underscore, hyphen, and dot, so any of them works.</p>
 <p>Whatever you pick, pick it once. The namespaced name appears in conversation history and in audit logs, and changing the separator invalidates both.</p>
 </aside>
+</section>
 </section>
 <section id="the-context-budget" class="level2">
 <h2>The context budget</h2>
