@@ -2,7 +2,7 @@
 \label{ch:operations}
 
 Operations is unglamorous compounding. Health checks that mean something, drains
-that actually drain, alerts that fire before a user notices rather than after.
+that actually drain, alerts that fire before a user notices.
 None of it is clever, and all of it is what makes three in the morning
 uneventful.
 
@@ -174,7 +174,8 @@ It was removed in \texttt{2026-07-28}. If your health check sends it, a modern
 server answers \texttt{-32601} and your orchestrator concludes the server is
 unhealthy and restarts it, forever.
 
-The dual-era bridge answers \texttt{ping} for exactly this reason, which is a compatibility shim, not a recommendation.
+The dual-era bridge answers \texttt{ping} for exactly this reason. Treat that
+as a compatibility shim with a shelf life.
 \end{notebox}
 
 \section{Graceful drain}
@@ -356,6 +357,9 @@ Meridian at 100 tasks/second: 3 round trips each is 300 requests/second mean,
 and a fan-out of 3 means bursts of up to 900 concurrent. Provisioning for the
 mean gives you a service that falls over during every parallel fan-out, which is
 to say during every task.
+
+\bookfig[0.94]{xkcd-thundering-herd}{The same 2,000 clients and the same
+one-hour TTL, with and without jitter.}{thundering-herd}
 
 \subsection{Little's Law, which sizes your pools}
 

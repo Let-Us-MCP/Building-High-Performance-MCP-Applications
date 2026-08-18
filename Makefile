@@ -91,6 +91,9 @@ lint:
 	$(PY) tools/check_contrastive.py
 	$(PY) tools/check_cadence.py
 
+coverage:
+	$(PY) tools/check_coverage.py
+
 review:
 	$(PY) tools/review_prose.py --summary
 	$(PY) tools/audit_style.py --deferrals

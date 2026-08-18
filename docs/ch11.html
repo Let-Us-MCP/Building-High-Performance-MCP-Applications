@@ -238,6 +238,10 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <li><p>The server identifies itself in every result, as the specification recommends.</p></li>
 </ol>
 <p>And the bare <code>except</code> at the bottom is deliberate. A handler that raises <code>KeyError</code> should produce a <code>-32603</code> for that one request, not take down a process serving forty others.</p>
+<figure id="fig:server-dispatch">
+<img src="figures/server-dispatch.svg" />
+<figcaption>One <code>tools/call</code> through a stateless server. The two red exits are caught by the client and never reach the model; the orange one is the whole reason the distinction matters.</figcaption>
+</figure>
 </section>
 <section id="registering-the-surface" class="level2">
 <h2>Registering the surface</h2>

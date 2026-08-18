@@ -279,9 +279,8 @@ AUDIT_LOG.append({
 })
 \end{py}
 
-Hashes rather than content, for a reason: the content may be private, and
-retaining it turns your audit log into a second copy of the data you were
-protecting. A hash plus a source plus a length is enough to prove that a
+Hashes, for a reason: the content may be private, and retaining it turns your
+audit log into a second copy of the data you were protecting. A hash plus a source plus a length is enough to prove that a
 particular result preceded a particular behaviour, which is what an incident
 review needs.
 
@@ -289,7 +288,7 @@ review needs.
 
 \begin{itemize}[leftmargin=1.6em, itemsep=3pt]
 \item \textbf{Append-only.} If it can be edited it is a database, not an audit
-log. \secref{tamper-evident} is about making that true rather than declaring it.
+log. \secref{tamper-evident} is about making that true instead of asserting it.
 \item \textbf{Written before the action.} Meridian audits before executing, so
 the record exists even when the call times out.
 \item \textbf{Independently queryable.} By principal, by subject, by trace, by
@@ -356,6 +355,10 @@ entry beneath it, somewhere the attacker does not control: a different account,
 a log-shipping pipeline, a customer's system, an hourly line in a chat channel.
 Rewriting the chain now requires also rewriting every published head, and the
 first one they miss is the alarm.
+
+\bookfig[1.0]{audit-chain}{Hash chaining makes tampering detectable.
+Publishing the head is what makes it detectable by somebody other than the
+attacker.}{audit-chain}
 
 \keyidea{Chaining is what makes publishing cheap. One digest an hour covers
 every entry written in that hour, so tamper-evidence costs a cron job rather

@@ -1,0 +1,47 @@
+% Chapter 20. Hash chaining, and the one number you publish.
+\documentclass[tikz,border=6pt]{standalone}
+\input{_style}
+\begin{document}
+\begin{tikzpicture}[x=1cm, y=1cm]
+
+  \node[lblink, font=\sffamily\bfseries] at (5.6,3.1) {Each entry commits to the one before it};
+
+  \foreach \i/\x/\txt in {0/0.0/{review\\T-1001}, 1/3.0/{override\\T-1002},
+                          2/6.0/{export\\audit log}, 3/9.0/{review\\T-1003}} {
+    \node[boxa, minimum width=22mm, minimum height=13mm, font=\sffamily\scriptsize]
+      (e\i) at (\x,1.7) {\txt};
+    \node[tag, font=\ttfamily\tiny] at (\x,0.92) {digest};
+  }
+
+  \foreach \i/\j in {0/1, 1/2, 2/3} {
+    \draw[flow] (e\i.east) -- node[lbl, above, font=\sffamily\tiny] {previous} (e\j.west);
+  }
+
+  \node[lbl, font=\sffamily\tiny] at (-1.55,1.7) {genesis};
+  \draw[flowmuted] (-1.2,1.7) -- (e0.west);
+
+  % the published head
+  \node[boxg, minimum width=30mm, minimum height=9mm, font=\sffamily\scriptsize]
+    (head) at (9.0,-0.9) {head digest\\{\scriptsize covers every entry above}};
+  \draw[flow, draw=good] (e3.south) -- (head.north);
+  \node[note, align=left, text=good] at (12.4,-0.9)
+    {publish this hourly,\\somewhere the attacker\\does not control};
+
+  % the tamper
+  \node[boxd, minimum width=24mm, minimum height=8mm, font=\sffamily\scriptsize]
+    (edit) at (3.0,-1.2) {attacker edits\\entry 1};
+  \draw[flowmuted, draw=danger] (edit.north) -- (e1.south);
+  \node[note, align=left, text=danger] at (6.6,-2.15)
+    {every digest from here on stops matching,\\and \texttt{verify()} names the first
+     broken link};
+  \draw[flowmuted, draw=danger] (4.25,-1.2) -- (5.2,-1.65);
+
+  \draw[rule, line width=0.7pt] (-2.6,-3.05) -- (14.6,-3.05);
+  \node[note, align=center, text=muted] at (6.0,-3.45)
+    {Chaining is what makes publishing cheap: one number covers everything
+     beneath it, so tamper-evidence costs\\a cron job instead of a replicated
+     write path. Without a published head, an attacker rewrites the chain and
+     it still verifies.};
+
+\end{tikzpicture}
+\end{document}

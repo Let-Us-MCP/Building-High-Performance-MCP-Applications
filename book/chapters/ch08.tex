@@ -151,8 +151,8 @@ on.}
 \label{tab:input-requests}
 \end{table}
 
-A map rather than a list, because a server can ask several things at once and
-the keys correlate answers to questions. Asking for everything in one interim
+A map, because a server can ask several things at once and the keys are what
+correlate answers back to questions. Asking for everything in one interim
 result costs one round trip; asking one at a time costs one each.
 
 And a hard rule: \textbf{never send a request the client did not declare support

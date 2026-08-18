@@ -214,6 +214,10 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </tbody>
 </table>
 <p>Meridian’s 210 tests run in about four seconds and use no model at all. Most of that is the handful that spawn real subprocesses and open real sockets; the rest finish in microseconds. The eval suite is separate, slower, and gates deploys.</p>
+<figure id="fig:test-pyramid">
+<img src="figures/test-pyramid.svg" />
+<figcaption>Four layers. Only the top one needs a model, and only the top one is slow, which is not a coincidence.</figcaption>
+</figure>
 <aside class="keyidea">
 <p>If your MCP tests are slow, you are testing the model when you meant to test the protocol. Push everything you can down a layer.</p>
 </aside>

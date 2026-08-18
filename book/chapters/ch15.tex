@@ -35,6 +35,9 @@ Meridian's 210 tests run in about four seconds and use no model at all. Most of
 that is the handful that spawn real subprocesses and open real sockets; the
 rest finish in microseconds. The eval suite is separate, slower, and gates deploys.
 
+\bookfig[0.96]{test-pyramid}{Four layers. Only the top one needs a model,
+and only the top one is slow, which is not a coincidence.}{test-pyramid}
+
 \keyidea{If your MCP tests are slow, you are testing the model when you meant to
 test the protocol. Push everything you can down a layer.}
 

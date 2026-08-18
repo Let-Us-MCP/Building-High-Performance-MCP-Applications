@@ -263,7 +263,7 @@ if self.cost_budget_usd is not None and result.cost_usd &gt; self.cost_budget_us
     result.stopped_because = &quot;cost budget exhausted&quot;
     result.answer = &quot;Stopped: the dollar budget for this task ran out.&quot;
     break</code></pre>
-<p>Note that a budget stop still produces an <em>answer</em>. Not an exception, not a blank. The user asked a question and deserves to be told why they are not getting one.</p>
+<p>Note that a budget stop still produces an <em>answer</em>. The user asked a question and deserves to be told why they are not getting one, which an exception thrown three frames up does not accomplish.</p>
 <pre class="python" data-language="python"><code>def test_step_budget_stops_a_runaway(self):
     looping = [[{&quot;name&quot;: &quot;fraud.screen_account&quot;,
                  &quot;arguments&quot;: {&quot;accountId&quot;: &quot;ACC-1000&quot;}}]] * 50
@@ -320,6 +320,10 @@ if self.cost_budget_usd is not None and result.cost_usd &gt; self.cost_budget_us
 <h2>Context management</h2>
 <p>Now the hard part.</p>
 <p>Every tool result enters the context and stays there. Ten calls returning 2 KB each is 20 KB of JSON, re-processed on every subsequent turn, most of it irrelevant by the time you get to turn eight.</p>
+<figure id="fig:context-growth">
+<img src="figures/xkcd-context-growth.svg" />
+<figcaption>Six iterations of one task. The input line is everything you are paying to re-read.</figcaption>
+</figure>
 <section id="the-cost-argument-is-the-weaker-one" class="level3">
 <h3>The cost argument is the weaker one</h3>
 <p>The obvious reason to manage context is money, and this chapter’s cost table makes that case. There is a second reason, and in practice it decides more outcomes.</p>
@@ -488,7 +492,7 @@ def cost_usd(self) -&gt; float:
 </section>
 <section id="streaming-because-perceived-latency-is-the-latency" class="level2">
 <h2>Streaming, because perceived latency is the latency</h2>
-<p>The Meridian baseline is 1,366 ms, 96 % of it model inference. You cannot make that faster. You can make it <em>feel</em> faster, and that is not a trick, it is the actual user experience.</p>
+<p>The Meridian baseline is 1,366 ms, 96 % of it model inference. You cannot make that faster. You can make it <em>feel</em> faster, which is the actual user experience and therefore the thing worth optimising.</p>
 <ul>
 <li><p><strong>Stream the model’s tokens</strong> as they arrive. Time to first token becomes the number the user feels, and it is a third of the total.</p></li>
 <li><p><strong>Show tool calls as they happen.</strong> “Checking fraud signals...” tells the user the system is working and, incidentally, gives them a chance to notice it is doing something wrong.</p></li>

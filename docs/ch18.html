@@ -174,7 +174,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <main>
 <section id="ch:operations" class="level1">
 <h1>Deployment and Operations</h1>
-<p>Operations is unglamorous compounding. Health checks that mean something, drains that actually drain, alerts that fire before a user notices rather than after. None of it is clever, and all of it is what makes three in the morning uneventful.</p>
+<p>Operations is unglamorous compounding. Health checks that mean something, drains that actually drain, alerts that fire before a user notices. None of it is clever, and all of it is what makes three in the morning uneventful.</p>
 <p>The good news for MCP specifically is that the stateless core deleted most of the hard parts of this chapter before it was written. If you deployed a 2025-era server you spent real effort on session affinity, a session store, and draining state during a deploy. All three of those problems are simply gone.</p>
 <section id="what-statelessness-bought-you" class="level2">
 <h2>What statelessness bought you</h2>
@@ -321,7 +321,7 @@ CMD [&quot;python3&quot;, &quot;-m&quot;, &quot;meridian.serve&quot;, &quot;risk
 </table>
 <aside class="box note"><p class="box-title">Do not use <code>ping</code></p>
 <p>It was removed in <code>2026-07-28</code>. If your health check sends it, a modern server answers <code>-32601</code> and your orchestrator concludes the server is unhealthy and restarts it, forever.</p>
-<p>The dual-era bridge answers <code>ping</code> for exactly this reason, which is a compatibility shim, not a recommendation.</p>
+<p>The dual-era bridge answers <code>ping</code> for exactly this reason. Treat that as a compatibility shim with a shelf life.</p>
 </aside>
 </section>
 <section id="graceful-drain" class="level2">
@@ -436,6 +436,10 @@ CMD [&quot;python3&quot;, &quot;-m&quot;, &quot;meridian.serve&quot;, &quot;risk
 requests/second (mean)          x  fan-out width
                                 =  concurrent requests at the burst</code></pre>
 <p>Meridian at 100 tasks/second: 3 round trips each is 300 requests/second mean, and a fan-out of 3 means bursts of up to 900 concurrent. Provisioning for the mean gives you a service that falls over during every parallel fan-out, which is to say during every task.</p>
+<figure id="fig:thundering-herd">
+<img src="figures/xkcd-thundering-herd.svg" />
+<figcaption>The same 2,000 clients and the same one-hour TTL, with and without jitter.</figcaption>
+</figure>
 <section id="littles-law-which-sizes-your-pools" class="level3">
 <h3>Little’s Law, which sizes your pools</h3>
 <p>That arithmetic has a name, and knowing it turns capacity planning from guesswork into a division.</p>

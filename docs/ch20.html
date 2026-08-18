@@ -424,12 +424,12 @@ def rank_portfolio_risk(ctx: RequestContext):
     &quot;inputSource&quot;: f&quot;{server_label}.{tool_name}&quot;,
     &quot;inputBytes&quot;: len(result_text),
 })</code></pre>
-<p>Hashes rather than content, for a reason: the content may be private, and retaining it turns your audit log into a second copy of the data you were protecting. A hash plus a source plus a length is enough to prove that a particular result preceded a particular behaviour, which is what an incident review needs.</p>
+<p>Hashes, for a reason: the content may be private, and retaining it turns your audit log into a second copy of the data you were protecting. A hash plus a source plus a length is enough to prove that a particular result preceded a particular behaviour, which is what an incident review needs.</p>
 </section>
 <section id="properties-not-just-fields" class="level3">
 <h3>Properties, not just fields</h3>
 <ul>
-<li><p><strong>Append-only.</strong> If it can be edited it is a database, not an audit log. <a href="#sec:tamper-evident">§20.4.4</a> is about making that true rather than declaring it.</p></li>
+<li><p><strong>Append-only.</strong> If it can be edited it is a database, not an audit log. <a href="#sec:tamper-evident">§20.4.4</a> is about making that true instead of asserting it.</p></li>
 <li><p><strong>Written before the action.</strong> Meridian audits before executing, so the record exists even when the call times out.</p></li>
 <li><p><strong>Independently queryable.</strong> By principal, by subject, by trace, by time.</p></li>
 <li><p><strong>Retained past the incident.</strong> Compromises are found late. A 30-day retention is a 30-day investigation limit.</p></li>
@@ -460,6 +460,10 @@ def rank_portfolio_risk(ctx: RequestContext):
 <p>Deletion and reordering are caught by the same property, which is worth noting because they are the operations a naive integrity check misses. A per-row checksum detects edits and says nothing about a row that is no longer there.</p>
 <p>Now the honest limitation, because a control whose limits you have not stated is a control somebody will over-trust. An attacker who can write to the log can also recompute the whole chain from their edit onward. Verification then passes against a log that lies.</p>
 <p>What closes that is one number. Publish the head digest, which covers every entry beneath it, somewhere the attacker does not control: a different account, a log-shipping pipeline, a customer’s system, an hourly line in a chat channel. Rewriting the chain now requires also rewriting every published head, and the first one they miss is the alarm.</p>
+<figure id="fig:audit-chain">
+<img src="figures/audit-chain.svg" />
+<figcaption>Hash chaining makes tampering detectable. Publishing the head is what makes it detectable by somebody other than the attacker.</figcaption>
+</figure>
 <aside class="keyidea">
 <p>Chaining is what makes publishing cheap. One digest an hour covers every entry written in that hour, so tamper-evidence costs a cron job rather than a replicated write path.</p>
 </aside>

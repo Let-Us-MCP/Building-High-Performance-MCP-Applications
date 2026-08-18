@@ -615,6 +615,8 @@ def call_tools_parallel(self, calls: list[dict]) -> list[dict]:
         ...
 \end{py}
 
+% lint: allow-repeat. Deliberately restating chapter 1's measurement at the
+% point where a reader is deciding whether to fan out.
 Chapter~\ref{ch:primer} measured this: a consistent 2.8$\times$ on three calls,
 holding steady as per-call latency rises from 2\,ms to 40\,ms. The ceiling is
 3$\times$, and the gap is thread scheduling plus the slowest of the three

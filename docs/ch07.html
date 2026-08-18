@@ -244,6 +244,10 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
       &quot;text&quot;: &quot;# Risk model v4.2\n\nScores are 1-99...&quot;
     } } }</code></pre>
 <p>The alternative is a <code>resource_link</code>, which names the resource and makes the model ask for it: cheaper if it does not want it, one extra round trip and one extra model turn if it does. Embed when the material is small and the workflow always needs it. Link when it is large or optional. A model card the prompt exists to apply is the first case; a 284-page filing is the second.</p>
+<figure id="fig:prompt-prefix">
+<img src="figures/prompt-prefix.svg" />
+<figcaption>A prompt is a conversation prefix. Return an assistant turn and you have shown the model the answer shape instead of describing it.</figcaption>
+</figure>
 <section id="prompts-are-user-controlled" class="level3">
 <h3>Prompts are user-controlled</h3>
 <p>The third control axis, and the one that completes the set:</p>

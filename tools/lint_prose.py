@@ -305,12 +305,26 @@ def lint_file(path: Path, sentence_index: dict) -> list[Finding]:
     if path.parent.name == "appendices":
         return findings
 
+    # A few restatements are deliberate: a measurement quoted in the chapter that
+    # owns it and again in the chapter that applies it. Mark those at the source
+    # with `% lint: allow-repeat` rather than leaving a warning to be scrolled
+    # past forever, because a warning nobody acts on trains you to ignore the
+    # ones that matter.
+    exempt_lines = {i + 1 for i, line in enumerate(raw.splitlines())
+                    if "lint: allow-repeat" in line}
+
+    def exempt(line_no: int) -> bool:
+        return any(line_no - back in exempt_lines for back in range(0, 8))
+
     for m in re.finditer(r"[^.!?\n][^.!?]{40,}[.!?]", prose[:limit]):
         sentence = " ".join(m.group(0).split())
         fp = fingerprint(sentence)
         if len(fp) < 6:
             continue
-        sentence_index[path].append((line_of(prose, m.start()), sentence, fp))
+        line_no = line_of(prose, m.start())
+        if exempt(line_no):
+            continue
+        sentence_index[path].append((line_no, sentence, fp))
 
     return findings
 

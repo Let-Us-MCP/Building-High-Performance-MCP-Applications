@@ -1,0 +1,38 @@
+% Chapter 7. A prompt is a conversation prefix, not a string.
+\documentclass[tikz,border=6pt]{standalone}
+\input{_style}
+\begin{document}
+\begin{tikzpicture}[x=1cm, y=1cm]
+
+  \node[lblink, font=\sffamily\bfseries] at (2.6,4.5) {What \texttt{prompts/get} returns};
+  \node[lbl] at (2.6,4.12) {messages, with roles};
+
+  \node[boxa, minimum width=48mm, align=left, font=\sffamily\scriptsize]
+    (m1) at (2.6,3.3) {\textbf{user}\\``Review ACC-1001.''};
+  \node[boxg, minimum width=48mm, align=left, font=\sffamily\scriptsize]
+    (m2) at (2.6,2.0) {\textbf{assistant}\\``Score 41 (moderate). Drivers:\\utilisation 0.62, 2 late payments.''};
+  \node[boxa, minimum width=48mm, align=left, font=\sffamily\scriptsize]
+    (m3) at (2.6,0.75) {\textbf{user}\\``Review ACC-1042.''};
+
+  \node[note, align=left, text=good] at (7.15,2.0)
+    {the answer you want,\\put in the model's mouth\\before it answers};
+  \draw[flowmuted, draw=good] (5.15,2.0) -- (5.6,2.0);
+
+  \draw[flow] (m3.south) -- (2.6,0.0);
+  \node[lbl] at (2.6,-0.28) {host prepends all three};
+
+  \node[box, minimum width=62mm, minimum height=12mm, align=center]
+    (ctx) at (2.6,-1.35) {model context\\[2pt]
+      {\scriptsize prefix (3 messages) $+$ the real task}};
+
+  \node[note, align=left] at (7.55,-1.35)
+    {the model has now seen\\the format, the length,\\and that drivers are\\quoted numerically,\\with no instructions\\describing any of it};
+
+  \draw[rule, line width=0.7pt] (-0.4,-2.35) -- (10.6,-2.35);
+  \node[note, align=center, text=muted] at (5.1,-2.75)
+    {Demonstration is denser than description, and it fails more gently:
+     a misread instruction produces something arbitrary,\\a misread example
+     produces something close to the example.};
+
+\end{tikzpicture}
+\end{document}

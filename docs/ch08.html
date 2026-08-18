@@ -285,7 +285,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </tr>
 </tbody>
 </table>
-<p>A map rather than a list, because a server can ask several things at once and the keys correlate answers to questions. Asking for everything in one interim result costs one round trip; asking one at a time costs one each.</p>
+<p>A map, because a server can ask several things at once and the keys are what correlate answers back to questions. Asking for everything in one interim result costs one round trip; asking one at a time costs one each.</p>
 <p>And a hard rule: <strong>never send a request the client did not declare support for.</strong> Meridian checks and degrades:</p>
 <pre class="python" data-language="python"><code>def _ask_for_approval(self, ctx, account_id, exposure):
     if not ctx.capabilities.supports_elicitation(&quot;form&quot;):

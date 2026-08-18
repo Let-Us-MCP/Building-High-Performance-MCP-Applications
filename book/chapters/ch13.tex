@@ -99,9 +99,9 @@ if self.cost_budget_usd is not None and result.cost_usd > self.cost_budget_usd:
     break
 \end{py}
 
-Note that a budget stop still produces an \emph{answer}. Not an exception, not a
-blank. The user asked a question and deserves to be told why they are not getting
-one.
+Note that a budget stop still produces an \emph{answer}. The user asked a
+question and deserves to be told why they are not getting one, which an
+exception thrown three frames up does not accomplish.
 
 \begin{py}
 def test_step_budget_stops_a_runaway(self):
@@ -181,6 +181,9 @@ Now the hard part.
 Every tool result enters the context and stays there. Ten calls returning 2\,KB
 each is 20\,KB of JSON, re-processed on every subsequent turn, most of it
 irrelevant by the time you get to turn eight.
+
+\bookfig[0.94]{xkcd-context-growth}{Six iterations of one task. The input
+line is everything you are paying to re-read.}{context-growth}
 
 \subsection{The cost argument is the weaker one}
 
@@ -400,8 +403,8 @@ expensive, ephemeral, and invisible to every other consumer.
 \section{Streaming, because perceived latency is the latency}
 
 The Meridian baseline is 1,366\,ms, 96\,\% of it model inference. You cannot make
-that faster. You can make it \emph{feel} faster, and that is not a trick, it is
-the actual user experience.
+that faster. You can make it \emph{feel} faster, which is the actual user experience and
+therefore the thing worth optimising.
 
 \begin{itemize}[leftmargin=1.6em, itemsep=3pt]
 \item \textbf{Stream the model's tokens} as they arrive. Time to first token
