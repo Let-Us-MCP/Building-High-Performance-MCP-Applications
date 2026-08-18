@@ -1,8 +1,6 @@
 \chapter{Testing and Debugging}
 \label{ch:testing}
 
-\epigraph{``Houston, we have a problem.''}{Jim Lovell, \emph{Apollo 13} (1995)}
-
 Testing a system with a language model in it sounds impossible, and the
 impossibility is routinely overstated. Almost none of an MCP application is the
 model. Almost all of it is a protocol, and protocols are extremely testable:
@@ -33,7 +31,7 @@ slow. That is not a coincidence.}
 \label{tab:test-pyramid}
 \end{table}
 
-Meridian's 208 tests run in about four seconds and use no model at all. Most of
+Meridian's 210 tests run in about four seconds and use no model at all. Most of
 that is the handful that spawn real subprocesses and open real sockets; the
 rest finish in microseconds. The eval suite is separate, slower, and gates deploys.
 
@@ -495,7 +493,7 @@ What Meridian gates on, and roughly what I would gate on generally:
 \toprule
 \thead{Gate} & \thead{Checks} & \thead{Runs on} \\
 \midrule
-Unit and contract & 208 tests, no model & every commit \\
+Unit and contract & 210 tests, no model & every commit \\
 Benchmarks        & Round trips and token counts did not regress & every commit \\
 Prose lint        & Em dashes, slop, repetition, listing encodings & every commit \\
 Reference check   & No \texttt{??} in the finished book & every commit \\
@@ -513,7 +511,7 @@ thousand more tokens per turn, and both are invisible to correctness tests and
 obvious to a benchmark that runs on every commit.
 
 \begin{sh}
-make test      # 208 tests, about four seconds
+make test      # 210 tests, about four seconds
 make bench     # regenerates every number in the book
 make lint      # prose rules plus cross-reference integrity
 \end{sh}

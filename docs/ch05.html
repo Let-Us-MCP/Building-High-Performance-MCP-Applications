@@ -174,10 +174,6 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <main>
 <section id="ch:tools" class="level1">
 <h1>Tools: The Execution Layer</h1>
-<aside class="epigraph">
-<p><em>“You’re gonna need a bigger boat.”</em></p>
-<p>Chief Brody, <em>Jaws</em> (1975)</p>
-</aside>
 <p>Everybody has the same experience with tool catalogues. You design six tools, they work beautifully, you ship. Eighteen months later there are forty-one, three of them do nearly the same thing, the model picks the wrong one about a fifth of the time, and nobody can say when that started or which change caused it.</p>
 <p>This chapter is about not arriving there. Tools are the primitive that does the work, and they are the primitive where design mistakes compound fastest, for a structural reason worth stating early: the catalogue is re-sent to the model on every request, so a bad decision is charged to you again on every turn of every task for as long as the tool exists.</p>
 <section id="mechanics-first" class="level2">
@@ -469,7 +465,8 @@ band, and the weighted factors behind it.</code></pre>
 <section id="errors-the-distinction-that-decides-whether-a-model-recovers" class="level2">
 <h2>Errors: the distinction that decides whether a model recovers</h2>
 <p>There are two error mechanisms, they are not interchangeable, and mislabelling one as the other either burns tokens or kills tasks.</p>
-<p><strong>Protocol errors</strong> are JSON-RPC errors. They mean the request was structurally wrong: unknown tool, malformed parameters, server on fire. Models are unlikely to recover from these, because the problem lies in the shape of the request and the model can only vary its arguments.</p>
+<p><strong>Protocol errors</strong> are JSON-RPC errors. They mean the request was structurally wrong in a way the model cannot fix by choosing different arguments: an unknown tool, a <code>tools/call</code> that does not satisfy the request schema, or a server on fire.</p>
+<p>The reason that class is drawn so narrowly is that a client catches protocol errors and handles them itself. They do not reach the model. So anything you report this way is something the model will never see, never learn from, and never correct.</p>
 <pre class="json" data-language="json"><code>{ &quot;jsonrpc&quot;: &quot;2.0&quot;, &quot;id&quot;: 3,
   &quot;error&quot;: { &quot;code&quot;: -32602, &quot;message&quot;: &quot;Unknown tool: invalid_tool_name&quot; } }</code></pre>
 <p><strong>Tool execution errors</strong> are <em>successful</em> results with <code>isError: true</code>. They mean the call was well-formed and the work failed for a reason the model can understand and act on.</p>
@@ -496,10 +493,22 @@ band, and the weighted factors behind it.</code></pre>
 <td style="text-align: left;">The catalogue is wrong, not the arguments</td>
 </tr>
 <tr>
-<td style="text-align: left;">Missing required argument</td>
+<td style="text-align: left;">Malformed <code>tools/call</code></td>
 <td style="text-align: left;">Protocol</td>
 <td style="text-align: left;"><code>-32602</code></td>
-<td style="text-align: left;">Schema violation; caught before your code runs</td>
+<td style="text-align: left;">The envelope is wrong, not the arguments</td>
+</tr>
+<tr>
+<td style="text-align: left;">Missing required argument</td>
+<td style="text-align: left;">Tool</td>
+<td style="text-align: left;"><code>isError</code></td>
+<td style="text-align: left;">The model can add the argument and retry</td>
+</tr>
+<tr>
+<td style="text-align: left;">Argument of the wrong type</td>
+<td style="text-align: left;">Tool</td>
+<td style="text-align: left;"><code>isError</code></td>
+<td style="text-align: left;">The model can fix the type and retry</td>
 </tr>
 <tr>
 <td style="text-align: left;">Account id does not exist</td>

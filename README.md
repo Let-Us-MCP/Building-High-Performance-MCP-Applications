@@ -21,7 +21,7 @@ and a formal feature-lifecycle policy.
 |---|---|
 | **20 chapters + epilogue**, five parts | ~59,000 words, 346 pages |
 | **[`meridian/`](meridian/)** | A complete `2026-07-28` implementation, no third-party runtime dependencies |
-| **208 tests** | Contract, transport, integration, and dual-era. About four seconds |
+| **210 tests** | Contract, transport, integration, and dual-era. About four seconds |
 | **9 benchmark scenarios** | Every number printed in the book comes from these |
 | **25 figures** | TikZ and matplotlib, generated to PDF and SVG from one source |
 
@@ -34,7 +34,7 @@ reproducible with `make bench`.
 git clone https://github.com/Let-Us-MCP/Building-High-Performance-MCP-Applications
 cd Building-High-Performance-MCP-Applications
 
-make test      # 208 tests, about four seconds
+make test      # 210 tests, about four seconds
 make bench     # regenerate every measurement in the book
 ```
 
@@ -134,7 +134,7 @@ meridian/        the companion application
   servers/         risk, compliance, fraud, marketdata
   host/            Host, AgentLoop, and a deterministic model stub
   bench/           the measurement harness and results.json
-  tests/           208 tests
+  tests/           210 tests
 docs/            the generated website (GitHub Pages)
 tools/           build, lint, and verification scripts
 ```

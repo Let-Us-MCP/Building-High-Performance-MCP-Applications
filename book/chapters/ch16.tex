@@ -1,9 +1,6 @@
 \chapter{Measuring MCP Applications}
 \label{ch:measuring}
 
-\epigraph{``It's about getting things down to one number.''}{Peter Brand,
-\emph{Moneyball} (2011)}
-
 Everything before this chapter was mechanism. Everything after it is
 optimisation, and optimisation without measurement is superstition with a build
 pipeline attached. So this is the hinge.
@@ -207,6 +204,33 @@ Bad: anything sensitive. Baggage crosses every trust boundary in the system,
 including into servers you do not operate, and it lands in whatever tracing
 backend each of them uses.
 \end{notebox}
+
+\begin{legacybox}{Logging}
+Deprecated as of \texttt{2026-07-28} (SEP-2577), eligible for removal no earlier
+than 2027-07-28. It still works in the meantime, and it changed shape rather
+than disappearing, which is why it is easy to misread as removed.
+
+The \texttt{logging/setLevel} RPC is gone. A client now sets the level it wants
+per request, in \texttt{\_meta}:
+
+\begin{wire}
+"_meta": { "io.modelcontextprotocol/logLevel": "warning" }
+\end{wire}
+
+Absent that key, a server \textbf{must not} send \texttt{notifications/message}
+for the request at all. Opting in is the client's move, and it is per request
+rather than per connection, for the same reason everything else in this revision
+is.
+
+The notifications themselves, the \texttt{logging} server capability, and the
+severity levels all survive the deprecation window unchanged.
+
+Migrating: \texttt{stderr} for stdio, where the client already captures it, and
+OpenTelemetry for anything structured. The SEP's reasoning is that both are
+mature, widely adopted, and better at this than an application protocol is, and
+that carrying a second logging system in the core specification taxes every
+implementation whether or not it uses one.
+\end{legacybox}
 
 \section{Instrumenting a server}
 

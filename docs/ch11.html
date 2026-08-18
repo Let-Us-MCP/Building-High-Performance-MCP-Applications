@@ -174,10 +174,6 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <main>
 <section id="ch:building-servers" class="level1">
 <h1>Building Servers</h1>
-<aside class="epigraph">
-<p><em>“Do, or do not. There is no try.”</em></p>
-<p>Yoda, <em>The Empire Strikes Back</em> (1980)</p>
-</aside>
 <p>This chapter builds a server from an empty directory. Not a toy one: the risk server that ships with this book, with everything real in it. MRTR approvals, TTL’d resources, the Tasks extension, a dual-era bridge, and a contract test suite that passes.</p>
 <p>Half the craft turns out to be in the error handling, and the standard to hold yourself to is easy to state and easy to miss. A tool either did the thing or it did not. The worst response you can send is one that leaves the caller unable to tell which of those happened.</p>
 <section id="anatomy-of-a-2026-server" class="level2">
@@ -285,17 +281,22 @@ def assess_account_risk(ctx: RequestContext):
 <section id="validate-at-the-edge-then-trust" class="level3">
 <h3>Validate at the edge, then trust</h3>
 <p>Meridian validates arguments against the input schema before calling the handler:</p>
-<pre class="python" data-language="python"><code>def _tools_call(self, ctx: RequestContext) -&gt; dict:
-    name = ctx.params.get(&quot;name&quot;)
-    tool = self._tools.get(name)
-    if tool is None:
-        raise errors.InvalidParams(f&quot;Unknown tool: {name}&quot;)
-
-    validate_against_schema(ctx.arguments, tool.input_schema,
-                            where=f&quot;{name} arguments&quot;)
-    result = tool.handler(ctx)
-    return normalise_tool_result(result, tool)</code></pre>
-<p>Which means handlers can write <code>ctx.arguments["accountId"]</code> without a guard, because a request that got this far has one. That is a small quality-of- life thing that compounds across forty tools.</p>
+<pre class="python" data-language="python"><code># An argument that fails the tool&#39;s own inputSchema is a *tool execution*
+    # error, not a protocol error (SEP-1303). The distinction is the whole
+    # point: protocol errors are caught by the client and never reach the
+    # model, so a model that sent a bad date can never learn that it did.
+    # Returning isError puts the message in the context window, where it can
+    # be read and corrected on the next turn.
+    #
+    # Protocol errors stay protocol errors for the things a model cannot fix
+    # by changing arguments: an unknown tool, or a malformed CallToolRequest.
+    try:
+        validate_against_schema(ctx.arguments, tool.input_schema,
+                                where=f&quot;{name} arguments&quot;)
+    except errors.McpError as exc:
+        return normalise_tool_result(tool_error(exc.message), tool)</code></pre>
+<p>The two-line version of this is what most servers ship, and it is wrong in a way that is invisible from the server side. Raising <code>InvalidParams</code> produces a correct-looking JSON-RPC error, the client handles it, and the model never finds out that its date was in the wrong format. It tries again identically, because nothing told it not to. Chapter <a href="ch05.html#ch:tools">5</a> has the taxonomy; this is the line of code where you either honour it or do not.</p>
+<p>Either way the handler still runs only on arguments that satisfied the schema, so it can write <code>ctx.arguments["accountId"]</code> without a guard. That is a small quality-of-life thing that compounds across forty tools, and it is independent of how the failure gets reported.</p>
 </section>
 <section id="let-handlers-return-whatever-is-natural" class="level3">
 <h3>Let handlers return whatever is natural</h3>
@@ -473,7 +474,7 @@ StdioServerTransport(endpoint).serve_forever()</code></pre>
 <section id="contract-tests" class="level2">
 <h2>Contract tests</h2>
 <p>A server without contract tests is a server that conforms to the specification today.</p>
-<p>Meridian has 208 tests, and the ones in this section are the ones I would write first for any new server. They assert on the wire, not on convenience objects, because the wire is what another implementation has to interoperate with.</p>
+<p>Meridian has 210 tests, and the ones in this section are the ones I would write first for any new server. They assert on the wire, not on convenience objects, because the wire is what another implementation has to interoperate with.</p>
 <section id="the-envelope" class="level3">
 <h3>The envelope</h3>
 <pre class="python" data-language="python"><code>def test_request_without_protocol_version_is_rejected(self):

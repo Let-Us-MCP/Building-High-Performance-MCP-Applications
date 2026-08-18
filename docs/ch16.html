@@ -174,10 +174,6 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <main>
 <section id="ch:measuring" class="level1">
 <h1>Measuring MCP Applications</h1>
-<aside class="epigraph">
-<p><em>“It’s about getting things down to one number.”</em></p>
-<p>Peter Brand, <em>Moneyball</em> (2011)</p>
-</aside>
 <p>Everything before this chapter was mechanism. Everything after it is optimisation, and optimisation without measurement is superstition with a build pipeline attached. So this is the hinge.</p>
 <p>The specific difficulty in an agentic system is that the obvious instruments measure the wrong thing. Requests per second describes your server, and your server is three percent of what the user waits for. A latency graph averaged over all calls hides the one that ran during a fan-out and held up a model turn behind it. This chapter is about which numbers actually move when your system gets better, and how to collect them without rebuilding anything.</p>
 <section id="the-metrics-that-matter" class="level2">
@@ -357,6 +353,14 @@ class Iteration:
 <p><code>baggage</code> propagates key-value pairs across every hop, which makes it tempting as a general-purpose channel. Resist.</p>
 <p>Good: tenant id, task id, environment. Things you want to slice traces by.</p>
 <p>Bad: anything sensitive. Baggage crosses every trust boundary in the system, including into servers you do not operate, and it lands in whatever tracing backend each of them uses.</p>
+</aside>
+<aside class="box legacy"><p class="box-title">Legacy: Logging</p>
+<p>Deprecated as of <code>2026-07-28</code> (SEP-2577), eligible for removal no earlier than 2027-07-28. It still works in the meantime, and it changed shape rather than disappearing, which is why it is easy to misread as removed.</p>
+<p>The <code>logging/setLevel</code> RPC is gone. A client now sets the level it wants per request, in <code>_meta</code>:</p>
+<pre class="json" data-language="json"><code>&quot;_meta&quot;: { &quot;io.modelcontextprotocol/logLevel&quot;: &quot;warning&quot; }</code></pre>
+<p>Absent that key, a server <strong>must not</strong> send <code>notifications/message</code> for the request at all. Opting in is the client’s move, and it is per request rather than per connection, for the same reason everything else in this revision is.</p>
+<p>The notifications themselves, the <code>logging</code> server capability, and the severity levels all survive the deprecation window unchanged.</p>
+<p>Migrating: <code>stderr</code> for stdio, where the client already captures it, and OpenTelemetry for anything structured. The SEP’s reasoning is that both are mature, widely adopted, and better at this than an application protocol is, and that carrying a second logging system in the core specification taxes every implementation whether or not it uses one.</p>
 </aside>
 </section>
 </section>

@@ -174,10 +174,6 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <main>
 <section id="ch:testing" class="level1">
 <h1>Testing and Debugging</h1>
-<aside class="epigraph">
-<p><em>“Houston, we have a problem.”</em></p>
-<p>Jim Lovell, <em>Apollo 13</em> (1995)</p>
-</aside>
 <p>Testing a system with a language model in it sounds impossible, and the impossibility is routinely overstated. Almost none of an MCP application is the model. Almost all of it is a protocol, and protocols are extremely testable: deterministic, inspectable, and cheap enough to exercise thousands of times a second.</p>
 <p>This chapter is about pushing as much of your suite as possible down into that testable part, and then being deliberate about the thin layer at the top where you genuinely do need a model and genuinely cannot have determinism.</p>
 <section id="the-testing-pyramid-adapted" class="level2">
@@ -217,7 +213,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 </tr>
 </tbody>
 </table>
-<p>Meridian’s 208 tests run in about four seconds and use no model at all. Most of that is the handful that spawn real subprocesses and open real sockets; the rest finish in microseconds. The eval suite is separate, slower, and gates deploys.</p>
+<p>Meridian’s 210 tests run in about four seconds and use no model at all. Most of that is the handful that spawn real subprocesses and open real sockets; the rest finish in microseconds. The eval suite is separate, slower, and gates deploys.</p>
 <aside class="keyidea">
 <p>If your MCP tests are slow, you are testing the model when you meant to test the protocol. Push everything you can down a layer.</p>
 </aside>
@@ -533,7 +529,7 @@ self.assertIn(&quot;structuredContent&quot;, third[&quot;result&quot;])</code></
 </tr>
 <tr>
 <td style="text-align: left;">Unit and contract</td>
-<td style="text-align: left;">208 tests, no model</td>
+<td style="text-align: left;">210 tests, no model</td>
 <td style="text-align: left;">every commit</td>
 </tr>
 <tr>
@@ -559,7 +555,7 @@ self.assertIn(&quot;structuredContent&quot;, third[&quot;result&quot;])</code></
 </tbody>
 </table>
 <p>That benchmark gate deserves a word. A performance regression in an agent system does not look like a slow function. It looks like one more round trip, or two thousand more tokens per turn, and both are invisible to correctness tests and obvious to a benchmark that runs on every commit.</p>
-<pre class="bash" data-language="bash"><code>make test      # 208 tests, about four seconds
+<pre class="bash" data-language="bash"><code>make test      # 210 tests, about four seconds
 make bench     # regenerates every number in the book
 make lint      # prose rules plus cross-reference integrity</code></pre>
 </section>

@@ -174,10 +174,6 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <main>
 <section id="ch:agent-loop" class="level1">
 <h1>The Agent Loop, State, and Memory</h1>
-<aside class="epigraph">
-<p><em>“What we do in life echoes in eternity.”</em></p>
-<p>Maximus, <em>Gladiator</em> (2000)</p>
-</aside>
 <p>An agent loop is three steps repeated: think, act, observe. Everything difficult about operating one comes from the fact that the observations accumulate. Each tool result joins the context, stays there, is re-read on every subsequent turn, and is paid for again each time.</p>
 <p>This chapter is about the loop as a thing you run in production: how it terminates, where state lives now that the protocol holds none of it, and how to stop the context filling up with the remains of steps that finished long ago.</p>
 <section id="the-loop-instrumented" class="level2">

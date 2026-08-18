@@ -1,9 +1,6 @@
 \chapter{Multi Round-Trip Requests}
 \label{ch:mrtr}
 
-\epigraph{``What we've got here is failure to communicate.''}{The Captain,
-\emph{Cool Hand Luke} (1967)}
-
 A 2025-era server that needed something from you mid-call stopped, held the
 connection open, and sent its own JSON-RPC request back down the pipe at you.
 That mechanism is gone, and what replaced it is one of the cleanest pieces of
@@ -592,11 +589,19 @@ The idea: a server asks the client to run a completion on its behalf. The server
 gets model access without an API key, the user's provider and quota are used,
 and the host keeps control over what the model sees.
 
-Genuinely elegant. It lost anyway, for three reasons.
+Genuinely elegant. It lost anyway, and SEP-2577 gives three reasons, none of
+which is that the idea was bad.
 
-\textbf{The control-flow inversion was the whole problem.} Sampling was the main
-justification for server-initiated requests, and server-initiated requests are
-what statelessness could not accommodate.
+\textbf{Almost nobody implemented it.} This is the leading reason in the SEP and
+the least interesting to read, which is exactly why it is worth stating first. A
+capability available since November 2024 that few clients support is a
+capability servers cannot rely on, and a capability servers cannot rely on does
+not get built against either.
+
+\textbf{It is genuinely hard to implement correctly.} A conforming client needs
+human-in-the-loop approval, model selection, a security model for what a server
+may ask the model to do, and, after SEP-1577, tool-loop support. That is a large
+surface to get right in exchange for a feature your users have not asked for.
 
 \textbf{Direct provider integration won on the ground.} It is 2026. A server
 that wants a model call adds three lines and an API key. The indirection bought

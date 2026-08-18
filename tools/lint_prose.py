@@ -7,7 +7,7 @@ Enforces the house rules from `desc`:
   2. No AI slop: a banned-phrase list of the tics that make text read as generated.
   3. No saying the same thing twice: near-duplicate sentence detection, within a
      chapter and across the whole book.
-  4. Every chapter opens with a movie-dialogue epigraph.
+  4. No epigraphs. Chapters open on their argument.
 
 Usage:
     python3 tools/lint_prose.py                 # lint everything under book/
@@ -253,9 +253,12 @@ def lint_file(path: Path, sentence_index: dict) -> list[Finding]:
                             f"...{excerpt(prose, m.start())}...")
                 )
 
-    # Rule 4. Epigraph.
-    if is_chapter and "\\epigraph" not in raw:
-        findings.append(Finding(path, 1, "epigraph", "chapter has no \\epigraph"))
+    # Rule 4. No epigraphs. They were a house rule until the chapters were read
+    # end to end: every one had grown a paragraph explaining how the quotation
+    # bore on the topic, and that paragraph was always the weakest on the page.
+    for m in re.finditer(r"\\epigraph", raw):
+        findings.append(Finding(path, line_of(raw, m.start()), "epigraph",
+                                "chapters open on their argument, not a quotation"))
 
     # Rule 5. Listings are typeset by `listings` under T1, which cannot render
     # characters outside Latin-1. A stray arrow or CJK glyph in a code block is

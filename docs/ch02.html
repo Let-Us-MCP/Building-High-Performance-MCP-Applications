@@ -174,10 +174,6 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <main>
 <section id="ch:architecture" class="level1">
 <h1>The MCP Architectural Model</h1>
-<aside class="epigraph">
-<p><em>“Forget it, Jake. It’s Chinatown.”</em></p>
-<p>Lawrence Walsh, <em>Chinatown</em> (1974)</p>
-</aside>
 <p>MCP looks like RPC. It is shaped like RPC: requests go out, responses come back, and if you squint it is a slightly opinionated JSON API carried over one of two transports. Building on that reading is the most common architectural mistake in the ecosystem, and it produces applications that work perfectly in development and are insecure the first time they meet a server somebody else wrote.</p>
 <p>The reason is that the request-response mechanics are the least interesting part of the architecture. What matters is the trust boundary: where it sits, what crosses it, and which component is answerable for the crossing. It sits somewhere most people do not guess, and once you know where, a surprising number of the protocol’s odder decisions turn out to be arranged around protecting it.</p>
 <p>This chapter builds the model from nothing. Three roles and the lines between them, then the change that made the 2026 revision worth writing a book about, then the lifecycle contract that tells you how long any of it will remain true.</p>

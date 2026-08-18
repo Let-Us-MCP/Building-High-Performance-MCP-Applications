@@ -174,10 +174,6 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <main>
 <section id="ch:access-control" class="level1">
 <h1>Access Control, Audit, and MCP in the Enterprise</h1>
-<aside class="epigraph">
-<p><em>“Follow the money.”</em></p>
-<p>Deep Throat, <em>All the President’s Men</em> (1976)</p>
-</aside>
 <p>In an agentic application the chain of responsibility runs user, model, host, client, server, data. Every link is a place where accountability can go missing if nobody wrote it down, and the components most likely to be blamed afterwards are usually the ones with the least ability to record anything useful.</p>
 <p>This chapter is about writing it down, and about the access controls that make the record worth having. An audit log full of actions that should never have been permitted is a precise description of an incident.</p>
 <section id="scoped-authorization-in-practice" class="level2">
@@ -658,7 +654,7 @@ def rank_portfolio_risk(ctx: RequestContext):
 </tr>
 <tr>
 <td style="text-align: left;">Tests</td>
-<td colspan="2" style="text-align: right;">208, all passing</td>
+<td colspan="2" style="text-align: right;">210, all passing</td>
 </tr>
 <tr>
 <td style="text-align: left;">Third-party runtime dependencies</td>

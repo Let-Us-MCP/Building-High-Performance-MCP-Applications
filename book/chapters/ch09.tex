@@ -1,8 +1,6 @@
 \chapter{Extensions and Tasks}
 \label{ch:tasks}
 
-\epigraph{``I'll be back.''}{The Terminator, \emph{The Terminator} (1984)}
-
 Some work takes longer than anybody wants to hold a connection open for.
 Underwriting a loan, running a batch, waiting on a human being to make up their
 mind. The Tasks extension is how a server says ``this will take a while, here is
@@ -92,9 +90,18 @@ def test_client_without_the_extension_gets_the_synchronous_answer(self):
 
 Three reasons, and the third is the one that will matter in 2028.
 
-\textbf{The core stays small.} Tasks moved \emph{out} of core in this revision.
-That is a protocol getting smaller, which almost never happens, and it happened
-because the extensions framework gave it somewhere to go.
+\textbf{The core stays small, and features get somewhere to grow up.} Tasks
+moved \emph{out} of core in this revision, which is a protocol getting smaller
+and almost never happens. Read SEP-2663 for the reason, though, because it is
+not that Tasks were judged unimportant. The opposite: the SEP calls them a
+foundational building block and says outright that once the extension stabilises
+and gets broad adoption, the intention is to promote it back into core.
+
+The experimental \texttt{tasks} in \texttt{2025-11-25} was a stopgap shipped
+before the extension mechanism existed. Moving it out buys it the ability to
+evolve on its own cadence, on real implementation feedback, without being pinned
+to the core specification's release schedule. That is what an extension is for,
+and it is a more interesting claim than ``the core got smaller''.
 
 \textbf{Extensions version independently.} MCP Apps was finalised
 \texttt{2026-01-26} while core was on a different cycle. Neither had to wait.

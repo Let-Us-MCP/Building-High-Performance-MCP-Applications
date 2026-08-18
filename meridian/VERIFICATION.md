@@ -14,7 +14,7 @@ Re-run all of it with `make verify` from the repository root.
 | Machine | Apple Silicon (arm64), macOS 15.7.3 |
 | Python | 3.14.6 |
 | Third-party runtime dependencies | none |
-| Claude Code | 2.1.233 |
+| Claude Code | 2.1.234 |
 | Protocol revision implemented | `2026-07-28` |
 | Legacy revisions the bridge negotiates | `2025-06-18`, `2025-03-26`, `2024-11-05` |
 
@@ -22,15 +22,16 @@ Re-run all of it with `make verify` from the repository root.
 
 ```
 $ python3 -m unittest discover -s meridian/tests -t .
-Ran 134 tests in 2.269s
+Ran 210 tests in 4.317s
 OK
 ```
 
 | File | Tests | Covers |
 |---|---|---|
-| `tests/test_protocol.py` | 57 | stateless envelope, `resultType`, error-code allocation, caching hints, pagination, schema validation, MRTR shapes, `requestState` sealing, `x-mcp-header` rules |
-| `tests/test_transports.py` | 28 | header encoding, header/body agreement, removed GET and DELETE endpoints, SSE progress streams, subscriptions, real stdio subprocesses |
+| `tests/test_protocol.py` | 59 | stateless envelope, `resultType`, error-code allocation, caching hints, pagination, schema validation, MRTR shapes, `requestState` sealing, `x-mcp-header` rules |
+| `tests/test_transports.py` | 32 | header encoding, header/body agreement, removed GET and DELETE endpoints, SSE progress streams, subscriptions, connection pooling, real stdio subprocesses |
 | `tests/test_integration.py` | 33 | host routing and namespacing, consent, MRTR end to end, Tasks, cache behaviour, agent-loop budgets, per-server behaviour |
+| `tests/test_patterns.py` | 70 | delegation budgets and cycles, circuit breakers, scoped access, handles, completions, task notifications, idempotency, backoff, the audit chain |
 | `tests/test_legacy.py` | 16 | dual-era selection, legacy translation, bridge transparency |
 
 ## Benchmarks
@@ -52,7 +53,7 @@ Two caveats stated wherever the numbers appear:
 
 ## Claude Code, end to end
 
-Claude Code 2.1.233 opens with the handshake-era protocol, so it reaches
+Claude Code 2.1.234 opens with the handshake-era protocol, so it reaches
 Meridian through the dual-era bridge in `meridian/protocol/legacy.py`. This is
 the arrangement described in Chapter 2 and shipped in Appendix E.
 
@@ -137,7 +138,7 @@ correct for the protocol it targets and usable by the clients that exist.
 ## Reproducing everything
 
 ```bash
-make test      # 134 tests
+make test      # 210 tests
 make bench     # regenerate meridian/bench/results.json
 make verify    # both, plus the Claude Code runs above
 ```

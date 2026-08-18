@@ -59,10 +59,12 @@ def book_text() -> str:
     for sub in ("chapters", "appendices", "frontmatter"):
         for p in sorted((BOOK / sub).glob("*.tex")):
             parts.append(p.read_text(encoding="utf-8"))
-    for extra in ("README.md", "CLAUDE.md"):
-        p = ROOT / extra
-        if p.exists():
-            parts.append(p.read_text(encoding="utf-8"))
+    # Every prose file that states a count, not just the book. VERIFICATION.md
+    # went eleven commits stale because it sat one directory outside this list.
+    for extra in [ROOT / "README.md", ROOT / "CLAUDE.md",
+                  *sorted((ROOT / "meridian").rglob("*.md"))]:
+        if extra.exists():
+            parts.append(extra.read_text(encoding="utf-8"))
     return "\n".join(parts)
 
 

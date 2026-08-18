@@ -1,9 +1,6 @@
 \chapter{Building Servers}
 \label{ch:building-servers}
 
-\epigraph{``Do, or do not. There is no try.''}{Yoda, \emph{The Empire Strikes
-Back} (1980)}
-
 This chapter builds a server from an empty directory. Not a toy one: the risk
 server that ships with this book, with everything real in it. MRTR approvals,
 TTL'd resources, the Tasks extension, a dual-era bridge, and a contract test
@@ -153,21 +150,33 @@ Meridian validates arguments against the input schema before calling the
 handler:
 
 \begin{py}
-def _tools_call(self, ctx: RequestContext) -> dict:
-    name = ctx.params.get("name")
-    tool = self._tools.get(name)
-    if tool is None:
-        raise errors.InvalidParams(f"Unknown tool: {name}")
-
-    validate_against_schema(ctx.arguments, tool.input_schema,
-                            where=f"{name} arguments")
-    result = tool.handler(ctx)
-    return normalise_tool_result(result, tool)
+    # An argument that fails the tool's own inputSchema is a *tool execution*
+    # error, not a protocol error (SEP-1303). The distinction is the whole
+    # point: protocol errors are caught by the client and never reach the
+    # model, so a model that sent a bad date can never learn that it did.
+    # Returning isError puts the message in the context window, where it can
+    # be read and corrected on the next turn.
+    #
+    # Protocol errors stay protocol errors for the things a model cannot fix
+    # by changing arguments: an unknown tool, or a malformed CallToolRequest.
+    try:
+        validate_against_schema(ctx.arguments, tool.input_schema,
+                                where=f"{name} arguments")
+    except errors.McpError as exc:
+        return normalise_tool_result(tool_error(exc.message), tool)
 \end{py}
 
-Which means handlers can write \texttt{ctx.arguments["accountId"]} without a
-guard, because a request that got this far has one. That is a small quality-of-
-life thing that compounds across forty tools.
+The two-line version of this is what most servers ship, and it is wrong in a way
+that is invisible from the server side. Raising \texttt{InvalidParams} produces
+a correct-looking JSON-RPC error, the client handles it, and the model never
+finds out that its date was in the wrong format. It tries again identically,
+because nothing told it not to. Chapter~\ref{ch:tools} has the taxonomy; this is
+the line of code where you either honour it or do not.
+
+Either way the handler still runs only on arguments that satisfied the schema,
+so it can write \texttt{ctx.arguments["accountId"]} without a guard. That is a
+small quality-of-life thing that compounds across forty tools, and it is
+independent of how the failure gets reported.
 
 \subsection{Let handlers return whatever is natural}
 
@@ -469,7 +478,7 @@ a handshake, which is a useful thing to see once.
 A server without contract tests is a server that conforms to the specification
 today.
 
-Meridian has 208 tests, and the ones in this section are the ones I would write
+Meridian has 210 tests, and the ones in this section are the ones I would write
 first for any new server. They assert on the wire, not on convenience objects,
 because the wire is what another implementation has to interoperate with.
 

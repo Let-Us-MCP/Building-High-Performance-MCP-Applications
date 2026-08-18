@@ -353,19 +353,40 @@ class TestPagination(unittest.TestCase):
 
 
 class TestSchemaValidation(unittest.TestCase):
+    """Argument validation failures are tool execution errors (SEP-1303).
+
+    A protocol error is caught by the client and never reaches the model, so a
+    model that sent the wrong type could never learn that it had. These have to
+    come back as `isError` results with a message worth reading.
+    """
+
+    def call(self, arguments):
+        return tiny_server().handle(
+            request("tools/call", {"name": "add", "arguments": arguments}))
+
     def test_missing_required_argument(self):
-        resp = tiny_server().handle(
-            request("tools/call", {"name": "add", "arguments": {"a": 1}}))
-        self.assertEqual(resp["error"]["code"], errors.INVALID_PARAMS)
+        resp = self.call({"a": 1})
+        self.assertNotIn("error", resp)
+        self.assertTrue(resp["result"]["isError"])
+        self.assertIn("b", resp["result"]["content"][0]["text"])
 
     def test_wrong_type(self):
-        resp = tiny_server().handle(
-            request("tools/call", {"name": "add", "arguments": {"a": "x", "b": 2}}))
-        self.assertEqual(resp["error"]["code"], errors.INVALID_PARAMS)
+        resp = self.call({"a": "x", "b": 2})
+        self.assertNotIn("error", resp)
+        self.assertTrue(resp["result"]["isError"])
 
     def test_additional_properties_false_is_enforced(self):
-        resp = tiny_server().handle(request(
-            "tools/call", {"name": "add", "arguments": {"a": 1, "b": 2, "c": 3}}))
+        resp = self.call({"a": 1, "b": 2, "c": 3})
+        self.assertNotIn("error", resp)
+        self.assertTrue(resp["result"]["isError"])
+
+    def test_unknown_tool_is_still_a_protocol_error(self):
+        """The model cannot fix this by changing arguments, so it stays -32602."""
+        resp = tiny_server().handle(request("tools/call", {"name": "nope"}))
+        self.assertEqual(resp["error"]["code"], errors.INVALID_PARAMS)
+
+    def test_malformed_request_is_still_a_protocol_error(self):
+        resp = tiny_server().handle(request("tools/call", {"name": 42}))
         self.assertEqual(resp["error"]["code"], errors.INVALID_PARAMS)
 
     def test_remote_ref_is_not_dereferenced(self):

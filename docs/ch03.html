@@ -174,10 +174,6 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <main>
 <section id="ch:transport" class="level1">
 <h1>Building Blocks of the Transport</h1>
-<aside class="epigraph">
-<p><em>“Show me the money!”</em></p>
-<p>Rod Tidwell, <em>Jerry Maguire</em> (1996)</p>
-</aside>
 <p>This chapter looks at literal bytes on a literal connection, because every performance claim that follows depends on the difference between what is genuinely on the wire and what you assumed was there. Those two diverge more often than is comfortable. Most arguments about protocol overhead can be settled in about ninety seconds by printing one request, and almost nobody prints the request before having the argument.</p>
 <p>There are two transports. They are not interchangeable, and the choice between them fixes your deployment topology, your failure modes, and a good part of your latency budget.</p>
 <section id="what-a-transport-is-and-why-there-are-two" class="level2">

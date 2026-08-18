@@ -1,8 +1,6 @@
 \chapter{Tools: The Execution Layer}
 \label{ch:tools}
 
-\epigraph{``You're gonna need a bigger boat.''}{Chief Brody, \emph{Jaws} (1975)}
-
 Everybody has the same experience with tool catalogues. You design six tools,
 they work beautifully, you ship. Eighteen months later there are forty-one,
 three of them do nearly the same thing, the model picks the wrong one about a
@@ -486,8 +484,14 @@ There are two error mechanisms, they are not interchangeable, and mislabelling
 one as the other either burns tokens or kills tasks.
 
 \textbf{Protocol errors} are JSON-RPC errors. They mean the request was
-structurally wrong: unknown tool, malformed parameters, server on fire. Models are unlikely to recover from these, because the problem lies in the
-shape of the request and the model can only vary its arguments.
+structurally wrong in a way the model cannot fix by choosing different
+arguments: an unknown tool, a \texttt{tools/call} that does not satisfy the
+request schema, or a server on fire.
+
+The reason that class is drawn so narrowly is that a client catches protocol
+errors and handles them itself. They do not reach the model. So anything you
+report this way is something the model will never see, never learn from, and
+never correct.
 
 \begin{wire}
 { "jsonrpc": "2.0", "id": 3,
@@ -518,7 +522,9 @@ to fix it. That is the whole design goal.
 \thead{Situation} & \thead{Mechanism} & \thead{Code} & \thead{Because} \\
 \midrule
 Unknown tool name          & Protocol & \texttt{-32602} & The catalogue is wrong, not the arguments \\
-Missing required argument  & Protocol & \texttt{-32602} & Schema violation; caught before your code runs \\
+Malformed \texttt{tools/call} & Protocol & \texttt{-32602} & The envelope is wrong, not the arguments \\
+Missing required argument  & Tool     & \texttt{isError} & The model can add the argument and retry \\
+Argument of the wrong type & Tool     & \texttt{isError} & The model can fix the type and retry \\
 Account id does not exist  & Tool     & \texttt{isError} & The model can try a different id \\
 Date in the past           & Tool     & \texttt{isError} & The model can pick another date \\
 Downstream API timed out   & Tool     & \texttt{isError} & The model can retry or route around \\

@@ -174,10 +174,6 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <main>
 <section id="ch:authorization" class="level1">
 <h1>Authorization on the Wire</h1>
-<aside class="epigraph">
-<p><em>“You shall not pass!”</em></p>
-<p>Gandalf, <em>The Fellowship of the Ring</em> (2001)</p>
-</aside>
 <p>This is a security chapter with a performance chapter hiding inside it, which is the structure <em>High Performance Browser Networking</em> used for TLS and for the same reason. Authorization is not a policy you configure once and stop thinking about. It is a sequence of network round trips, all of which happen before your application does any useful work, and each of which the user experiences as your application being slow to start.</p>
 <p>Done properly you pay that sequence once and cache the result for hours. Done carelessly you pay it on every request forever, and because each individual round trip looks cheap in isolation, nobody notices until the total is the largest single item in your latency budget.</p>
 <section id="the-shape-of-it" class="level2">

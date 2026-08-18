@@ -174,10 +174,6 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <main>
 <section id="ch:resources" class="level1">
 <h1>Resources: The Context Layer</h1>
-<aside class="epigraph">
-<p><em>“Roads? Where we’re going, we don’t need roads.”</em></p>
-<p>Doc Brown, <em>Back to the Future</em> (1985)</p>
-</aside>
 <p>The constraint people design resources around is “how do I get data to the model”. The real constraint is “how do I get data to the model without spending the context budget on data it will never read”. Those are different problems with different solutions, and mistaking the second for the first is how you end up with a 200,000-token context window and no room left in it to think.</p>
 <p>Resources are the primitive built for the second problem, and they are also where the protocol’s caching model lives. That combination makes this the chapter with the largest measured speedup in the book.</p>
 <section id="what-a-resource-is-and-what-it-is-not" class="level2">

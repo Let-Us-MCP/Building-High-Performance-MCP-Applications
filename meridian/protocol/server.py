@@ -371,7 +371,20 @@ class Server:
         if tool is None:
             raise errors.InvalidParams(f"Unknown tool: {name}")
 
-        validate_against_schema(ctx.arguments, tool.input_schema, where=f"{name} arguments")
+        # An argument that fails the tool's own inputSchema is a *tool execution*
+        # error, not a protocol error (SEP-1303). The distinction is the whole
+        # point: protocol errors are caught by the client and never reach the
+        # model, so a model that sent a bad date can never learn that it did.
+        # Returning isError puts the message in the context window, where it can
+        # be read and corrected on the next turn.
+        #
+        # Protocol errors stay protocol errors for the things a model cannot fix
+        # by changing arguments: an unknown tool, or a malformed CallToolRequest.
+        try:
+            validate_against_schema(ctx.arguments, tool.input_schema,
+                                    where=f"{name} arguments")
+        except errors.McpError as exc:
+            return normalise_tool_result(tool_error(exc.message), tool)
 
         result = tool.handler(ctx)
         if inspect.isawaitable(result):

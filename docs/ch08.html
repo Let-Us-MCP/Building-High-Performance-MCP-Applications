@@ -174,10 +174,6 @@ hr{border:0;border-top:1px solid var(--rule);margin:2.5em 0}
 <main>
 <section id="ch:mrtr" class="level1">
 <h1>Multi Round-Trip Requests</h1>
-<aside class="epigraph">
-<p><em>“What we’ve got here is failure to communicate.”</em></p>
-<p>The Captain, <em>Cool Hand Luke</em> (1967)</p>
-</aside>
 <p>A 2025-era server that needed something from you mid-call stopped, held the connection open, and sent its own JSON-RPC request back down the pipe at you. That mechanism is gone, and what replaced it is one of the cleanest pieces of design in the revision.</p>
 <p>It also costs more than people expect, which is why this chapter does the mechanism first and the price second. Both halves matter. The mechanism is what you implement; the price is what changes your design once you have measured it.</p>
 <section id="the-problem" class="level2">
@@ -594,8 +590,9 @@ if not approver:
 <section id="sampling" class="level3">
 <h3>Sampling</h3>
 <p>The idea: a server asks the client to run a completion on its behalf. The server gets model access without an API key, the user’s provider and quota are used, and the host keeps control over what the model sees.</p>
-<p>Genuinely elegant. It lost anyway, for three reasons.</p>
-<p><strong>The control-flow inversion was the whole problem.</strong> Sampling was the main justification for server-initiated requests, and server-initiated requests are what statelessness could not accommodate.</p>
+<p>Genuinely elegant. It lost anyway, and SEP-2577 gives three reasons, none of which is that the idea was bad.</p>
+<p><strong>Almost nobody implemented it.</strong> This is the leading reason in the SEP and the least interesting to read, which is exactly why it is worth stating first. A capability available since November 2024 that few clients support is a capability servers cannot rely on, and a capability servers cannot rely on does not get built against either.</p>
+<p><strong>It is genuinely hard to implement correctly.</strong> A conforming client needs human-in-the-loop approval, model selection, a security model for what a server may ask the model to do, and, after SEP-1577, tool-loop support. That is a large surface to get right in exchange for a feature your users have not asked for.</p>
 <p><strong>Direct provider integration won on the ground.</strong> It is 2026. A server that wants a model call adds three lines and an API key. The indirection bought less than it cost.</p>
 <p><strong>Quality control is impossible through the indirection.</strong> The server cannot choose the model, cannot see the system prompt, and cannot verify what actually ran. <code>modelPreferences</code> was a hint, and hints are not a contract.</p>
 <aside class="box legacy"><p class="box-title">Legacy: Sampling</p>
